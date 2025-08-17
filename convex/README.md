@@ -82,63 +82,145 @@ The schema models a complete university academic system with the following entit
 erDiagram
     USERS ||--o{ ENROLLMENTS : "enrolls in"
     USERS ||--o{ SECTIONS : "teaches"
-    USERS ||--|| PROGRAMS : "belongs to"
+    USERS ||--o{ PROGRAMS : "belongs to"
+    USERS ||--o{ ACCESS_LIST : "creates"
+    USERS ||--o{ ANNOUNCEMENTS : "authors"
+    USERS ||--o{ GRADES : "grades"
+    
     PROGRAMS ||--o{ COURSES : "contains"
+    PROGRAMS ||--o{ ACCESS_LIST : "pre-assigns"
+    
     COURSES ||--o{ SECTIONS : "offered as"
+    
     SECTIONS ||--o{ ENROLLMENTS : "has students"
     SECTIONS ||--o{ ACTIVITIES : "contains"
-    ENROLLMENTS ||--o{ GRADES : "receives"
-    ACTIVITIES ||--o{ GRADES : "graded in"
+    SECTIONS ||--o{ ANNOUNCEMENTS : "receives"
+    
     SEMESTERS ||--o{ SECTIONS : "scheduled in"
     SEMESTERS ||--o{ ENROLLMENTS : "during"
+    
+    ENROLLMENTS ||--o{ GRADES : "receives"
+    
+    ACTIVITIES ||--o{ GRADES : "graded in"
 
     USERS {
         string clerkId PK
         string email
         string name
         enum role
+        boolean isActive
         object studentProfile
         object professorProfile
+        string phone
+        string country
+        string city
+        id createdBy
+        number createdAt
     }
     
     PROGRAMS {
         string code PK
         string name
         enum type
+        string department
         number totalCredits
+        number durationSemesters
+        boolean isActive
+    }
+    
+    SEMESTERS {
+        string code PK
+        number year
+        enum period
+        number startDate
+        number endDate
+        number enrollmentStart
+        number enrollmentEnd
+        enum status
     }
     
     COURSES {
         string code PK
         string name
-        array prerequisites
-        enum area
+        string description
         number credits
+        id programId FK
+        enum area
+        array prerequisites
+        number minSemester
+        boolean isActive
     }
     
     SECTIONS {
         string crn PK
+        id courseId FK
+        id semesterId FK
+        string sectionNumber
+        id professorId FK
         array schedule
         number capacity
+        number enrolled
         string gradeWeights
+        enum status
     }
     
     ENROLLMENTS {
+        id studentId FK
+        id sectionId FK
+        id semesterId FK
+        id courseId FK
+        number enrolledAt
         enum status
         number finalGrade
         string letterGrade
+        number creditsEarned
+        number droppedAt
+        boolean isRetake
     }
     
     ACTIVITIES {
+        id sectionId FK
         string title
+        string description
         enum category
         number weight
         number maxPoints
+        number assignedAt
+        number dueAt
+        boolean isVisible
+        boolean gradesReleased
     }
     
     GRADES {
+        id activityId FK
+        id enrollmentId FK
         number score
+        number submittedAt
+        number gradedAt
         string feedback
+        id gradedBy FK
+    }
+    
+    ACCESS_LIST {
+        string email
+        enum role
+        id programId FK
+        string studentCode
+        id createdBy FK
+        number createdAt
+        number expiresAt
+        boolean isUsed
+        number usedAt
+        id usedBy FK
+    }
+    
+    ANNOUNCEMENTS {
+        id sectionId FK
+        string title
+        string content
+        id authorId FK
+        number createdAt
+        boolean isPinned
     }
 ```
 
