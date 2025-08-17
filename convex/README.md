@@ -298,7 +298,3 @@ convex/
 - Descriptive error messages for UI
 - Proper HTTP status codes for API responses
 
----
-
-**Built for Colombian Higher Education**  
-*Supporting academic excellence through technology*
