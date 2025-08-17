@@ -38,6 +38,7 @@ export default defineSchema({
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
     createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
 
     // Contact
     phone: v.optional(v.string()),
@@ -263,9 +264,21 @@ export default defineSchema({
       v.literal("admin")
     ),
 
-    // Pre-assignments
+    // Información completa del usuario (admin la llena)
+    name: v.string(), // Nombre completo del estudiante
+    phone: v.optional(v.string()),
+    country: v.optional(v.string()),
+    city: v.optional(v.string()),
+
+    // Para estudiantes
     programId: v.optional(v.id("programs")),
     studentCode: v.optional(v.string()),
+    enrollmentYear: v.optional(v.number()),
+
+    // Para profesores
+    department: v.optional(v.string()),
+    employeeCode: v.optional(v.string()),
+    title: v.optional(v.string()),
 
     // Control
     createdBy: v.id("users"),
