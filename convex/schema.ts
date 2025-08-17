@@ -1,3 +1,25 @@
+// ################################################################################
+// # File: schema.tsx                                                             # 
+// # Authors: Juan Camilo Narváez Tascón (github.com/ulvenforst)                  #
+// # Creation date: 08/17/2025                                                    #
+// # License: Apache License 2.0                                                  #
+// ################################################################################
+
+/**
+ * HISTORY: Alef University’s Academic Records and Grading System (MVP). A Convex schema
+ * designed to manage students, faculty, courses, and transcripts. The tables used are:
+ * * users - Stores user information and profiles.
+ * * programs - Stores academic program information.
+ * * semesters - Stores academic period information.
+ * * courses - Stores course catalog information.
+ * * sections - Stores information about course sections offered each semester.
+ * * enrollments - Stores student enrollments in sections.
+ * * activities - Stores information about student activities and participation.
+ * * grades - Stores student grades for activities.
+ * * accessList - Stores pre-authorized registration emails.
+ * * announcements - Stores important updates and notifications for students related to sections.
+ */
+
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 

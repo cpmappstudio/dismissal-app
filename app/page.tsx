@@ -1,5 +1,19 @@
 "use client";
 
+// ################################################################################
+// # File: page.tsx                                                               # 
+// # Authors: Juan Camilo Narváez Tascón (github.com/ulvenforst)                  #
+// # Creation date: 08/17/2025                                                    #
+// # License: Apache License 2.0                                                  #
+// ################################################################################
+
+/**
+ * HISTORY: Alef University’s Academic Records and Grading System (MVP). A Next.js 
+ * application with a clean and scalable architecture, designed to manage students, 
+ * faculty, courses, and transcripts, ensuring academic excellence, integrity, 
+ * and structured growth.
+ */
+
 import {
   Authenticated,
   Unauthenticated,
