@@ -1,28 +1,5 @@
-import { defineSchema, defineTable } from "convex/s  /**
-   * Academic programs.
-   */
-  programs: defineTable({
-    code: v.string(), // Maps to IdPrograma
-    name: v.string(), // Maps to NombrePrograma
-    type: v.union(
-      v.literal("diploma"),
-      v.literal("bachelor"),
-      v.literal("master"),
-      v.literal("doctorate")
-    ), // Maps to Tipo
-    category: v.string(), // Maps to Categoria
-    totalCredits: v.number(), // Maps to Creditos
-    
-    // Credit distribution for progress tracking
-    creditsDistribution: v.object({
-      humanities: v.number(), // 40 for your case
-      core: v.number(), // 60 "troncales"
-      electives: v.number(), // 20 electivos
-    }),
-    
-    durationSemesters: v.number(),
-    isActive: v.boolean(),
-  })v } from "convex/values";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
 export default defineSchema({
   /**
@@ -79,9 +56,9 @@ export default defineSchema({
     code: v.string(),
     name: v.string(),
     type: v.union(
-      v.literal("diploma Program"),
-      v.literal("bachelor’s Degree"),
-      v.literal("master’s Degree"),
+      v.literal("diploma program"),
+      v.literal("bachelor’s degree"),
+      v.literal("master’s degree"),
       v.literal("doctorate")
     ),
     department: v.string(),
@@ -151,6 +128,7 @@ export default defineSchema({
       day: v.number(), // 0-6
       startTime: v.string(), // "14:00"
       endTime: v.string(),
+      room: v.string(),
     })),
 
     capacity: v.number(),
