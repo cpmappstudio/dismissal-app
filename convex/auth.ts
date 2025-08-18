@@ -1,15 +1,21 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
-import { 
-  userRoleValidator, 
-  ErrorCodes, 
+import {
+  userRoleValidator,
+  ErrorCodes,
   AppError,
-  type UserRole 
+  type UserRole
 } from "./types";
-import { 
+import {
   getCurrentUserFromAuth,
   requireAuth,
-  requireRole 
+  requireRole,
+  checkEmailAuthorization,
+  getUserTemplate,
+  deleteUserTemplate,
+  isEmailRegistered,
+  isStudentCodeTaken,
+  isEmployeeCodeTaken
 } from "./helpers";
 
 // ============================================================================
@@ -28,8 +34,8 @@ export const getCurrentUser = query({
     // Enrich with program data if student
     if (user.role === "student" && user.studentProfile) {
       const program = await ctx.db.get(user.studentProfile.programId);
-      return { 
-        ...user, 
+      return {
+        ...user,
         program,
         // Calculate if user can see grades (for UI)
         canViewGrades: user.studentProfile.showGrades,
@@ -37,7 +43,7 @@ export const getCurrentUser = query({
         canViewCourses: user.studentProfile.showCourses,
       };
     }
-    
+
     return user;
   },
 });
@@ -45,31 +51,27 @@ export const getCurrentUser = query({
 /**
  * Check if an email is authorized to register
  */
-export const checkEmailAuthorization = query({
-  args: { 
-    email: v.string() 
+export const checkRegistrationAuthorization = query({
+  args: {
+    email: v.string()
   },
   handler: async (ctx, args) => {
-    const accessEntry = await ctx.db
-      .query("accessList")
-      .withIndex("by_email_unused", (q) => 
-        q.eq("email", args.email).eq("isUsed", false)
-      )
-      .first();
+    const accessEntry = await checkEmailAuthorization(ctx, args.email);
 
     if (!accessEntry) {
-      return { authorized: false, message: "Email not authorized for registration" };
+      return {
+        authorized: false,
+        message: "Email not authorized for registration"
+      };
     }
 
-    // Check expiration
-    if (accessEntry.expiresAt && accessEntry.expiresAt < Date.now()) {
-      return { authorized: false, message: "Registration authorization has expired" };
-    }
+    // Get template data if available
+    const template = await getUserTemplate(ctx, args.email);
 
-    return { 
-      authorized: true, 
+    return {
+      authorized: true,
       role: accessEntry.role,
-      programId: accessEntry.programId,
+      hasTemplate: template !== null,
       message: "Email authorized for registration"
     };
   },
@@ -101,33 +103,22 @@ export const registerUser = mutation({
 
     if (existingUser) {
       // User already registered, just return the ID
-      return { 
-        userId: existingUser._id, 
-        isNewUser: false 
+      return {
+        userId: existingUser._id,
+        isNewUser: false
       };
     }
 
     // Check if email exists in system (shouldn't happen with Clerk)
-    const existingEmail = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-
-    if (existingEmail) {
+    if (await isEmailRegistered(ctx, args.email)) {
       throw new AppError(
         "Email already registered in the system",
         ErrorCodes.DUPLICATE_ENTRY
       );
     }
 
-    // Check accessList for authorization
-    const accessEntry = await ctx.db
-      .query("accessList")
-      .withIndex("by_email_unused", (q) => 
-        q.eq("email", args.email).eq("isUsed", false)
-      )
-      .first();
-
+    // Check authorization using helper
+    const accessEntry = await checkEmailAuthorization(ctx, args.email);
     if (!accessEntry) {
       throw new AppError(
         "Your email is not authorized for registration. Please contact an administrator.",
@@ -143,6 +134,9 @@ export const registerUser = mutation({
       );
     }
 
+    // Get template data using helper
+    const template = await getUserTemplate(ctx, args.email);
+
     // Build user data
     const userData: any = {
       clerkId: args.clerkId,
@@ -157,11 +151,30 @@ export const registerUser = mutation({
       createdAt: Date.now(),
     };
 
-    // Add role-specific profile
-    if (accessEntry.role === "student" && accessEntry.programId) {
+    // Add role-specific profile using template data
+    if (accessEntry.role === "student") {
+      // Use template data if available, otherwise generate defaults
+      const studentCode = template?.studentCode || `STU${Date.now()}`;
+      const programId = template?.programId;
+
+      if (!programId) {
+        throw new AppError(
+          "Program ID is required for student registration",
+          ErrorCodes.INVALID_INPUT
+        );
+      }
+
+      // Check if student code is already taken
+      if (await isStudentCodeTaken(ctx, studentCode)) {
+        throw new AppError(
+          "Student code already exists",
+          ErrorCodes.DUPLICATE_ENTRY
+        );
+      }
+
       userData.studentProfile = {
-        studentCode: accessEntry.studentCode || `STU${Date.now()}`,
-        programId: accessEntry.programId,
+        studentCode,
+        programId,
         enrollmentYear: new Date().getFullYear(),
         status: "active" as const,
         // Default privacy settings
@@ -170,10 +183,21 @@ export const registerUser = mutation({
         showGrades: false,
       };
     } else if (accessEntry.role === "professor") {
+      // Use template data if available
+      const employeeCode = template?.employeeCode || `PROF${Date.now()}`;
+
+      // Check if employee code is already taken
+      if (await isEmployeeCodeTaken(ctx, employeeCode)) {
+        throw new AppError(
+          "Employee code already exists",
+          ErrorCodes.DUPLICATE_ENTRY
+        );
+      }
+
       userData.professorProfile = {
-        employeeCode: `PROF${Date.now()}`,
-        department: "", // To be updated later
-        title: undefined,
+        employeeCode,
+        department: template?.department || "",
+        title: template?.title,
       };
     }
 
@@ -187,27 +211,16 @@ export const registerUser = mutation({
       usedBy: userId,
     });
 
-    return { 
-      userId, 
+    // Clean up template data using helper
+    if (template) {
+      await deleteUserTemplate(ctx, args.email);
+    }
+
+    return {
+      userId,
       isNewUser: true,
-      role: accessEntry.role 
+      role: accessEntry.role
     };
-  },
-});
-
-/**
- * Update user's last login time
- */
-export const updateLastLogin = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const user = await requireAuth(ctx);
-    
-    await ctx.db.patch(user._id, {
-      lastLoginAt: Date.now(),
-    });
-
-    return { success: true };
   },
 });
 
@@ -216,14 +229,14 @@ export const updateLastLogin = mutation({
 // ============================================================================
 
 /**
- * Add an email to the access list (Admin only)
+ * Pre-register a student with complete data (Admin only)
  */
-export const addToAccessList = mutation({
+export const preRegisterStudent = mutation({
   args: {
     email: v.string(),
-    role: userRoleValidator,
-    programId: v.optional(v.id("programs")),
-    studentCode: v.optional(v.string()),
+    name: v.string(),
+    studentCode: v.string(),
+    programId: v.id("programs"),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -240,43 +253,104 @@ export const addToAccessList = mutation({
     }
 
     // Check if email already exists in users
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-
-    if (existingUser) {
+    if (await isEmailRegistered(ctx, args.email)) {
       throw new AppError(
         "Email already registered as a user",
         ErrorCodes.DUPLICATE_ENTRY
       );
     }
 
-    // Check if email already in accessList (unused)
-    const existingEntry = await ctx.db
-      .query("accessList")
-      .withIndex("by_email_unused", (q) => 
-        q.eq("email", args.email).eq("isUsed", false)
-      )
-      .first();
-
-    if (existingEntry) {
+    // Check if email already has authorization
+    const existingAuth = await checkEmailAuthorization(ctx, args.email);
+    if (existingAuth) {
       throw new AppError(
         "Email already has a pending authorization",
         ErrorCodes.DUPLICATE_ENTRY
       );
     }
 
-    // Validate student-specific fields
-    if (args.role === "student" && !args.programId) {
+    // Check if student code is already taken
+    if (await isStudentCodeTaken(ctx, args.studentCode)) {
       throw new AppError(
-        "Program ID is required for student role",
-        ErrorCodes.INVALID_INPUT
+        "Student code already exists",
+        ErrorCodes.DUPLICATE_ENTRY
       );
     }
 
     // Calculate expiration
-    const expiresAt = args.expiresInDays 
+    const expiresAt = args.expiresInDays
+      ? Date.now() + (args.expiresInDays * 24 * 60 * 60 * 1000)
+      : undefined;
+
+    // Create access list entry
+    const entryId = await ctx.db.insert("accessList", {
+      email: args.email,
+      role: "student" as const,
+      createdBy: admin._id,
+      createdAt: Date.now(),
+      expiresAt,
+      isUsed: false,
+    });
+
+    // Create user template with complete data
+    await ctx.db.insert("userTemplates", {
+      email: args.email,
+      name: args.name,
+      studentCode: args.studentCode,
+      programId: args.programId,
+      createdBy: admin._id,
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      entryId,
+      message: `Student ${args.name} pre-registered successfully`
+    };
+  },
+});
+
+/**
+ * Add a simple email authorization (for professor or admin roles)
+ */
+export const addEmailAuthorization = mutation({
+  args: {
+    email: v.string(),
+    role: userRoleValidator,
+    expiresInDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Require admin role
+    const admin = await requireRole(ctx, "admin");
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(args.email)) {
+      throw new AppError(
+        "Invalid email format",
+        ErrorCodes.INVALID_INPUT
+      );
+    }
+
+    // Check if email already exists in users
+    if (await isEmailRegistered(ctx, args.email)) {
+      throw new AppError(
+        "Email already registered as a user",
+        ErrorCodes.DUPLICATE_ENTRY
+      );
+    }
+
+    // Check if email already has authorization
+    const existingAuth = await checkEmailAuthorization(ctx, args.email);
+    if (existingAuth) {
+      throw new AppError(
+        "Email already has a pending authorization",
+        ErrorCodes.DUPLICATE_ENTRY
+      );
+    }
+
+    // Calculate expiration
+    const expiresAt = args.expiresInDays
       ? Date.now() + (args.expiresInDays * 24 * 60 * 60 * 1000)
       : undefined;
 
@@ -284,101 +358,17 @@ export const addToAccessList = mutation({
     const entryId = await ctx.db.insert("accessList", {
       email: args.email,
       role: args.role,
-      programId: args.programId,
-      studentCode: args.studentCode,
       createdBy: admin._id,
       createdAt: Date.now(),
       expiresAt,
       isUsed: false,
     });
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       entryId,
       message: `Email ${args.email} authorized for registration as ${args.role}`
     };
-  },
-});
-
-/**
- * Bulk add emails to access list (Admin only)
- */
-export const bulkAddToAccessList = mutation({
-  args: {
-    entries: v.array(v.object({
-      email: v.string(),
-      role: userRoleValidator,
-      programId: v.optional(v.id("programs")),
-      studentCode: v.optional(v.string()),
-    })),
-    expiresInDays: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const admin = await requireRole(ctx, "admin");
-
-    const results = {
-      successful: [] as string[],
-      failed: [] as { email: string; reason: string }[],
-    };
-
-    const expiresAt = args.expiresInDays 
-      ? Date.now() + (args.expiresInDays * 24 * 60 * 60 * 1000)
-      : undefined;
-
-    for (const entry of args.entries) {
-      try {
-        // Check if email already exists
-        const existingUser = await ctx.db
-          .query("users")
-          .withIndex("by_email", (q) => q.eq("email", entry.email))
-          .first();
-
-        if (existingUser) {
-          results.failed.push({
-            email: entry.email,
-            reason: "Already registered",
-          });
-          continue;
-        }
-
-        // Check if already in accessList
-        const existingEntry = await ctx.db
-          .query("accessList")
-          .withIndex("by_email_unused", (q) => 
-            q.eq("email", entry.email).eq("isUsed", false)
-          )
-          .first();
-
-        if (existingEntry) {
-          results.failed.push({
-            email: entry.email,
-            reason: "Already authorized",
-          });
-          continue;
-        }
-
-        // Create entry
-        await ctx.db.insert("accessList", {
-          email: entry.email,
-          role: entry.role,
-          programId: entry.programId,
-          studentCode: entry.studentCode,
-          createdBy: admin._id,
-          createdAt: Date.now(),
-          expiresAt,
-          isUsed: false,
-        });
-
-        results.successful.push(entry.email);
-      } catch (error) {
-        results.failed.push({
-          email: entry.email,
-          reason: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    }
-
-    return results;
   },
 });
 
@@ -392,12 +382,7 @@ export const revokeAccessListEntry = mutation({
   handler: async (ctx, args) => {
     await requireRole(ctx, "admin");
 
-    const entry = await ctx.db
-      .query("accessList")
-      .withIndex("by_email_unused", (q) => 
-        q.eq("email", args.email).eq("isUsed", false)
-      )
-      .first();
+    const entry = await checkEmailAuthorization(ctx, args.email);
 
     if (!entry) {
       throw new AppError(
@@ -406,11 +391,18 @@ export const revokeAccessListEntry = mutation({
       );
     }
 
+    // Delete access list entry
     await ctx.db.delete(entry._id);
 
-    return { 
-      success: true, 
-      message: `Authorization revoked for ${args.email}` 
+    // Also delete any associated template
+    const template = await getUserTemplate(ctx, args.email);
+    if (template) {
+      await deleteUserTemplate(ctx, args.email);
+    }
+
+    return {
+      success: true,
+      message: `Authorization revoked for ${args.email}`
     };
   },
 });
@@ -425,9 +417,10 @@ export const getPendingAccessList = query({
   handler: async (ctx, args) => {
     await requireRole(ctx, "admin");
 
+    // Get all unused entries by filtering
     let entries = await ctx.db
       .query("accessList")
-      .withIndex("by_email_unused", (q) => q.eq("isUsed", false))
+      .filter((q) => q.eq(q.field("isUsed"), false))
       .collect();
 
     // Filter out expired if requested
@@ -436,18 +429,25 @@ export const getPendingAccessList = query({
       entries = entries.filter(e => !e.expiresAt || e.expiresAt > now);
     }
 
-    // Enrich with creator info and program info
+    // Enrich with creator info and template data
     const enrichedEntries = await Promise.all(
       entries.map(async (entry) => {
-        const [creator, program] = await Promise.all([
+        const [creator, template] = await Promise.all([
           ctx.db.get(entry.createdBy),
-          entry.programId ? ctx.db.get(entry.programId) : null,
+          getUserTemplate(ctx, entry.email),
         ]);
 
         return {
           ...entry,
           creatorName: creator?.name || "Unknown",
-          programName: program?.name || null,
+          hasTemplate: template !== null,
+          templateData: template ? {
+            name: template.name,
+            studentCode: template.studentCode,
+            programId: template.programId,
+            employeeCode: template.employeeCode,
+            department: template.department,
+          } : null,
           isExpired: entry.expiresAt ? entry.expiresAt < Date.now() : false,
         };
       })
@@ -468,22 +468,32 @@ export const _cleanupExpiredAccessEntries = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    
+
     const expiredEntries = await ctx.db
       .query("accessList")
-      .withIndex("by_email_unused", (q) => q.eq("isUsed", false))
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("isUsed"), false),
+          q.lt(q.field("expiresAt"), now)
+        )
+      )
       .collect();
 
     let deletedCount = 0;
     for (const entry of expiredEntries) {
+      // Also clean up any associated templates
+      const template = await getUserTemplate(ctx, entry.email);
+      if (template) {
+        await deleteUserTemplate(ctx, entry.email);
+      }
+
       await ctx.db.delete(entry._id);
       deletedCount++;
     }
 
-    return { 
-      deletedCount, 
-      message: `Cleaned up ${deletedCount} expired entries` 
+    return {
+      deletedCount,
+      message: `Cleaned up ${deletedCount} expired entries`
     };
   },
 });
