@@ -67,12 +67,6 @@ export const activityCategoryValidator = v.union(
     v.literal("project")
 );
 
-export const accessListStatusValidator = v.union(
-    v.literal("pending"),
-    v.literal("used"),
-    v.literal("expired")
-);
-
 // ============================================================================
 // SCHEDULE VALIDATORS
 // ============================================================================
@@ -104,7 +98,6 @@ export type SemesterPeriod = Infer<typeof semesterPeriodValidator>;
 export type SemesterStatus = Infer<typeof semesterStatusValidator>;
 export type SectionStatus = Infer<typeof sectionStatusValidator>;
 export type ActivityCategory = Infer<typeof activityCategoryValidator>;
-export type AccessListStatus = Infer<typeof accessListStatusValidator>;
 export type ScheduleSlot = Infer<typeof scheduleSlotValidator>;
 export type GradeWeights = Infer<typeof gradeWeightsValidator>;
 
@@ -249,18 +242,109 @@ export interface AnnouncementWithAuthor {
 }
 
 // ============================================================================
-// ACCESS CONTROL TYPES
+// ACCESS CONTROL TYPES (UPDATED FOR NEW SCHEMA)
 // ============================================================================
 
+/**
+ * Simplified access list entry (whitelist only)
+ */
 export interface AccessListEntry {
+    _id: Id<"accessList">;
     email: string;
     role: UserRole;
+    createdBy: Id<"users">;
+    createdAt: number;
+    expiresAt?: number;
+    isUsed: boolean;
+    usedAt?: number;
+    usedBy?: Id<"users">;
+}
+
+/**
+ * Enriched access list entry with creator info
+ */
+export interface AccessListEntryWithCreator {
+    entry: Doc<"accessList">;
+    creator: Doc<"users"> | null;
+    isExpired: boolean;
+}
+
+/**
+ * User template with complete pre-registration data
+ */
+export interface UserTemplate {
+    _id: Id<"userTemplates">;
+    email: string;
+    name: string;
+    phone?: string;
+    country?: string;
+    city?: string;
+
+    // Student-specific
     programId?: Id<"programs">;
     studentCode?: string;
-    createdBy: Doc<"users"> | null;
-    status: AccessListStatus;
-    expiresAt?: number;
+    enrollmentYear?: number;
+
+    // Professor-specific
+    department?: string;
+    employeeCode?: string;
+    title?: string;
+
+    createdBy: Id<"users">;
+    createdAt: number;
 }
+
+/**
+ * Enriched user template with program info
+ */
+export interface UserTemplateWithProgram {
+    template: Doc<"userTemplates">;
+    program: Doc<"programs"> | null;
+    creator: Doc<"users"> | null;
+}
+
+/**
+ * Pre-registration input for students
+ */
+export interface PreRegisterStudentInput {
+    email: string;
+    name: string;
+    studentCode: string;
+    programId: Id<"programs">;
+    enrollmentYear: number;
+    phone?: string;
+    country?: string;
+    city?: string;
+    expiresInDays?: number;
+}
+
+/**
+ * Pre-registration input for professors
+ */
+export interface PreRegisterProfessorInput {
+    email: string;
+    name: string;
+    employeeCode: string;
+    department: string;
+    title?: string;
+    phone?: string;
+    country?: string;
+    city?: string;
+    expiresInDays?: number;
+}
+
+/**
+ * Registration result
+ */
+export interface RegistrationResult {
+    userId: Id<"users">;
+    isNewUser: boolean;
+    role: UserRole;
+}
+
+// ============================================================================
+// AUTHENTICATED USER TYPES
+// ============================================================================
 
 export interface AuthenticatedUser {
     user: Doc<"users">;
@@ -333,6 +417,24 @@ export interface PaginatedResult<T> {
 }
 
 // ============================================================================
+// BULK OPERATION TYPES
+// ============================================================================
+
+/**
+ * Result of bulk pre-registration
+ */
+export interface BulkPreRegistrationResult {
+    successful: string[];
+    failed: {
+        email: string;
+        reason: string;
+    }[];
+    totalProcessed: number;
+    successCount: number;
+    failCount: number;
+}
+
+// ============================================================================
 // ERROR TYPES
 // ============================================================================
 
@@ -365,11 +467,13 @@ export const ErrorCodes = {
     USER_NOT_FOUND: 'USER_NOT_FOUND',
     COURSE_NOT_FOUND: 'COURSE_NOT_FOUND',
     SECTION_NOT_FOUND: 'SECTION_NOT_FOUND',
+    TEMPLATE_NOT_FOUND: 'TEMPLATE_NOT_FOUND',
 
     // Business logic
     INVALID_GRADE_WEIGHTS: 'INVALID_GRADE_WEIGHTS',
     ENROLLMENT_CLOSED: 'ENROLLMENT_CLOSED',
     SEMESTER_NOT_ACTIVE: 'SEMESTER_NOT_ACTIVE',
+    REGISTRATION_EXPIRED: 'REGISTRATION_EXPIRED',
 } as const;
 
 // ============================================================================

@@ -1,6 +1,13 @@
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { StudentProgress, EnrollmentWithDetails, GradeWeights } from "./types";
+import {
+    StudentProgress,
+    EnrollmentWithDetails,
+    GradeWeights,
+    // UserTemplate,
+    AppError,
+    ErrorCodes
+} from "./types";
 
 // ============================================================================
 // AUTHENTICATION HELPERS
@@ -25,7 +32,7 @@ export async function getCurrentUserFromAuth(ctx: QueryCtx) {
 export async function requireAuth(ctx: QueryCtx) {
     const user = await getCurrentUserFromAuth(ctx);
     if (!user) {
-        throw new Error("Authentication required");
+        throw new AppError("Authentication required", ErrorCodes.UNAUTHENTICATED);
     }
     return user;
 }
@@ -39,7 +46,10 @@ export async function requireRole(
 ) {
     const user = await requireAuth(ctx);
     if (user.role !== requiredRole) {
-        throw new Error(`Role ${requiredRole} required`);
+        throw new AppError(
+            `Role ${requiredRole} required`,
+            ErrorCodes.UNAUTHORIZED
+        );
     }
     return user;
 }
@@ -53,9 +63,92 @@ export async function requireAdminOrSelf(
 ) {
     const user = await requireAuth(ctx);
     if (user.role !== "admin" && user._id !== targetUserId) {
-        throw new Error("Unauthorized: Admin access or own account required");
+        throw new AppError(
+            "Unauthorized: Admin access or own account required",
+            ErrorCodes.UNAUTHORIZED
+        );
     }
     return user;
+}
+
+// ============================================================================
+// ACCESS LIST & TEMPLATE HELPERS
+// ============================================================================
+
+/**
+ * Check if email is authorized in access list
+ */
+export async function checkEmailAuthorization(
+    ctx: QueryCtx,
+    email: string
+): Promise<Doc<"accessList"> | null> {
+    const entry = await ctx.db
+        .query("accessList")
+        .withIndex("by_email_unused", (q) =>
+            q.eq("email", email).eq("isUsed", false)
+        )
+        .first();
+
+    if (!entry) return null;
+
+    // Check if expired
+    if (entry.expiresAt && entry.expiresAt < Date.now()) {
+        return null;
+    }
+
+    return entry;
+}
+
+/**
+ * Get user template by email
+ */
+export async function getUserTemplate(
+    ctx: QueryCtx,
+    email: string
+): Promise<Doc<"userTemplates"> | null> {
+    return await ctx.db
+        .query("userTemplates")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+}
+
+/**
+ * Get user template with enriched data
+ */
+export async function getUserTemplateWithDetails(
+    ctx: QueryCtx,
+    email: string
+) {
+    const template = await getUserTemplate(ctx, email);
+    if (!template) return null;
+
+    const [program, creator] = await Promise.all([
+        template.programId ? ctx.db.get(template.programId) : null,
+        ctx.db.get(template.createdBy)
+    ]);
+
+    return {
+        template,
+        program,
+        creator
+    };
+}
+
+/**
+ * Delete user template after successful registration
+ */
+export async function deleteUserTemplate(
+    ctx: MutationCtx,
+    email: string
+): Promise<void> {
+    const template = await ctx.db
+        .query("userTemplates")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+
+    if (template) {
+        await ctx.db.delete(template._id);
+    }
 }
 
 // ============================================================================
@@ -286,7 +379,7 @@ export async function meetsMinimumSemester(
 
     const currentYear = new Date().getFullYear();
     const yearsEnrolled = currentYear - student.studentProfile.enrollmentYear;
-    const currentSemester = yearsEnrolled * 2 + 1; // Aproximación
+    const currentSemester = yearsEnrolled * 2 + 1; // Approximation
 
     return currentSemester >= course.minSemester;
 }
@@ -386,6 +479,73 @@ export async function isCRNTaken(
 }
 
 // ============================================================================
+// USER VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Check if email already exists in users
+ */
+export async function isEmailRegistered(
+    ctx: QueryCtx,
+    email: string
+): Promise<boolean> {
+    const existing = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+
+    return existing !== null;
+}
+
+/**
+ * Check if student code already exists
+ */
+export async function isStudentCodeTaken(
+    ctx: QueryCtx,
+    studentCode: string,
+    excludeUserId?: Id<"users">
+): Promise<boolean> {
+    const users = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "student"))
+        .collect();
+
+    for (const user of users) {
+        if (user.studentProfile?.studentCode === studentCode) {
+            if (!excludeUserId || user._id !== excludeUserId) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Check if employee code already exists
+ */
+export async function isEmployeeCodeTaken(
+    ctx: QueryCtx,
+    employeeCode: string,
+    excludeUserId?: Id<"users">
+): Promise<boolean> {
+    const users = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "professor"))
+        .collect();
+
+    for (const user of users) {
+        if (user.professorProfile?.employeeCode === employeeCode) {
+            if (!excludeUserId || user._id !== excludeUserId) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// ============================================================================
 // GRADE CALCULATION HELPERS
 // ============================================================================
 
@@ -467,4 +627,66 @@ export async function calculateCurrentGrade(
     }
 
     return totalWeight > 0 ? Number((totalWeightedScore / totalWeight).toFixed(2)) : 0;
+}
+
+// ============================================================================
+// PRIVACY HELPERS
+// ============================================================================
+
+/**
+ * Check if user can view another user's profile
+ */
+export async function canViewProfile(
+    ctx: QueryCtx,
+    viewerId: Id<"users">,
+    targetId: Id<"users">
+): Promise<boolean> {
+    // Same user can always view own profile
+    if (viewerId === targetId) return true;
+
+    const [viewer, target] = await Promise.all([
+        ctx.db.get(viewerId),
+        ctx.db.get(targetId)
+    ]);
+
+    if (!viewer || !target) return false;
+
+    // Admins and professors can view all profiles
+    if (viewer.role === "admin" || viewer.role === "professor") return true;
+
+    // Check student privacy settings
+    if (target.role === "student" && target.studentProfile) {
+        return target.studentProfile.showProfile;
+    }
+
+    return false;
+}
+
+/**
+ * Check if user can view another user's grades
+ */
+export async function canViewGrades(
+    ctx: QueryCtx,
+    viewerId: Id<"users">,
+    targetId: Id<"users">
+): Promise<boolean> {
+    // Same user can always view own grades
+    if (viewerId === targetId) return true;
+
+    const [viewer, target] = await Promise.all([
+        ctx.db.get(viewerId),
+        ctx.db.get(targetId)
+    ]);
+
+    if (!viewer || !target) return false;
+
+    // Admins and professors can view all grades
+    if (viewer.role === "admin" || viewer.role === "professor") return true;
+
+    // Check student privacy settings
+    if (target.role === "student" && target.studentProfile) {
+        return target.studentProfile.showGrades;
+    }
+
+    return false;
 }
