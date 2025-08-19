@@ -6,18 +6,19 @@
 // ################################################################################
 
 /**
- * HISTORY: Alef University’s Academic Records and Grading System (MVP). A Convex schema
+ * HISTORY: Alef University's Academic Records and Grading System (MVP). A Convex schema
  * designed to manage students, faculty, courses, and transcripts. The tables used are:
- * * users - Stores user information and profiles.
- * * programs - Stores academic program information.
- * * semesters - Stores academic period information.
- * * courses - Stores course catalog information.
- * * sections - Stores information about course sections offered each semester.
- * * enrollments - Stores student enrollments in sections.
- * * activities - Stores information about student activities and participation.
- * * grades - Stores student grades for activities.
- * * accessList - Stores pre-authorized registration emails.
- * * announcements - Stores important updates and notifications for students related to sections.
+ * 1 users - Stores user information and profiles.
+ * 2 programs - Stores academic program information.
+ * 3 semesters - Stores academic period information.
+ * 4 courses - Stores course catalog information.
+ * 5 sections - Stores information about course sections offered each semester.
+ * 6 enrollments - Stores student enrollments in sections.
+ * 7 activities - Stores information about student activities and participation.
+ * 8 grades - Stores student grades for activities.
+ * 9 accessList - Whitelist of authorized emails for registration.
+ * 10 userTemplates - Pre-registered user data (temporary until user registers).
+ * 11 announcements - Stores important updates and notifications for students related to sections.
  */
 
 import { defineSchema, defineTable } from "convex/server";
@@ -80,8 +81,8 @@ export default defineSchema({
     name: v.string(),
     type: v.union(
       v.literal("diploma program"),
-      v.literal("bachelor’s degree"),
-      v.literal("master’s degree"),
+      v.literal("bachelor's degree"),
+      v.literal("master's degree"),
       v.literal("doctorate")
     ),
     department: v.string(),
@@ -254,7 +255,8 @@ export default defineSchema({
     .index("by_activity", ["activityId"]),
 
   /**
-   * Pre-authorized registration emails.
+   * Whitelist of authorized emails for registration.
+   * Minimal information for authorization control only.
    */
   accessList: defineTable({
     email: v.string(),
@@ -263,22 +265,6 @@ export default defineSchema({
       v.literal("professor"),
       v.literal("admin")
     ),
-
-    // Información completa del usuario (admin la llena)
-    name: v.string(), // Nombre completo del estudiante
-    phone: v.optional(v.string()),
-    country: v.optional(v.string()),
-    city: v.optional(v.string()),
-
-    // Para estudiantes
-    programId: v.optional(v.id("programs")),
-    studentCode: v.optional(v.string()),
-    enrollmentYear: v.optional(v.number()),
-
-    // Para profesores
-    department: v.optional(v.string()),
-    employeeCode: v.optional(v.string()),
-    title: v.optional(v.string()),
 
     // Control
     createdBy: v.id("users"),
@@ -292,6 +278,36 @@ export default defineSchema({
   })
     .index("by_email_unused", ["email", "isUsed"])
     .index("by_created", ["createdBy", "createdAt"]),
+
+  /**
+   * Pre-registered user data templates.
+   * Contains complete user information filled by admin.
+   * Gets deleted after user successfully registers.
+   */
+  userTemplates: defineTable({
+    email: v.string(), // Primary key to match with accessList
+
+    // Basic information
+    name: v.string(),
+    phone: v.optional(v.string()),
+    country: v.optional(v.string()),
+    city: v.optional(v.string()),
+
+    // Student-specific data
+    programId: v.optional(v.id("programs")),
+    studentCode: v.optional(v.string()),
+    enrollmentYear: v.optional(v.number()),
+
+    // Professor-specific data
+    department: v.optional(v.string()),
+    employeeCode: v.optional(v.string()),
+    title: v.optional(v.string()),
+
+    // Metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"]),
 
   /**
    * Course announcements.
