@@ -6,23 +6,18 @@
 // ################################################################################
 
 /**
- * Administrative functions for bulk operations and system management
+ * Administrative functions for SIS
  */
 
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 import {
     ErrorCodes,
     AppError,
-    userRoleValidator,
-    enrollmentStatusValidator,
 } from "./types";
 import {
     requireAuth,
     requireRole,
-    calculateLetterGrade,
-    isPassingGrade,
 } from "./helpers";
 
 // ============================================================================
@@ -30,129 +25,86 @@ import {
 // ============================================================================
 
 /**
- * Get overall system statistics
+ * Get system statistics (Admin)
  */
 export const getSystemStats = query({
     args: {},
     handler: async (ctx) => {
-        const currentUser = await requireRole(ctx, "admin");
+        await requireRole(ctx, "admin");
 
         // Count users by role
         const allUsers = await ctx.db.query("users").collect();
         const userStats = {
             total: allUsers.length,
-            students: allUsers.filter((u: any) => u.role === "student").length,
-            professors: allUsers.filter((u: any) => u.role === "professor").length,
-            admins: allUsers.filter((u: any) => u.role === "admin").length,
+            students: allUsers.filter(u => u.role === "student").length,
+            professors: allUsers.filter(u => u.role === "professor").length,
+            admins: allUsers.filter(u => u.role === "admin").length,
         };
 
         // Count programs and courses
-        const [programs, courses, semesters, sections] = await Promise.all([
+        const [programs, courses, periods, sections] = await Promise.all([
             ctx.db.query("programs").collect(),
             ctx.db.query("courses").collect(),
-            ctx.db.query("semesters").collect(),
+            ctx.db.query("periods").collect(),
             ctx.db.query("sections").collect(),
         ]);
 
-        // Count enrollments by status
-        const allEnrollments = await ctx.db.query("enrollments").collect();
-        const enrollmentStats = {
-            total: allEnrollments.length,
-            enrolled: allEnrollments.filter((e: any) => e.status === "enrolled").length,
-            completed: allEnrollments.filter((e: any) => e.status === "completed").length,
-            failed: allEnrollments.filter((e: any) => e.status === "failed").length,
-            dropped: allEnrollments.filter((e: any) => e.status === "dropped").length,
-        };
+        // Students by program
+        const studentsByProgram = new Map();
+        for (const user of allUsers.filter(u => u.role === "student" && u.studentProfile)) {
+            const programId = user.studentProfile!.programId;
+            if (!studentsByProgram.has(programId)) {
+                const program = await ctx.db.get(programId);
+                studentsByProgram.set(programId, {
+                    program,
+                    count: 0,
+                    active: 0,
+                    graduated: 0,
+                });
+            }
+            const data = studentsByProgram.get(programId);
+            data.count++;
+            if (user.studentProfile!.status === "active") data.active++;
+            if (user.studentProfile!.status === "graduated") data.graduated++;
+        }
 
-        // Count activities and grades
-        const [activities, grades] = await Promise.all([
-            ctx.db.query("activities").collect(),
-            ctx.db.query("grades").collect(),
-        ]);
+        // Calculate average GPAs
+        const enrollments = await ctx.db
+            .query("enrollments")
+            .filter(q => q.eq(q.field("status"), "completed"))
+            .collect();
+
+        const totalGrades = enrollments.reduce((sum, e) => sum + (e.effectiveGrade || 0), 0);
+        const averageGPA = enrollments.length > 0 ? totalGrades / enrollments.length : 0;
 
         return {
             users: userStats,
-            academic: {
-                programs: programs.length,
-                courses: courses.length,
-                semesters: semesters.length,
-                sections: sections.length,
+            programs: {
+                total: programs.length,
+                byProgram: Array.from(studentsByProgram.values()),
             },
-            enrollments: enrollmentStats,
-            activities: {
-                total: activities.length,
-                graded: grades.length,
-                pending: activities.length - grades.length,
+            courses: {
+                total: courses.length,
+                byCategory: {
+                    humanities: courses.filter(c => c.category === "humanities").length,
+                    core: courses.filter(c => c.category === "core").length,
+                    elective: courses.filter(c => c.category === "elective").length,
+                },
             },
-            timestamp: Date.now(),
-        };
-    },
-});
-
-/**
- * Get semester-specific statistics
- */
-export const getSemesterStats = query({
-    args: {
-        semesterId: v.id("semesters"),
-    },
-    handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        const semester = await ctx.db.get(args.semesterId);
-        if (!semester) {
-            throw new AppError(
-                "Semester not found",
-                ErrorCodes.USER_NOT_FOUND
-            );
-        }
-
-        // Get sections for this semester
-        const allSections = await ctx.db.query("sections").collect();
-        const sections = allSections.filter((s: any) => s.semesterId === args.semesterId);
-
-        // Get enrollments for this semester
-        const allEnrollments = await ctx.db.query("enrollments").collect();
-        const enrollments = allEnrollments.filter((e: any) => e.semesterId === args.semesterId);
-
-        // Calculate enrollment statistics
-        const sectionIds = sections.map((s: any) => s._id);
-        const sectionEnrollments = allEnrollments.filter((e: any) =>
-            sectionIds.includes(e.sectionId)
-        );
-
-        // Get courses offered
-        const courseIds = [...new Set(sections.map((s: any) => s.courseId))];
-        const courses = await Promise.all(courseIds.map(id => ctx.db.get(id)));
-
-        // Calculate capacity utilization
-        const totalCapacity = sections.reduce((sum: number, s: any) => sum + (s.capacity || 0), 0);
-        const totalEnrolled = sectionEnrollments.filter((e: any) => e.status === "enrolled").length;
-
-        return {
-            semester: {
-                _id: semester._id,
-                code: semester.code,
-                year: semester.year,
-                period: semester.period,
-                status: semester.status,
+            periods: {
+                total: periods.length,
+                current: periods.filter(p => p.status === "active").length,
             },
             sections: {
                 total: sections.length,
-                active: sections.filter((s: any) => s.status === "active").length,
+                active: sections.filter(s => s.isActive).length,
             },
-            courses: {
-                offered: courses.filter(Boolean).length,
-                totalCapacity,
-                totalEnrolled,
-                utilizationRate: totalCapacity > 0 ? (totalEnrolled / totalCapacity) * 100 : 0,
-            },
-            enrollments: {
-                total: sectionEnrollments.length,
-                enrolled: sectionEnrollments.filter((e: any) => e.status === "enrolled").length,
-                completed: sectionEnrollments.filter((e: any) => e.status === "completed").length,
-                failed: sectionEnrollments.filter((e: any) => e.status === "failed").length,
-                dropped: sectionEnrollments.filter((e: any) => e.status === "dropped").length,
+            academics: {
+                totalEnrollments: enrollments.length,
+                averageGPA: parseFloat(averageGPA.toFixed(2)),
+                completionRate: enrollments.length > 0
+                    ? (enrollments.filter(e => (e.effectiveGrade || 0) >= 3.0).length / enrollments.length) * 100
+                    : 0,
             },
         };
     },
@@ -163,252 +115,92 @@ export const getSemesterStats = query({
 // ============================================================================
 
 /**
- * Bulk create students from CSV data
+ * Bulk create students from CSV data (Admin)
  */
 export const bulkCreateStudents = mutation({
     args: {
         students: v.array(v.object({
-            name: v.string(),
             email: v.string(),
-            studentCode: v.optional(v.string()),
-            programId: v.optional(v.id("programs")),
+            name: v.string(),
+            studentCode: v.string(),
+            programId: v.id("programs"),
+            country: v.optional(v.string()),
+            phone: v.optional(v.string()),
         })),
     },
     handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
+        await requireRole(ctx, "admin");
 
         const results = {
-            successful: [] as string[],
+            successful: 0,
             failed: [] as { email: string; reason: string }[],
         };
 
         for (const studentData of args.students) {
             try {
-                // Validate email format (simple validation)
-                if (!studentData.email.includes("@") || !studentData.email.includes(".")) {
-                    results.failed.push({
-                        email: studentData.email,
-                        reason: "Invalid email format",
-                    });
-                    continue;
-                }
-
-                // Check if user already exists
-                const existingUser = await ctx.db
-                    .query("users")
-                    .filter((q: any) => q.eq(q.field("email"), studentData.email))
+                // Check if email already exists in accessList
+                const existingAccess = await ctx.db
+                    .query("accessList")
+                    .withIndex("by_email_unused", q => q.eq("email", studentData.email))
                     .first();
 
-                if (existingUser) {
+                if (existingAccess) {
                     results.failed.push({
                         email: studentData.email,
-                        reason: "User with this email already exists",
+                        reason: "Email already in access list",
                     });
                     continue;
                 }
 
-                // Validate program if provided
-                if (studentData.programId) {
-                    const program = await ctx.db.get(studentData.programId);
-                    if (!program) {
-                        results.failed.push({
-                            email: studentData.email,
-                            reason: "Invalid program ID",
-                        });
-                        continue;
-                    }
+                // Check if student code already exists
+                const existingCode = await ctx.db
+                    .query("userTemplates")
+                    .filter(q => q.eq(q.field("studentCode"), studentData.studentCode))
+                    .first();
+
+                if (existingCode) {
+                    results.failed.push({
+                        email: studentData.email,
+                        reason: "Student code already exists",
+                    });
+                    continue;
                 }
 
-                // Create student user
-                const userProfile: any = {
-                    studentCode: studentData.studentCode || `STU${Date.now()}`,
-                };
-
-                if (studentData.programId) {
-                    userProfile.programId = studentData.programId;
+                // Verify program exists
+                const program = await ctx.db.get(studentData.programId);
+                if (!program) {
+                    results.failed.push({
+                        email: studentData.email,
+                        reason: "Program not found",
+                    });
+                    continue;
                 }
 
-                const userId = await ctx.db.insert("users", {
-                    clerkId: `temp_${Date.now()}_${Math.random()}`, // Temporary clerkId for admin-created users
-                    name: studentData.name,
+                // Add to access list
+                await ctx.db.insert("accessList", {
                     email: studentData.email,
-                    role: "student",
-                    isActive: true,
+                    role: "student" as const,
+                    isUsed: false,
+                    createdBy: (await requireAuth(ctx))._id,
                     createdAt: Date.now(),
-                    studentProfile: userProfile,
                 });
 
-                results.successful.push(studentData.email);
-            } catch (error) {
-                results.failed.push({
+                // Create user template
+                await ctx.db.insert("userTemplates", {
                     email: studentData.email,
-                    reason: error instanceof Error ? error.message : "Unknown error",
-                });
-            }
-        }
-
-        return {
-            ...results,
-            message: `Created ${results.successful.length} students, ${results.failed.length} failed`,
-        };
-    },
-});
-
-/**
- * Bulk enroll students in a section
- */
-export const bulkEnrollStudents = mutation({
-    args: {
-        sectionId: v.id("sections"),
-        studentIds: v.array(v.id("users")),
-    },
-    handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        const section = await ctx.db.get(args.sectionId);
-        if (!section) {
-            throw new AppError(
-                "Section not found",
-                ErrorCodes.SECTION_NOT_FOUND
-            );
-        }
-
-        const course = await ctx.db.get(section.courseId);
-        if (!course) {
-            throw new AppError(
-                "Course not found",
-                ErrorCodes.COURSE_NOT_FOUND
-            );
-        }
-
-        const results = {
-            successful: [] as string[],
-            failed: [] as { studentId: string; reason: string }[],
-        };
-
-        for (const studentId of args.studentIds) {
-            try {
-                const student = await ctx.db.get(studentId);
-                if (!student || student.role !== "student") {
-                    results.failed.push({
-                        studentId,
-                        reason: "Student not found or invalid role",
-                    });
-                    continue;
-                }
-
-                // Check if already enrolled
-                const allEnrollments = await ctx.db.query("enrollments").collect();
-                const existingEnrollment = allEnrollments.find((e: any) =>
-                    e.studentId === studentId &&
-                    e.sectionId === args.sectionId
-                );
-
-                if (existingEnrollment) {
-                    results.failed.push({
-                        studentId,
-                        reason: "Student already enrolled in this section",
-                    });
-                    continue;
-                }
-
-                // Check section capacity
-                const sectionEnrollments = allEnrollments.filter((e: any) =>
-                    e.sectionId === args.sectionId && e.status === "enrolled"
-                );
-
-                if (sectionEnrollments.length >= section.capacity) {
-                    results.failed.push({
-                        studentId,
-                        reason: "Section is full",
-                    });
-                    continue;
-                }
-
-                // Create enrollment
-                await ctx.db.insert("enrollments", {
-                    studentId,
-                    courseId: section.courseId,
-                    sectionId: args.sectionId,
-                    semesterId: section.semesterId,
-                    status: "enrolled",
-                    enrolledAt: Date.now(),
-                    creditsEarned: 0,
-                    isRetake: false,
+                    name: studentData.name,
+                    country: studentData.country,
+                    phone: studentData.phone,
+                    programId: studentData.programId,
+                    studentCode: studentData.studentCode,
+                    createdBy: (await requireAuth(ctx))._id,
+                    createdAt: Date.now(),
                 });
 
-                results.successful.push(studentId);
-            } catch (error) {
-                results.failed.push({
-                    studentId,
-                    reason: error instanceof Error ? error.message : "Unknown error",
-                });
-            }
-        }
-
-        return {
-            ...results,
-            message: `Enrolled ${results.successful.length} students, ${results.failed.length} failed`,
-        };
-    },
-});
-
-/**
- * Bulk update enrollment status
- */
-export const bulkUpdateEnrollmentStatus = mutation({
-    args: {
-        enrollmentIds: v.array(v.id("enrollments")),
-        newStatus: enrollmentStatusValidator,
-    },
-    handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        const results = {
-            successful: 0,
-            failed: [] as { enrollmentId: string; reason: string }[],
-        };
-
-        for (const enrollmentId of args.enrollmentIds) {
-            try {
-                const enrollment = await ctx.db.get(enrollmentId);
-                if (!enrollment) {
-                    results.failed.push({
-                        enrollmentId,
-                        reason: "Enrollment not found",
-                    });
-                    continue;
-                }
-
-                // Update status
-                const updateData: any = {
-                    status: args.newStatus,
-                };
-
-                // If completing or failing, ensure grades are set
-                if (args.newStatus === "completed" || args.newStatus === "failed") {
-                    if (!enrollment.finalGrade) {
-                        results.failed.push({
-                            enrollmentId,
-                            reason: "Cannot complete/fail enrollment without final grade",
-                        });
-                        continue;
-                    }
-
-                    // Update credits earned
-                    if (args.newStatus === "completed" && isPassingGrade(enrollment.finalGrade)) {
-                        const course = await ctx.db.get(enrollment.courseId);
-                        updateData.creditsEarned = course?.credits || 0;
-                    } else {
-                        updateData.creditsEarned = 0;
-                    }
-                }
-
-                await ctx.db.patch(enrollmentId, updateData);
                 results.successful++;
             } catch (error) {
                 results.failed.push({
-                    enrollmentId,
+                    email: studentData.email,
                     reason: error instanceof Error ? error.message : "Unknown error",
                 });
             }
@@ -416,271 +208,119 @@ export const bulkUpdateEnrollmentStatus = mutation({
 
         return {
             ...results,
-            message: `Updated ${results.successful} enrollments, ${results.failed.length} failed`,
-        };
-    },
-});
-
-// ============================================================================
-// USER MANAGEMENT
-// ============================================================================
-
-/**
- * Get all users with filters
- */
-export const getAllUsers = query({
-    args: {
-        role: v.optional(userRoleValidator),
-        isActive: v.optional(v.boolean()),
-        limit: v.optional(v.number()),
-        offset: v.optional(v.number()),
-    },
-    handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        let allUsers = await ctx.db.query("users").collect();
-
-        // Apply filters
-        if (args.role) {
-            allUsers = allUsers.filter((u: any) => u.role === args.role);
-        }
-
-        if (args.isActive !== undefined) {
-            allUsers = allUsers.filter((u: any) => u.isActive === args.isActive);
-        }
-
-        // Sort by creation date (newest first)
-        allUsers.sort((a: any, b: any) => b.createdAt - a.createdAt);
-
-        // Apply pagination
-        const offset = args.offset || 0;
-        const limit = args.limit || 50;
-        const paginatedUsers = allUsers.slice(offset, offset + limit);
-
-        return {
-            users: paginatedUsers.map((user: any) => ({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                isActive: user.isActive,
-                createdAt: user.createdAt,
-                lastLoginAt: user.lastLoginAt,
-                studentCode: user.studentProfile?.studentCode,
-                programId: user.studentProfile?.programId,
-                department: user.professorProfile?.department,
-            })),
-            totalCount: allUsers.length,
-            hasMore: offset + limit < allUsers.length,
+            message: `Pre-registered ${results.successful} students, ${results.failed.length} failed`,
         };
     },
 });
 
 /**
- * Update user role and status
+ * Generate period rankings (Admin) - Dynamic calculation
  */
-export const updateUserRole = mutation({
+export const generatePeriodRankings = mutation({
     args: {
-        userId: v.id("users"),
-        newRole: userRoleValidator,
-        isActive: v.optional(v.boolean()),
+        periodId: v.id("periods"),
     },
     handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
+        await requireRole(ctx, "admin");
 
-        // Prevent admin from changing their own role
-        if (currentUser._id === args.userId) {
-            throw new AppError(
-                "Cannot change your own role",
-                ErrorCodes.INVALID_INPUT
-            );
-        }
+        // Get all students with enrollments in this period
+        const enrollments = await ctx.db
+            .query("enrollments")
+            .filter(q =>
+                q.and(
+                    q.eq(q.field("periodId"), args.periodId),
+                    q.eq(q.field("status"), "completed")
+                )
+            )
+            .collect();
 
-        const user = await ctx.db.get(args.userId);
-        if (!user) {
-            throw new AppError(
-                "User not found",
-                ErrorCodes.USER_NOT_FOUND
-            );
-        }
+        // Group by student and calculate period GPA
+        const studentGPAs = new Map();
 
-        const updates: any = {
-            role: args.newRole,
-        };
-
-        if (args.isActive !== undefined) {
-            updates.isActive = args.isActive;
-        }
-
-        // Handle role-specific profile updates
-        if (args.newRole === "student" && !user.studentProfile) {
-            updates.studentProfile = {
-                studentCode: `STU${Date.now()}`,
-            };
-        } else if (args.newRole === "professor" && !user.professorProfile) {
-            updates.professorProfile = {
-                department: "General",
-            };
-        }
-
-        await ctx.db.patch(args.userId, updates);
-
-        return {
-            success: true,
-            message: `User role updated to ${args.newRole}`
-        };
-    },
-});
-
-/**
- * Delete user and cleanup related data
- */
-export const deleteUser = mutation({
-    args: {
-        userId: v.id("users"),
-        force: v.optional(v.boolean()),
-    },
-    handler: async (ctx, args) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        // Prevent admin from deleting themselves
-        if (currentUser._id === args.userId) {
-            throw new AppError(
-                "Cannot delete your own account",
-                ErrorCodes.INVALID_INPUT
-            );
-        }
-
-        const user = await ctx.db.get(args.userId);
-        if (!user) {
-            throw new AppError(
-                "User not found",
-                ErrorCodes.USER_NOT_FOUND
-            );
-        }
-
-        // Check for related data that would prevent deletion
-        if (!args.force) {
-            const allEnrollments = await ctx.db.query("enrollments").collect();
-            const userEnrollments = allEnrollments.filter((e: any) =>
-                e.studentId === args.userId
-            );
-
-            const allSections = await ctx.db.query("sections").collect();
-            const userSections = allSections.filter((s: any) =>
-                s.professorId === args.userId
-            );
-
-            if (userEnrollments.length > 0 || userSections.length > 0) {
-                throw new AppError(
-                    "Cannot delete user with existing enrollments or sections. Use force=true to override.",
-                    ErrorCodes.INVALID_INPUT
-                );
-            }
-        }
-
-        // Delete related data if force is true
-        if (args.force) {
-            // Delete enrollments
-            const allEnrollments = await ctx.db.query("enrollments").collect();
-            const userEnrollments = allEnrollments.filter((e: any) =>
-                e.studentId === args.userId
-            );
-
-            for (const enrollment of userEnrollments) {
-                await ctx.db.delete(enrollment._id);
-            }
-
-            // Update sections to remove professor assignment
-            const allSections = await ctx.db.query("sections").collect();
-            const userSections = allSections.filter((s: any) =>
-                s.professorId === args.userId
-            );
-
-            for (const section of userSections) {
-                await ctx.db.patch(section._id, {
-                    status: "draft" as any,
-                    // Remove professor assignment would require schema change
+        for (const enrollment of enrollments) {
+            if (!studentGPAs.has(enrollment.studentId)) {
+                const student = await ctx.db.get(enrollment.studentId);
+                studentGPAs.set(enrollment.studentId, {
+                    student,
+                    grades: [],
+                    totalCredits: 0,
+                    weightedSum: 0,
                 });
             }
+
+            const data = studentGPAs.get(enrollment.studentId);
+            const course = await ctx.db.get(enrollment.courseId);
+            const credits = course?.credits || 0;
+            const grade = enrollment.effectiveGrade || 0;
+
+            data.grades.push({ grade, credits });
+            data.totalCredits += credits;
+            data.weightedSum += grade * credits;
         }
 
-        // Delete the user
-        await ctx.db.delete(args.userId);
+        // Calculate GPAs and sort
+        const rankings = Array.from(studentGPAs.entries())
+            .map(([studentId, data]) => ({
+                studentId,
+                student: data.student,
+                periodGPA: data.totalCredits > 0 ? data.weightedSum / data.totalCredits : 0,
+                totalCredits: data.totalCredits,
+            }))
+            .sort((a, b) => b.periodGPA - a.periodGPA)
+            .map((entry, index) => ({
+                ...entry,
+                rank: index + 1,
+                periodGPA: parseFloat(entry.periodGPA.toFixed(2)),
+            }));
 
         return {
-            success: true,
-            message: `User ${user.name} deleted successfully`
-        };
-    },
-});
-
-// ============================================================================
-// SYSTEM MAINTENANCE
-// ============================================================================
-
-/**
- * Cleanup expired access codes (simplified since registrations table doesn't exist)
- */
-export const cleanupExpiredAccess = mutation({
-    args: {},
-    handler: async (ctx) => {
-        const currentUser = await requireRole(ctx, "admin");
-
-        // This would clean up expired access codes from accessList
-        // For now, just return a success message
-        return {
-            success: true,
-            deletedCount: 0,
-            message: "Cleanup completed (no expired access codes found)",
+            periodId: args.periodId,
+            rankings,
+            generatedAt: Date.now(),
+            totalStudents: rankings.length,
         };
     },
 });
 
 /**
- * Generate system backup data
+ * Close period (Admin)
  */
-export const generateBackupData = query({
-    args: {},
-    handler: async (ctx) => {
-        const currentUser = await requireRole(ctx, "admin");
+export const closePeriod = mutation({
+    args: {
+        periodId: v.id("periods"),
+    },
+    handler: async (ctx, args) => {
+        await requireRole(ctx, "admin");
 
-        // Get all data for backup
-        const [
-            users,
-            programs,
-            courses,
-            semesters,
-            sections,
-            enrollments,
-            activities,
-            grades,
-        ] = await Promise.all([
-            ctx.db.query("users").collect(),
-            ctx.db.query("programs").collect(),
-            ctx.db.query("courses").collect(),
-            ctx.db.query("semesters").collect(),
-            ctx.db.query("sections").collect(),
-            ctx.db.query("enrollments").collect(),
-            ctx.db.query("activities").collect(),
-            ctx.db.query("grades").collect(),
-        ]);
+        const period = await ctx.db.get(args.periodId);
+        if (!period) {
+            throw new AppError("Period not found", ErrorCodes.USER_NOT_FOUND);
+        }
+
+        // Check if all sections have submitted grades
+        const sections = await ctx.db
+            .query("sections")
+            .filter(q => q.eq(q.field("periodId"), args.periodId))
+            .collect();
+
+        const pendingSections = sections.filter(s => !s.gradesSubmitted);
+
+        if (pendingSections.length > 0) {
+            throw new AppError(
+                `Cannot close period: ${pendingSections.length} sections have not submitted grades`,
+                ErrorCodes.INVALID_INPUT
+            );
+        }
+
+        // Close the period
+        await ctx.db.patch(args.periodId, {
+            status: "closed" as const,
+        });
 
         return {
-            timestamp: Date.now(),
-            version: "1.0.0",
-            data: {
-                users: users.length,
-                programs: programs.length,
-                courses: courses.length,
-                semesters: semesters.length,
-                sections: sections.length,
-                enrollments: enrollments.length,
-                activities: activities.length,
-                grades: grades.length,
-            },
-            // Note: In a real implementation, you would return actual data
-            // but be careful about size limits and sensitive information
+            success: true,
+            message: `Period ${period.name} closed successfully`,
+            sectionsProcessed: sections.length,
         };
     },
 });

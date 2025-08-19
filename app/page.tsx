@@ -8,10 +8,9 @@
 // ################################################################################
 
 /**
- * HISTORY: Alef University’s Academic Records and Grading System (MVP). A Next.js 
- * application with a clean and scalable architecture, designed to manage students, 
- * faculty, courses, and transcripts, ensuring academic excellence, integrity, 
- * and structured growth.
+ * HISTORY: Alef University’s student information system (SIS). A Next.js 
+ * application with a clean and scalable architecture, designed to manage students grades, 
+ * programs, courses, and transcripts.
  */
 
 import {

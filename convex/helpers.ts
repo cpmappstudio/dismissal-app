@@ -3,8 +3,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import {
     StudentProgress,
     EnrollmentWithDetails,
-    GradeWeights,
-    // UserTemplate,
+    PendingCourses,
     AppError,
     ErrorCodes
 } from "./types";
@@ -113,28 +112,6 @@ export async function getUserTemplate(
 }
 
 /**
- * Get user template with enriched data
- */
-export async function getUserTemplateWithDetails(
-    ctx: QueryCtx,
-    email: string
-) {
-    const template = await getUserTemplate(ctx, email);
-    if (!template) return null;
-
-    const [program, creator] = await Promise.all([
-        template.programId ? ctx.db.get(template.programId) : null,
-        ctx.db.get(template.createdBy)
-    ]);
-
-    return {
-        template,
-        program,
-        creator
-    };
-}
-
-/**
  * Delete user template after successful registration
  */
 export async function deleteUserTemplate(
@@ -152,87 +129,25 @@ export async function deleteUserTemplate(
 }
 
 // ============================================================================
-// DATA ENRICHMENT HELPERS
+// PERIOD HELPERS (renamed from semester)
 // ============================================================================
 
 /**
- * Enrich enrollments with course and section details
+ * Get current active period
  */
-export async function enrichEnrollmentsWithDetails(
-    ctx: QueryCtx,
-    enrollments: Doc<"enrollments">[]
-): Promise<EnrollmentWithDetails[]> {
-    const enrichedEnrollments: EnrollmentWithDetails[] = [];
-
-    for (const enrollment of enrollments) {
-        const [course, section] = await Promise.all([
-            ctx.db.get(enrollment.courseId),
-            ctx.db.get(enrollment.sectionId)
-        ]);
-
-        // Only include if both course and section exist
-        if (course && section) {
-            enrichedEnrollments.push({
-                enrollment,
-                course,
-                section,
-            });
-        } else {
-            console.warn(`Missing data for enrollment ${enrollment._id}`);
-        }
-    }
-
-    return enrichedEnrollments;
-}
-
-/**
- * Get section with course details and enrollment count
- */
-export async function getSectionWithDetails(
-    ctx: QueryCtx,
-    sectionId: Id<"sections">
-) {
-    const section = await ctx.db.get(sectionId);
-    if (!section) return null;
-
-    const [course, enrollments] = await Promise.all([
-        ctx.db.get(section.courseId),
-        ctx.db
-            .query("enrollments")
-            .withIndex("by_section_status", (q) =>
-                q.eq("sectionId", sectionId).eq("status", "enrolled")
-            )
-            .collect()
-    ]);
-
-    return {
-        section,
-        course,
-        enrollments,
-        enrolledCount: enrollments.length,
-    };
-}
-
-// ============================================================================
-// SEMESTER HELPERS
-// ============================================================================
-
-/**
- * Get current active semester
- */
-export async function getCurrentSemester(ctx: QueryCtx): Promise<Doc<"semesters"> | null> {
+export async function getCurrentPeriod(ctx: QueryCtx): Promise<Doc<"periods"> | null> {
     return await ctx.db
-        .query("semesters")
-        .withIndex("by_status", (q) => q.eq("status", "active"))
+        .query("periods")
+        .withIndex("by_current", (q) => q.eq("isCurrentPeriod", true))
         .first();
 }
 
 /**
- * Get enrollment period semester
+ * Get enrollment period
  */
-export async function getEnrollmentSemester(ctx: QueryCtx): Promise<Doc<"semesters"> | null> {
+export async function getEnrollmentPeriod(ctx: QueryCtx): Promise<Doc<"periods"> | null> {
     return await ctx.db
-        .query("semesters")
+        .query("periods")
         .withIndex("by_status", (q) => q.eq("status", "enrollment"))
         .first();
 }
@@ -242,7 +157,7 @@ export async function getEnrollmentSemester(ctx: QueryCtx): Promise<Doc<"semeste
 // ============================================================================
 
 /**
- * Calculate academic progress for a student
+ * Calculate academic progress for a student (40-60-20 credits)
  */
 export async function calculateStudentProgress(
     ctx: QueryCtx,
@@ -254,32 +169,46 @@ export async function calculateStudentProgress(
     const program = await ctx.db.get(student.studentProfile.programId);
     if (!program) return null;
 
-    const completedEnrollments = await ctx.db
-        .query("enrollments")
-        .withIndex("by_student_status", (q) =>
-            q.eq("studentId", studentId).eq("status", "completed")
+    // Get program requirements
+    const requirements = await ctx.db
+        .query("program_requirements")
+        .withIndex("by_program_active", (q) =>
+            q.eq("programId", program._id).eq("isActive", true)
         )
+        .first();
+
+    if (!requirements) return null;
+
+    // Get completed enrollments
+    const enrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_student_period_status", (q) =>
+            q.eq("studentId", studentId)
+        )
+        .filter((q) => q.eq(q.field("status"), "completed"))
         .collect();
 
+    // Calculate credits by category
+    let humanitiesCredits = 0;
     let coreCredits = 0;
     let electiveCredits = 0;
-    let generalCredits = 0;
     let totalCredits = 0;
 
-    for (const enrollment of completedEnrollments) {
-        if (enrollment.creditsEarned) {
+    for (const enrollment of enrollments) {
+        // Only count if passed (effectiveGrade >= 3.0)
+        if (enrollment.effectiveGrade && enrollment.effectiveGrade >= 3.0) {
             const course = await ctx.db.get(enrollment.courseId);
             if (course) {
-                totalCredits += enrollment.creditsEarned;
-                switch (course.area) {
+                totalCredits += course.credits;
+                switch (course.category) {
+                    case "humanities":
+                        humanitiesCredits += course.credits;
+                        break;
                     case "core":
-                        coreCredits += enrollment.creditsEarned;
+                        coreCredits += course.credits;
                         break;
                     case "elective":
-                        electiveCredits += enrollment.creditsEarned;
-                        break;
-                    case "general":
-                        generalCredits += enrollment.creditsEarned;
+                        electiveCredits += course.credits;
                         break;
                 }
             }
@@ -287,12 +216,24 @@ export async function calculateStudentProgress(
     }
 
     return {
-        totalCredits,
+        // Current credits
+        humanitiesCredits,
         coreCredits,
         electiveCredits,
-        generalCredits,
-        requiredCredits: program.totalCredits,
-        completionPercentage: Math.min(100, (totalCredits / program.totalCredits) * 100),
+        totalCredits,
+        
+        // Required credits
+        requiredHumanities: requirements.humanitiesCredits,
+        requiredCore: requirements.coreCredits,
+        requiredElective: requirements.electiveCredits,
+        requiredTotal: requirements.totalCredits,
+        
+        // Progress percentages
+        humanitiesProgress: (humanitiesCredits / requirements.humanitiesCredits) * 100,
+        coreProgress: (coreCredits / requirements.coreCredits) * 100,
+        electiveProgress: (electiveCredits / requirements.electiveCredits) * 100,
+        overallProgress: (totalCredits / requirements.totalCredits) * 100,
+        
         program,
     };
 }
@@ -302,28 +243,143 @@ export async function calculateStudentProgress(
  */
 export async function calculateGPA(
     ctx: QueryCtx,
-    studentId: Id<"users">
+    studentId: Id<"users">,
+    periodId?: Id<"periods">
 ): Promise<number> {
-    const enrollments = await ctx.db
-        .query("enrollments")
-        .withIndex("by_student_status", (q) =>
-            q.eq("studentId", studentId).eq("status", "completed")
-        )
-        .collect();
-
-    if (enrollments.length === 0) return 0;
+    let enrollments;
+    
+    if (periodId) {
+        // Period GPA
+        enrollments = await ctx.db
+            .query("enrollments")
+            .withIndex("by_student_period", (q) =>
+                q.eq("studentId", studentId).eq("periodId", periodId)
+            )
+            .collect();
+    } else {
+        // Cumulative GPA
+        enrollments = await ctx.db
+            .query("enrollments")
+            .withIndex("by_student_course", (q) =>
+                q.eq("studentId", studentId)
+            )
+            .collect();
+    }
 
     let totalPoints = 0;
     let totalCredits = 0;
 
     for (const enrollment of enrollments) {
-        if (enrollment.finalGrade && enrollment.creditsEarned) {
-            totalPoints += enrollment.finalGrade * enrollment.creditsEarned;
-            totalCredits += enrollment.creditsEarned;
+        // Only count completed courses
+        if (enrollment.status === "completed" && enrollment.effectiveGrade) {
+            const course = await ctx.db.get(enrollment.courseId);
+            if (course) {
+                totalPoints += enrollment.effectiveGrade * course.credits;
+                totalCredits += course.credits;
+            }
         }
     }
 
     return totalCredits > 0 ? Number((totalPoints / totalCredits).toFixed(2)) : 0;
+}
+
+/**
+ * Calculate pending courses for pensum visualization
+ */
+export async function calculatePendingCourses(
+    ctx: QueryCtx,
+    studentId: Id<"users">
+): Promise<PendingCourses | null> {
+    const student = await ctx.db.get(studentId);
+    if (!student?.studentProfile) return null;
+
+    // Get all program courses
+    const allCourses = await ctx.db
+        .query("courses")
+        .withIndex("by_program_active", (q) =>
+            q.eq("programId", student.studentProfile!.programId).eq("isActive", true)
+        )
+        .collect();
+
+    // Get completed course codes
+    const completedEnrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_student_course", (q) =>
+            q.eq("studentId", studentId)
+        )
+        .filter((q) => q.eq(q.field("status"), "completed"))
+        .collect();
+
+    const completedCourseIds = new Set(
+        completedEnrollments.map(e => e.courseId)
+    );
+
+    // Categorize pending courses
+    const humanitiesPending: Doc<"courses">[] = [];
+    const corePending: Doc<"courses">[] = [];
+    const electivePending: Doc<"courses">[] = [];
+    const availableNow: Doc<"courses">[] = [];
+    const blockedCourses: Array<{
+        course: Doc<"courses">;
+        missingPrerequisites: string[];
+    }> = [];
+
+    // Get completed course codes for prerequisite checking
+    const completedCourseCodes = new Set<string>();
+    for (const courseId of completedCourseIds) {
+        const course = await ctx.db.get(courseId);
+        if (course) completedCourseCodes.add(course.code);
+    }
+
+    // Analyze each course
+    for (const course of allCourses) {
+        if (!completedCourseIds.has(course._id)) {
+            // Add to pending by category
+            switch (course.category) {
+                case "humanities":
+                    humanitiesPending.push(course);
+                    break;
+                case "core":
+                    corePending.push(course);
+                    break;
+                case "elective":
+                    electivePending.push(course);
+                    break;
+            }
+
+            // Check prerequisites
+            const missingPrereqs = course.prerequisites.filter(
+                code => !completedCourseCodes.has(code)
+            );
+
+            if (missingPrereqs.length === 0) {
+                availableNow.push(course);
+            } else {
+                blockedCourses.push({
+                    course,
+                    missingPrerequisites: missingPrereqs
+                });
+            }
+        }
+    }
+
+    // Get current progress
+    const progress = await calculateStudentProgress(ctx, studentId);
+    if (!progress) return null;
+
+    return {
+        humanitiesPending,
+        corePending,
+        electivePending,
+        
+        humanitiesNeeded: Math.max(0, progress.requiredHumanities - progress.humanitiesCredits),
+        coreNeeded: Math.max(0, progress.requiredCore - progress.coreCredits),
+        electiveNeeded: Math.max(0, progress.requiredElective - progress.electiveCredits),
+        totalNeeded: Math.max(0, progress.requiredTotal - progress.totalCredits),
+        
+        availableNow,
+        blockedCourses,
+    };
 }
 
 // ============================================================================
@@ -331,23 +387,24 @@ export async function calculateGPA(
 // ============================================================================
 
 /**
- * Check if student is already enrolled in a course for a semester
+ * Check if student is already enrolled in a course for a period
  */
 export async function isStudentEnrolledInCourse(
     ctx: QueryCtx,
     studentId: Id<"users">,
     courseId: Id<"courses">,
-    semesterId: Id<"semesters">
+    periodId: Id<"periods">
 ): Promise<boolean> {
     const existing = await ctx.db
         .query("enrollments")
-        .withIndex("by_student_semester", (q) =>
-            q.eq("studentId", studentId).eq("semesterId", semesterId)
+        .withIndex("by_student_period", (q) =>
+            q.eq("studentId", studentId).eq("periodId", periodId)
         )
         .filter((q) =>
             q.and(
                 q.eq(q.field("courseId"), courseId),
-                q.neq(q.field("status"), "dropped")
+                q.neq(q.field("status"), "cancelled"),
+                q.neq(q.field("status"), "withdrawn")
             )
         )
         .first();
@@ -363,33 +420,7 @@ export function hasAvailableCapacity(section: Doc<"sections">): boolean {
 }
 
 /**
- * Check if student meets minimum semester requirement for course
- */
-export async function meetsMinimumSemester(
-    ctx: QueryCtx,
-    studentId: Id<"users">,
-    courseId: Id<"courses">
-): Promise<boolean> {
-    const [student, course] = await Promise.all([
-        ctx.db.get(studentId),
-        ctx.db.get(courseId)
-    ]);
-
-    if (!student?.studentProfile || !course) return false;
-
-    const currentYear = new Date().getFullYear();
-    const yearsEnrolled = currentYear - student.studentProfile.enrollmentYear;
-    const currentSemester = yearsEnrolled * 2 + 1; // Approximation
-
-    return currentSemester >= course.minSemester;
-}
-
-// ============================================================================
-// PREREQUISITE HELPERS
-// ============================================================================
-
-/**
- * Check if student has completed all prerequisites for a course
+ * Check if student has completed prerequisites
  */
 export async function hasCompletedPrerequisites(
     ctx: QueryCtx,
@@ -403,15 +434,16 @@ export async function hasCompletedPrerequisites(
 
     const completedEnrollments = await ctx.db
         .query("enrollments")
-        .withIndex("by_student_status", (q) =>
-            q.eq("studentId", studentId).eq("status", "completed")
+        .withIndex("by_student_course", (q) =>
+            q.eq("studentId", studentId)
         )
+        .filter((q) => q.eq(q.field("status"), "completed"))
         .collect();
 
     const completedCourseCodes = new Set<string>();
     for (const enrollment of completedEnrollments) {
         const completedCourse = await ctx.db.get(enrollment.courseId);
-        if (completedCourse) {
+        if (completedCourse && enrollment.effectiveGrade && enrollment.effectiveGrade >= 3.0) {
             completedCourseCodes.add(completedCourse.code);
         }
     }
@@ -507,7 +539,9 @@ export async function isStudentCodeTaken(
 ): Promise<boolean> {
     const users = await ctx.db
         .query("users")
-        .filter((q) => q.eq(q.field("role"), "student"))
+        .withIndex("by_role_active", (q) => 
+            q.eq("role", "student")
+        )
         .collect();
 
     for (const user of users) {
@@ -531,7 +565,9 @@ export async function isEmployeeCodeTaken(
 ): Promise<boolean> {
     const users = await ctx.db
         .query("users")
-        .filter((q) => q.eq(q.field("role"), "professor"))
+        .withIndex("by_role_active", (q) => 
+            q.eq("role", "professor")
+        )
         .collect();
 
     for (const user of users) {
@@ -550,143 +586,163 @@ export async function isEmployeeCodeTaken(
 // ============================================================================
 
 /**
- * Calculate letter grade from numerical grade (Colombian scale)
+ * Calculate letter grade from numerical grade (0-5 scale)
  */
 export function calculateLetterGrade(numericalGrade: number): string {
     if (numericalGrade >= 4.5) return "A";
-    if (numericalGrade >= 4.0) return "A-";
-    if (numericalGrade >= 3.5) return "B+";
-    if (numericalGrade >= 3.0) return "B";
-    if (numericalGrade >= 2.5) return "C";
+    if (numericalGrade >= 4.0) return "B";
+    if (numericalGrade >= 3.5) return "C";
+    if (numericalGrade >= 3.0) return "D";
     return "F";
 }
 
 /**
- * Determine if grade is passing (Colombian scale: 3.0 minimum)
+ * Determine if grade is passing (3.0 minimum)
  */
 export function isPassingGrade(grade: number): boolean {
     return grade >= 3.0;
 }
 
 /**
- * Parse grade weights from JSON string
+ * Calculate effective grade (makeup replaces final if better)
  */
-export function parseGradeWeights(gradeWeightsJson: string): GradeWeights | null {
-    try {
-        const weights = JSON.parse(gradeWeightsJson) as GradeWeights;
-        if (validateGradeWeights(weights)) {
-            return weights;
-        }
-        return null;
-    } catch {
-        return null;
-    }
+export function calculateEffectiveGrade(
+    finalGrade: number | undefined,
+    makeupGrade: number | undefined
+): number | undefined {
+    if (!finalGrade && !makeupGrade) return undefined;
+    if (!makeupGrade) return finalGrade;
+    if (!finalGrade) return makeupGrade;
+    // Makeup grade replaces final grade (as specified in requirements)
+    return makeupGrade;
 }
 
-/**
- * Validate that grade weights sum to 100
- */
-export function validateGradeWeights(weights: GradeWeights): boolean {
-    const total = weights.exams + weights.assignments + weights.final + weights.other;
-    return Math.abs(total - 100) < 0.01; // Tolerance for floating point
-}
+// ============================================================================
+// DATA ENRICHMENT HELPERS
+// ============================================================================
 
 /**
- * Calculate current grade for an enrollment
+ * Enrich enrollments with course, section, period, and professor details
  */
-export async function calculateCurrentGrade(
+export async function enrichEnrollmentsWithDetails(
     ctx: QueryCtx,
-    enrollmentId: Id<"enrollments">
-): Promise<number> {
-    const enrollment = await ctx.db.get(enrollmentId);
-    if (!enrollment) return 0;
+    enrollments: Doc<"enrollments">[]
+): Promise<EnrollmentWithDetails[]> {
+    const enrichedEnrollments: EnrollmentWithDetails[] = [];
 
-    const section = await ctx.db.get(enrollment.sectionId);
-    if (!section) return 0;
+    for (const enrollment of enrollments) {
+        const [course, section, period] = await Promise.all([
+            ctx.db.get(enrollment.courseId),
+            ctx.db.get(enrollment.sectionId),
+            ctx.db.get(enrollment.periodId)
+        ]);
 
-    const weights = parseGradeWeights(section.gradeWeights);
-    if (!weights) return 0;
+        let professor = null;
+        if (section) {
+            professor = await ctx.db.get(section.professorId);
+        }
 
-    const grades = await ctx.db
-        .query("grades")
-        .withIndex("by_enrollment", (q) => q.eq("enrollmentId", enrollmentId))
+        enrichedEnrollments.push({
+            enrollment,
+            course,
+            section,
+            professor,
+            period,
+        });
+    }
+
+    return enrichedEnrollments;
+}
+
+/**
+ * Get section with course details and enrollment count
+ */
+export async function getSectionWithDetails(
+    ctx: QueryCtx,
+    sectionId: Id<"sections">
+) {
+    const section = await ctx.db.get(sectionId);
+    if (!section) return null;
+
+    const [course, professor] = await Promise.all([
+        ctx.db.get(section.courseId),
+        ctx.db.get(section.professorId)
+    ]);
+
+    return {
+        section,
+        course,
+        professor,
+        enrolledCount: section.enrolled,
+        availableSlots: section.capacity - section.enrolled,
+    };
+}
+
+// ============================================================================
+// RANKING HELPERS (calculated dynamically for 250 students)
+// ============================================================================
+
+/**
+ * Calculate student ranking for a period
+ * Returns ranking based on period GPA among all students who were enrolled in that period
+ */
+export async function calculatePeriodRanking(
+    ctx: QueryCtx,
+    periodId: Id<"periods">,
+    studentId: Id<"users">
+): Promise<{ rank: number; total: number; gpa: number }> {
+    // Get ALL enrollments for the period (not just completed ones)
+    const allPeriodEnrollments = await ctx.db
+        .query("enrollments")
+        .filter((q) => q.eq(q.field("periodId"), periodId))
         .collect();
 
-    let totalWeightedScore = 0;
-    let totalWeight = 0;
+    // Group enrollments by student
+    const studentEnrollments = new Map<string, Doc<"enrollments">[]>();
+    
+    for (const enrollment of allPeriodEnrollments) {
+        const existing = studentEnrollments.get(enrollment.studentId) || [];
+        existing.push(enrollment);
+        studentEnrollments.set(enrollment.studentId, existing);
+    }
 
-    for (const grade of grades) {
-        if (grade.score !== undefined) {
-            const activity = await ctx.db.get(grade.activityId);
-            if (activity && activity.gradesReleased) {
-                const normalizedScore = (grade.score / activity.maxPoints) * 5; // Convert to 0-5 scale
-                totalWeightedScore += normalizedScore * activity.weight;
-                totalWeight += activity.weight;
+    // Calculate period GPA for each student
+    const studentGPAs: Array<{ studentId: string; gpa: number }> = [];
+    
+    for (const [sid, enrollments] of studentEnrollments) {
+        let totalPoints = 0;
+        let totalCredits = 0;
+        
+        // Calculate GPA for this student in this specific period
+        for (const enrollment of enrollments) {
+            // Only count enrollments that have grades (completed or failed with grade)
+            if (enrollment.effectiveGrade !== undefined && enrollment.effectiveGrade !== null) {
+                const course = await ctx.db.get(enrollment.courseId);
+                if (course) {
+                    totalPoints += enrollment.effectiveGrade * course.credits;
+                    totalCredits += course.credits;
+                }
             }
+        }
+
+        // Only include students who have at least one graded course in this period
+        if (totalCredits > 0) {
+            studentGPAs.push({
+                studentId: sid,
+                gpa: Number((totalPoints / totalCredits).toFixed(2))
+            });
         }
     }
 
-    return totalWeight > 0 ? Number((totalWeightedScore / totalWeight).toFixed(2)) : 0;
-}
+    // Sort by GPA (descending - highest GPA gets rank 1)
+    studentGPAs.sort((a, b) => b.gpa - a.gpa);
 
-// ============================================================================
-// PRIVACY HELPERS
-// ============================================================================
-
-/**
- * Check if user can view another user's profile
- */
-export async function canViewProfile(
-    ctx: QueryCtx,
-    viewerId: Id<"users">,
-    targetId: Id<"users">
-): Promise<boolean> {
-    // Same user can always view own profile
-    if (viewerId === targetId) return true;
-
-    const [viewer, target] = await Promise.all([
-        ctx.db.get(viewerId),
-        ctx.db.get(targetId)
-    ]);
-
-    if (!viewer || !target) return false;
-
-    // Admins and professors can view all profiles
-    if (viewer.role === "admin" || viewer.role === "professor") return true;
-
-    // Check student privacy settings
-    if (target.role === "student" && target.studentProfile) {
-        return target.studentProfile.showProfile;
-    }
-
-    return false;
-}
-
-/**
- * Check if user can view another user's grades
- */
-export async function canViewGrades(
-    ctx: QueryCtx,
-    viewerId: Id<"users">,
-    targetId: Id<"users">
-): Promise<boolean> {
-    // Same user can always view own grades
-    if (viewerId === targetId) return true;
-
-    const [viewer, target] = await Promise.all([
-        ctx.db.get(viewerId),
-        ctx.db.get(targetId)
-    ]);
-
-    if (!viewer || !target) return false;
-
-    // Admins and professors can view all grades
-    if (viewer.role === "admin" || viewer.role === "professor") return true;
-
-    // Check student privacy settings
-    if (target.role === "student" && target.studentProfile) {
-        return target.studentProfile.showGrades;
-    }
-
-    return false;
+    // Find the target student's position
+    const studentIndex = studentGPAs.findIndex(s => s.studentId === studentId);
+    
+    return {
+        rank: studentIndex >= 0 ? studentIndex + 1 : 0,
+        total: studentGPAs.length,
+        gpa: studentIndex >= 0 ? studentGPAs[studentIndex].gpa : 0
+    };
 }
