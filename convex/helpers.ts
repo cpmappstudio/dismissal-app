@@ -221,19 +221,19 @@ export async function calculateStudentProgress(
         coreCredits,
         electiveCredits,
         totalCredits,
-        
+
         // Required credits
         requiredHumanities: requirements.humanitiesCredits,
         requiredCore: requirements.coreCredits,
         requiredElective: requirements.electiveCredits,
         requiredTotal: requirements.totalCredits,
-        
+
         // Progress percentages
         humanitiesProgress: (humanitiesCredits / requirements.humanitiesCredits) * 100,
         coreProgress: (coreCredits / requirements.coreCredits) * 100,
         electiveProgress: (electiveCredits / requirements.electiveCredits) * 100,
         overallProgress: (totalCredits / requirements.totalCredits) * 100,
-        
+
         program,
     };
 }
@@ -247,7 +247,7 @@ export async function calculateGPA(
     periodId?: Id<"periods">
 ): Promise<number> {
     let enrollments;
-    
+
     if (periodId) {
         // Period GPA
         enrollments = await ctx.db
@@ -371,12 +371,12 @@ export async function calculatePendingCourses(
         humanitiesPending,
         corePending,
         electivePending,
-        
+
         humanitiesNeeded: Math.max(0, progress.requiredHumanities - progress.humanitiesCredits),
         coreNeeded: Math.max(0, progress.requiredCore - progress.coreCredits),
         electiveNeeded: Math.max(0, progress.requiredElective - progress.electiveCredits),
         totalNeeded: Math.max(0, progress.requiredTotal - progress.totalCredits),
-        
+
         availableNow,
         blockedCourses,
     };
@@ -539,7 +539,7 @@ export async function isStudentCodeTaken(
 ): Promise<boolean> {
     const users = await ctx.db
         .query("users")
-        .withIndex("by_role_active", (q) => 
+        .withIndex("by_role_active", (q) =>
             q.eq("role", "student")
         )
         .collect();
@@ -565,7 +565,7 @@ export async function isEmployeeCodeTaken(
 ): Promise<boolean> {
     const users = await ctx.db
         .query("users")
-        .withIndex("by_role_active", (q) => 
+        .withIndex("by_role_active", (q) =>
             q.eq("role", "professor")
         )
         .collect();
@@ -684,65 +684,64 @@ export async function getSectionWithDetails(
 
 /**
  * Calculate student ranking for a period
- * Returns ranking based on period GPA among all students who were enrolled in that period
  */
 export async function calculatePeriodRanking(
     ctx: QueryCtx,
     periodId: Id<"periods">,
     studentId: Id<"users">
 ): Promise<{ rank: number; total: number; gpa: number }> {
-    // Get ALL enrollments for the period (not just completed ones)
-    const allPeriodEnrollments = await ctx.db
+    // Get all enrollments for the period
+    const allEnrollments = await ctx.db
         .query("enrollments")
         .filter((q) => q.eq(q.field("periodId"), periodId))
         .collect();
 
-    // Group enrollments by student
-    const studentEnrollments = new Map<string, Doc<"enrollments">[]>();
-    
-    for (const enrollment of allPeriodEnrollments) {
-        const existing = studentEnrollments.get(enrollment.studentId) || [];
-        existing.push(enrollment);
-        studentEnrollments.set(enrollment.studentId, existing);
+    // Group by student
+    const studentGPAs = new Map<string, number>();
+
+    for (const enrollment of allEnrollments) {
+        if (enrollment.status === "completed" && enrollment.effectiveGrade) {
+            const course = await ctx.db.get(enrollment.courseId);
+            if (course) {
+                const currentTotal = studentGPAs.get(enrollment.studentId) || 0;
+                studentGPAs.set(
+                    enrollment.studentId,
+                    currentTotal + (enrollment.effectiveGrade * course.credits)
+                );
+            }
+        }
     }
 
-    // Calculate period GPA for each student
-    const studentGPAs: Array<{ studentId: string; gpa: number }> = [];
-    
-    for (const [sid, enrollments] of studentEnrollments) {
-        let totalPoints = 0;
+    // Calculate GPAs
+    const gpas: Array<{ studentId: string; gpa: number }> = [];
+    for (const [sid, totalPoints] of studentGPAs) {
+        const studentEnrollments = allEnrollments.filter(e => e.studentId === sid);
         let totalCredits = 0;
-        
-        // Calculate GPA for this student in this specific period
-        for (const enrollment of enrollments) {
-            // Only count enrollments that have grades (completed or failed with grade)
-            if (enrollment.effectiveGrade !== undefined && enrollment.effectiveGrade !== null) {
+
+        for (const enrollment of studentEnrollments) {
+            if (enrollment.status === "completed") {
                 const course = await ctx.db.get(enrollment.courseId);
-                if (course) {
-                    totalPoints += enrollment.effectiveGrade * course.credits;
-                    totalCredits += course.credits;
-                }
+                if (course) totalCredits += course.credits;
             }
         }
 
-        // Only include students who have at least one graded course in this period
         if (totalCredits > 0) {
-            studentGPAs.push({
+            gpas.push({
                 studentId: sid,
-                gpa: Number((totalPoints / totalCredits).toFixed(2))
+                gpa: totalPoints / totalCredits
             });
         }
     }
 
-    // Sort by GPA (descending - highest GPA gets rank 1)
-    studentGPAs.sort((a, b) => b.gpa - a.gpa);
+    // Sort by GPA (descending)
+    gpas.sort((a, b) => b.gpa - a.gpa);
 
-    // Find the target student's position
-    const studentIndex = studentGPAs.findIndex(s => s.studentId === studentId);
-    
+    // Find student's rank
+    const studentIndex = gpas.findIndex(g => g.studentId === studentId);
+
     return {
         rank: studentIndex >= 0 ? studentIndex + 1 : 0,
-        total: studentGPAs.length,
-        gpa: studentIndex >= 0 ? studentGPAs[studentIndex].gpa : 0
+        total: gpas.length,
+        gpa: gpas[studentIndex]?.gpa || 0
     };
 }
