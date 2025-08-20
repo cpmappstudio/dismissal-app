@@ -7,7 +7,7 @@ import {
 } from "./types";
 import {
   getCurrentUserFromAuth,
-  requireAuth,
+  // requireAuth,
   requireRole,
   checkEmailAuthorization,
   getUserTemplate,

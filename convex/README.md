@@ -1,300 +1,368 @@
-# Alef University - Convex Backend
+# Alef University - Student Information System (SIS)
 
-A serverless backend implementation for university academic management using Convex database and TypeScript.
+A serverless **Student Information System** implementation using Convex database and TypeScript, optimized for 250 students and 20 professors.
 
-## Architecture Overview
+## 🎯 System Overview
 
-This project implements a **serverless-first architecture** using Convex as the backend infrastructure:
+This project implements a **minimalist SIS** focused on core academic functions:
+- **Grade management** (CAL/HAB scales)
+- **Transcript generation** 
+- **Academic progress tracking** (40-60-20 credit system)
+- **Course enrollment** with prerequisite validation
+- **Period-based** academic structure
+
+## 🏗️ Architecture
 
 ```mermaid
 graph TB
-    subgraph "Convex Backend Layer"
-        A[Query Functions] --> B[Academic Data]
-        C[Mutation Functions] --> B
-        D[Database Tables] --> B
-        E[Real-time Subscriptions] --> A
+    subgraph "SIS Core Functions"
+        A[Student Dashboard] --> B[Academic Progress]
+        C[Professor Dashboard] --> D[Grade Submission] 
+        E[Admin Functions] --> F[System Management]
+        G[Enrollment System] --> H[Transcript Generation]
     end
     
     subgraph "Data Layer"
-        F[Users & Profiles] --> D
-        G[Academic Programs] --> D
-        H[Course Catalog] --> D
-        I[Sections & Enrollments] --> D
-        J[Grades & Activities] --> D
+        I[Users & Profiles] --> J[Convex Database]
+        K[Programs & Courses] --> J
+        L[Periods & Sections] --> J
+        M[Enrollments & Grades] --> J
     end
     
     subgraph "Business Logic"
-        K[Validation Helpers] --> C
-        L[Academic Calculations] --> A
-        M[Type Safety] --> A
-        M --> C
+        N[Prerequisites Validation] --> O[Enrollment Logic]
+        P[GPA Calculations] --> Q[Progress Tracking]
+        R[Ranking System] --> S[Dynamic Calculations]
     end
     
-    A --> E
-    C --> K
-    L --> B
+    A --> I
+    C --> L  
+    E --> J
+    G --> N
+    H --> P
 ```
 
-### Key Components:
-- **Convex Database**: Serverless database with real-time capabilities
-- **TypeScript Functions**: Type-safe query and mutation functions
-- **Academic Schema**: Complete university data model
-- **Business Logic**: Academic rules and calculations
+## 📚 Academic Model
 
-## Backend Architecture
+### **Credit System (40-60-20)**
+- **40 credits**: Humanities courses
+- **60 credits**: Core program courses (Troncales)
+- **20 credits**: Elective courses
+- **Total**: 120 credits for graduation
 
-### Convex Functions Structure
+### **Grading Scales**
+- **CAL Scale**: 1.0 - 5.0 (Final grades)
+- **HAB Scale**: 0 - 100 (Makeup exams)
+- **Effective Grade**: Makeup grade replaces final grade when taken
+- **Passing Grade**: 3.0 minimum
 
-The backend is organized into four main TypeScript modules:
+### **Period Structure**
+- Uses **periods** instead of semesters
+- Format: "AGOSTO/2024 - DICIEMBRE/2024"
+- Status: planning → enrollment → active → grading → closed
 
-**Schema Definition** (`schema.ts`)
-- Defines all database tables and relationships
-- Implements indexes for optimal query performance
-- Enforces data integrity through type validation
+## 📁 SIS Functions Structure
 
-**Type System** (`types.ts`) 
-- Reusable validators using Convex's type system
-- Inferred TypeScript types for end-to-end safety
-- Complex business types for academic operations
+### **Core SIS Modules (9 files)**
 
-**Helper Functions** (`helpers.ts`)
-- Academic business logic and calculations
-- Data enrichment and transformation utilities
-- Validation and authorization helpers
+| Module | Functions | Purpose |
+|--------|-----------|---------|
+| **`auth.ts`** | `getCurrentUser`, `registerUser`, `preRegisterStudent`, `preRegisterProfessor` | Authentication with Clerk, pre-registration system |
+| **`users.ts`** | `getUserById`, `listStudents`, `updateUserProfile`, `activateUser` | User management and profiles |
+| **`programs.ts`** | `getPrograms`, `createProgram`, `createProgramRequirements` | Academic programs with 40-60-20 credit structure |
+| **`courses.ts`** | `getCoursesByProgram`, `getCourseById`, `getPendingCourses`, `createCourse` | Course catalog and pensum tracking |
+| **`sections.ts`** | `getSectionsByPeriod`, `getProfessorSections`, `createSection` | Course sections with professor assignment |
+| **`enrollments.ts`** | `enrollStudent`, `submitGrades`, `submitMakeupGrade`, `getTranscript` | Student enrollment and grade management |
+| **`studentDashboard.ts`** | `getStudentDashboard`, `getStudentProgress`, `getStudentPeriodSummary` | Student academic progress view |
+| **`professorDashboard.ts`** | `getProfessorDashboard`, `getClassList`, `getProfessorSchedule` | Professor class management |
+| **`admin.ts`** | `bulkCreateStudents`, `generatePeriodRankings`, `closePeriod`, `getSystemStats` | Administrative functions |
 
-**API Functions** (`myFunctions.ts`)
-- Query functions for data retrieval
-- Mutation functions for data modification
-- Real-time subscriptions for live updates
+### **Support Files**
+- **`schema.ts`**: Complete SIS database schema
+- **`types.ts`**: TypeScript interfaces and validators  
+- **`helpers.ts`**: Business logic and validation helpers
+- **`auth.config.ts`**: Clerk authentication configuration
 
-### Data Flow
+## 🗄️ SIS Database Schema
 
-1. **Queries**: Read operations that automatically subscribe to data changes
-2. **Mutations**: Write operations that validate and transform data
-3. **Real-time Updates**: Automatic propagation of changes to connected clients
-4. **Type Safety**: Compile-time validation of all data operations
-
-## Database Schema
-
-The schema models a complete university academic system with the following entities:
+Optimized schema for **Student Information System** with 9 core tables:
 
 ```mermaid
 erDiagram
-    USERS ||--o{ ENROLLMENTS : "enrolls in"
+    USERS ||--o{ ENROLLMENTS : "enrolls"
     USERS ||--o{ SECTIONS : "teaches"
-    USERS ||--o{ PROGRAMS : "belongs to"
-    USERS ||--o{ ACCESS_LIST : "creates"
-    USERS ||--o{ ANNOUNCEMENTS : "authors"
-    USERS ||--o{ GRADES : "grades"
-    
+    PROGRAMS ||--o{ USERS : "student belongs to"
     PROGRAMS ||--o{ COURSES : "contains"
-    PROGRAMS ||--o{ ACCESS_LIST : "pre-assigns"
+    PROGRAMS ||--o{ PROGRAM_REQUIREMENTS : "defines"
+    
+    PERIODS ||--o{ SECTIONS : "scheduled in"
+    PERIODS ||--o{ ENROLLMENTS : "during"
     
     COURSES ||--o{ SECTIONS : "offered as"
-    
     SECTIONS ||--o{ ENROLLMENTS : "has students"
-    SECTIONS ||--o{ ACTIVITIES : "contains"
-    SECTIONS ||--o{ ANNOUNCEMENTS : "receives"
     
-    SEMESTERS ||--o{ SECTIONS : "scheduled in"
-    SEMESTERS ||--o{ ENROLLMENTS : "during"
-    
-    ENROLLMENTS ||--o{ GRADES : "receives"
-    
-    ACTIVITIES ||--o{ GRADES : "graded in"
+    ACCESS_LIST ||--o{ USER_TEMPLATES : "pre-registration"
 
     USERS {
         string clerkId PK
         string email
         string name
-        enum role
+        enum role "student|professor|admin"
         boolean isActive
-        object studentProfile
-        object professorProfile
+        object studentProfile "code, programId, status"
+        object professorProfile "employeeCode, title"
         string phone
         string country
-        string city
-        id createdBy
-        number createdAt
     }
     
     PROGRAMS {
         string code PK
         string name
-        enum type
-        string department
-        number totalCredits
+        enum type "diploma|bachelor|master|doctorate"
+        number totalCredits "120 typically"
         number durationSemesters
         boolean isActive
     }
     
-    SEMESTERS {
-        string code PK
+    PERIODS {
+        string code PK "2024-2"
         number year
-        enum period
-        number startDate
-        number endDate
-        number enrollmentStart
-        number enrollmentEnd
-        enum status
+        number sequence "1,2,3"
+        string name "AGOSTO/2024 - DICIEMBRE/2024"
+        enum status "planning|enrollment|active|grading|closed"
+        boolean isCurrentPeriod
     }
     
     COURSES {
-        string code PK
+        string code PK "MATH101"
         string name
-        string description
         number credits
         id programId FK
-        enum area
-        array prerequisites
-        number minSemester
+        enum category "humanities|core|elective|general"
+        array prerequisites "course codes"
         boolean isActive
     }
     
     SECTIONS {
-        string crn PK
+        string crn PK "unique identifier"
         id courseId FK
-        id semesterId FK
-        string sectionNumber
+        id periodId FK
+        string groupNumber "01, 02"
         id professorId FK
-        array schedule
         number capacity
         number enrolled
-        string gradeWeights
-        enum status
+        string scheduleNote "Mon/Wed 2-4pm"
+        boolean gradesSubmitted
+        enum status "open|active|grading|closed"
     }
     
     ENROLLMENTS {
         id studentId FK
         id sectionId FK
-        id semesterId FK
-        id courseId FK
+        id periodId FK "denormalized"
+        id courseId FK "denormalized"
         number enrolledAt
-        enum status
-        number finalGrade
-        string letterGrade
-        number creditsEarned
-        number droppedAt
+        enum status "enrolled|cancelled|completed|failed"
+        number finalGrade "CAL 1-5"
+        number makeupGrade "HAB 0-100"
+        number effectiveGrade "makeup replaces final"
+        string letterGrade "A,B,C,D,F"
         boolean isRetake
     }
     
-    ACTIVITIES {
-        id sectionId FK
-        string title
-        string description
-        enum category
-        number weight
-        number maxPoints
-        number assignedAt
-        number dueAt
-        boolean isVisible
-        boolean gradesReleased
-    }
-    
-    GRADES {
-        id activityId FK
-        id enrollmentId FK
-        number score
-        number submittedAt
-        number gradedAt
-        string feedback
-        id gradedBy FK
+    PROGRAM_REQUIREMENTS {
+        id programId FK
+        number humanitiesCredits "40"
+        number coreCredits "60"
+        number electiveCredits "20"
+        number totalCredits "120"
+        number minGPA "3.0"
+        boolean isActive
     }
     
     ACCESS_LIST {
-        string email
-        enum role
-        id programId FK
-        string studentCode
+        string email PK
+        enum role "student|professor|admin"
         id createdBy FK
-        number createdAt
-        number expiresAt
         boolean isUsed
-        number usedAt
-        id usedBy FK
+        number createdAt
     }
     
-    ANNOUNCEMENTS {
-        id sectionId FK
-        string title
-        string content
-        id authorId FK
-        number createdAt
-        boolean isPinned
+    USER_TEMPLATES {
+        string email PK
+        string name
+        string studentCode "for students"
+        id programId FK "for students"
+        string employeeCode "for professors"
+        id createdBy FK
     }
 ```
 
-## File Structure
+## 📂 Project Structure
 
 ```
 convex/
-├── schema.ts          # Database schema definition
-├── types.ts           # TypeScript types and validators  
-├── helpers.ts         # Utility functions and business logic
-├── myFunctions.ts     # Main API functions
-└── _generated/        # Auto-generated Convex files
+├── 📋 Core SIS Functions
+│   ├── auth.ts              # Authentication & registration
+│   ├── users.ts             # User management
+│   ├── programs.ts          # Academic programs
+│   ├── courses.ts           # Course catalog
+│   ├── sections.ts          # Course sections
+│   ├── enrollments.ts       # Enrollment & grades
+│   ├── studentDashboard.ts  # Student interface
+│   ├── professorDashboard.ts # Professor interface
+│   └── admin.ts             # Administrative functions
+│
+├── 🔧 System Foundation
+│   ├── schema.ts            # Database schema
+│   ├── types.ts             # TypeScript definitions
+│   ├── helpers.ts           # Business logic utilities
+│   └── auth.config.ts       # Clerk configuration
+│
+└── 🤖 Auto-generated
+    └── _generated/          # Convex generated files
 ```
 
-## Academic Data Model
-
-### **User Management**
-- **Role-based system** (Student, Professor, Admin)
-- **Student profiles** with academic progress tracking
-- **Professor profiles** with department and title
-- **Privacy settings** for profile visibility
-
-### **Academic Structure**
-- **Programs**: Bachelor's, Master's, Doctorate, Diploma
-- **Courses**: Prerequisites, credit hours, area classification
-- **Sections**: Schedule, capacity, professor assignment
-- **Semesters**: Academic periods with enrollment windows
-
-### **Enrollment System**
-- **Prerequisites validation**
-- **Capacity management**
-- **Automatic conflict detection**
-- **Grade tracking** with weighted categories
-
-### **Grade Management**
-- **Flexible activity types** (exams, assignments, projects)
-- **Weighted grade calculations**
-- **Colombian grading scale** (0-5, 3.0 minimum to pass)
-- **Progress tracking** by academic area
-
-## Academic Business Rules
+## 🎓 SIS Business Logic
 
 ### **Enrollment Validation**
-- Prerequisites must be completed
-- Section capacity not exceeded
-- No schedule conflicts
-- Student not already enrolled in course
-- Enrollment period is active
+```typescript
+// Prerequisites must be completed
+await hasCompletedPrerequisites(ctx, studentId, courseId)
 
-### **Grade Calculation**
-- Colombian scale: 0.0 - 5.0
-- Minimum passing grade: 3.0
-- Letter grades: A (4.5+), A- (4.0+), B+ (3.5+), B (3.0+), C (2.5+), F (<2.5)
-- GPA weighted by credit hours
+// Section capacity not exceeded  
+hasAvailableCapacity(section)
 
-### **Academic Progress**
-- Credits classified by area: Core, Elective, General
-- Progress percentage based on total required credits
-- Completion tracking per program requirements
+// Student not already enrolled in course for period
+await isStudentEnrolledInCourse(ctx, studentId, courseId, periodId)
+```
 
-## Technical Implementation
+### **Grade Management**
+```typescript
+// CAL Scale: 1.0 - 5.0 (Final grades)
+finalGrade: 4.2  // CAL
 
-### **TypeScript Best Practices**
-- Use generated types from `_generated/dataModel`
-- Validators defined in `types.ts` for reusability
-- Helper functions in separate module for business logic
+// HAB Scale: 0 - 100 (Makeup exams) 
+makeupGrade: 85  // HAB
 
-### **Database Patterns**
-- Denormalize frequently queried fields
-- Use compound indexes for complex queries
-- Store flexible data as JSON strings when needed
+// Effective grade: makeup replaces final
+effectiveGrade = makeupGrade || finalGrade
+```
 
-### **Error Handling**
-- Custom `AppError` class with error codes
-- Descriptive error messages for UI
-- Proper HTTP status codes for API responses
+### **Academic Progress (40-60-20)**
+```typescript
+const progress = {
+  humanitiesCredits: 32,     // Current / 40 required
+  coreCredits: 45,           // Current / 60 required  
+  electiveCredits: 15,       // Current / 20 required
+  totalCredits: 92,          // Current / 120 total
+  overallProgress: 76.7%     // Completion percentage
+}
+```
+
+### **Dynamic Rankings**
+```typescript
+// Calculated real-time for 250 students
+const ranking = {
+  rank: 12,           // Student position
+  total: 247,         // Total students in period
+  gpa: 4.15,         // Period GPA
+  percentile: 95.1   // Top percentage
+}
+```
+
+## ⚙️ Technical Implementation
+
+### **SIS Architecture Principles**
+- **Minimalist Design**: Only essential features for grade management and transcripts
+- **Optimized for Scale**: 250 students, 20 professors - no over-engineering
+- **Period-based**: Academic periods instead of semesters
+- **Dynamic Calculations**: Rankings computed in real-time, no cache tables
+- **Type Safety**: End-to-end TypeScript with Convex validation
+
+### **Key Technical Decisions**
+
+**Simplified Grade Model**
+```typescript
+// NO complex activities table - grades stored directly in enrollments
+interface Enrollment {
+  finalGrade: number;      // CAL (1-5 scale)
+  makeupGrade: number;     // HAB (0-100 scale) 
+  effectiveGrade: number;  // What counts (makeup replaces final)
+  letterGrade: string;     // For transcripts
+}
+```
+
+**Optimized Queries**
+```typescript
+// Use indexes for frequent operations
+.withIndex("by_student_period", ["studentId", "periodId"])
+.withIndex("by_program_category", ["programId", "category"])
+.withIndex("by_professor_period", ["professorId", "periodId"])
+```
+
+**Business Rule Validation**
+```typescript
+// Prerequisites, capacity, conflicts all validated in helpers
+await requireAuth(ctx);
+await requireRole(ctx, "admin");
+await requireAdminOrSelf(ctx, userId);
+```
+
+### **What's NOT Implemented** ❌
+- Complex assignment/activity system
+- Detailed scheduling conflicts
+- Extensive notification system  
+- File upload/document management
+- Complex reporting dashboards
+- Student messaging system
+
+### **Deployment & Setup**
+
+1. **Install Dependencies**
+```bash
+npm install convex
+npx convex dev
+```
+
+2. **Environment Setup**
+```bash
+# .env.local
+CONVEX_DEPLOYMENT=your-deployment-url
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-key
+CLERK_SECRET_KEY=your-clerk-secret
+```
+
+3. **Database Initialization**
+```bash
+npx convex deploy
+# Schema automatically applied
+```
+
+## 📊 System Capabilities
+
+| Feature | Status | Scale |
+|---------|--------|-------|
+| **Student Management** | ✅ Complete | 250 students |
+| **Professor Management** | ✅ Complete | 20 professors |
+| **Course Catalog** | ✅ Complete | Unlimited courses |
+| **Section Management** | ✅ Complete | Period-based |
+| **Enrollment System** | ✅ Complete | With prerequisites |
+| **Grade Management** | ✅ Complete | CAL/HAB scales |
+| **Progress Tracking** | ✅ Complete | 40-60-20 credits |
+| **Transcript Generation** | ✅ Complete | Period-grouped |
+| **Dynamic Rankings** | ✅ Complete | Real-time calculation |
+| **Admin Functions** | ✅ Complete | Bulk operations |
+
+## 🚀 Ready for Production
+
+This SIS is **production-ready** for Alef University with:
+- ✅ Complete academic workflow
+- ✅ Role-based security  
+- ✅ Comprehensive validation
+- ✅ Optimized performance
+- ✅ Type-safe operations
+- ✅ Real-time capabilities
+
+Built with **Convex** for reliable, serverless academic management. 🎓
 
