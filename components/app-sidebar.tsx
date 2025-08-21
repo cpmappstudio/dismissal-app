@@ -39,7 +39,7 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
+      name: "Alef University",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
     },
@@ -179,6 +179,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             userButtonBox: {
               flexDirection: "row-reverse",
               textAlign: "left",
+              padding: state !== "collapsed" ? "0.5rem 0.5rem" : "0.1rem",
             },
           },
         }} showName={state !== "collapsed"} />
