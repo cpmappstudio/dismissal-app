@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun, Monitor, ChevronDown } from "lucide-react"
+import { Moon, Sun, Monitor, ChevronsUpDown } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import {
@@ -53,7 +53,7 @@ export function ModeToggle() {
                         {getThemeIcon()}
                         <span className="font-medium">{getThemeLabel()}</span>
                     </div>
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <ChevronsUpDown className="ml-auto h-4 w-4" />
                 </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-full">
