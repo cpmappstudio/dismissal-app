@@ -98,7 +98,6 @@ export const createPeriod = mutation({
             endDate: args.endDate,
             enrollmentStart: args.enrollmentStart,
             enrollmentEnd: args.enrollmentEnd,
-            gradingStart: args.endDate,  // Grading starts when period ends
             gradingDeadline: args.endDate + (7 * 24 * 60 * 60 * 1000), // 7 days after
             status: "planning" as const,
             isCurrentPeriod: false,
