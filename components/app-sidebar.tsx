@@ -17,7 +17,6 @@ import {
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
-import { shadcn } from "@clerk/themes"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
@@ -173,11 +172,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        {/* <ModeToggle /> */}
-        <ModeToggle />
+        <ModeToggle showText={state !== "collapsed"} />
         <UserButton
           appearance={{
-            baseTheme: shadcn,
             elements: {
               userButtonBox: {
                 flexDirection: "row-reverse",
@@ -185,7 +182,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 padding: state !== "collapsed" ? "0.5rem 0.5rem" : "0.1rem",
               },
             },
-          }} showName={state !== "collapsed"} />
+          }}
+          showName={state !== "collapsed"}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

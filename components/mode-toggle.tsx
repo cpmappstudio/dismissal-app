@@ -11,49 +11,62 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export function ModeToggle() {
-    const { theme, setTheme } = useTheme()
+interface ModeToggleProps {
+    showText?: boolean
+}
 
-    const getThemeLabel = () => {
-        switch (theme) {
-            case "light":
-                return "Light"
-            case "dark":
-                return "Dark"
-            case "system":
-                return "System"
-            default:
-                return "Theme"
-        }
-    }
+export function ModeToggle({ showText = true }: ModeToggleProps) {
+    const { theme, setTheme, resolvedTheme } = useTheme()
+    const [mounted, setMounted] = React.useState(false)
 
-    const getThemeIcon = () => {
+    React.useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    // Optimización: Solo recalcular cuando cambian los temas, no cuando mounted cambia
+    const themeLabel = React.useMemo(() => {
         switch (theme) {
-            case "light":
-                return <Sun className="h-4 w-4" />
-            case "dark":
-                return <Moon className="h-4 w-4" />
-            case "system":
-                return <Monitor className="h-4 w-4" />
-            default:
-                return (
-                    <>
-                        <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-                        <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-                    </>
-                )
+            case "light": return "Light"
+            case "dark": return "Dark"
+            case "system": return "System"
+            default: return "Theme"
         }
+    }, [theme])
+
+    const themeIcon = React.useMemo(() => {
+        if (theme === "system") {
+            return <Monitor className="h-4 w-4" />
+        }
+
+        switch (resolvedTheme) {
+            case "light": return <Sun className="h-4 w-4" />
+            case "dark": return <Moon className="h-4 w-4" />
+            default: return <Monitor className="h-4 w-4" />
+        }
+    }, [theme, resolvedTheme])
+
+    // Durante hydration: valores por defecto que coincidan con el tema más común
+    if (!mounted) {
+        return (
+            <div className={`flex items-center ${showText ? 'justify-between w-full px-2' : 'justify-center w-8 h-8'} py-1.5 text-left text-sm rounded-md`}>
+                <div className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    {showText && <span className="font-medium">System</span>}
+                </div>
+                {showText && <ChevronsUpDown className="ml-auto h-4 w-4" />}
+            </div>
+        )
     }
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <div className="flex items-center justify-between w-full px-2 py-1.5 text-left text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md transition-colors">
+                <div className={`flex items-center ${showText ? 'justify-between w-full px-2' : 'justify-center w-8 h-8'} py-1.5 text-left text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md transition-colors`}>
                     <div className="flex items-center gap-2">
-                        {getThemeIcon()}
-                        <span className="font-medium">{getThemeLabel()}</span>
+                        {themeIcon}
+                        {showText && <span className="font-medium">{themeLabel}</span>}
                     </div>
-                    <ChevronsUpDown className="ml-auto h-4 w-4" />
+                    {showText && <ChevronsUpDown className="ml-auto h-4 w-4" />}
                 </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-full">

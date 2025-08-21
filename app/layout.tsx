@@ -4,6 +4,7 @@ import "./globals.css";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider"
+import { shadcn } from "@clerk/themes"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +40,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ClerkProvider>
+          <ClerkProvider
+            appearance={{
+              baseTheme: shadcn,
+            }}
+          >
             <ConvexClientProvider>{children}</ConvexClientProvider>
           </ClerkProvider>
         </ThemeProvider>
