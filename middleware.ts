@@ -1,5 +1,3 @@
-// middleware.ts - Arquitectura Simplificada: Solo rutas públicas
-
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest } from 'next/server'
 
@@ -7,7 +5,6 @@ import { NextRequest } from 'next/server'
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
-  // Añade aquí landing, pricing, etc si las tienes en el futuro
 ])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {

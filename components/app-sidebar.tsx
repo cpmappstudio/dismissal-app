@@ -174,6 +174,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         {/* <ModeToggle /> */}
+        <ModeToggle />
         <UserButton
           appearance={{
             baseTheme: shadcn,

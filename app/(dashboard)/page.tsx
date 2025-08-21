@@ -2,7 +2,6 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
-  // Doble verificación aunque el middleware proteja
   const { userId } = await auth()
 
   if (!userId) {
