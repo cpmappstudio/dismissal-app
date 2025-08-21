@@ -174,15 +174,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         {/* <ModeToggle /> */}
-        <UserButton appearance={{
-          baseTheme: shadcn, elements: {
-            userButtonBox: {
-              flexDirection: "row-reverse",
-              textAlign: "left",
-              padding: state !== "collapsed" ? "0.5rem 0.5rem" : "0.1rem",
+        <UserButton
+          appearance={{
+            baseTheme: shadcn,
+            elements: {
+              userButtonBox: {
+                flexDirection: "row-reverse",
+                textAlign: "left",
+                padding: state !== "collapsed" ? "0.5rem 0.5rem" : "0.1rem",
+              },
             },
-          },
-        }} showName={state !== "collapsed"} />
+          }} showName={state !== "collapsed"} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

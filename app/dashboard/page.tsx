@@ -1,4 +1,14 @@
-export default function DashboardPage() {
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+
+export default async function DashboardPage() {
+  // Doble verificación aunque el middleware proteja
+  const { userId } = await auth()
+
+  if (!userId) {
+    redirect('/sign-in')
+  }
+
   return (
     <>
       <div className="grid auto-rows-min gap-4 md:grid-cols-3">
