@@ -1,35 +1,24 @@
-// middleware.ts - Versión Optimizada para Performance
+// middleware.ts - Arquitectura Simplificada: Solo rutas públicas
 
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest } from 'next/server'
 
-// Define las rutas protegidas
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/profile(.*)',
-  '/settings(.*)',
-  // Añade aquí otras rutas protegidas
-])
-
-// Define las rutas públicas (opcional, para claridad)
+// Solo definir rutas públicas - TODO lo demás está protegido
 const isPublicRoute = createRouteMatcher([
-  '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/about',
-  '/pricing',
-  // Añade aquí otras rutas públicas
+  // Añade aquí landing, pricing, etc si las tienes en el futuro
 ])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
-  // Proteger rutas que requieren autenticación
-  if (isProtectedRoute(req)) {
+  // Proteger TODO excepto rutas públicas
+  if (!isPublicRoute(req)) {
     await auth.protect()
   }
 
   // Debugging en desarrollo
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[Auth] ${req.nextUrl.pathname} - Protected: ${isProtectedRoute(req)}`)
+    console.log(`[Auth] ${req.nextUrl.pathname} - Public: ${isPublicRoute(req)}`)
   }
 })
 
