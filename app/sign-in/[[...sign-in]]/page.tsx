@@ -1,6 +1,5 @@
 import { SignIn } from "@clerk/nextjs"
-import { shadcn } from "@clerk/themes"
-import Image from "next/image"
+// import Image from "next/image"
 
 export default function SignInPage() {
     return (

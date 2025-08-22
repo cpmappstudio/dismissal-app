@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SIS Alef University",
-  description: "Alef University's student information system (SIS). A Next.js application with a clean and scalable architecture, designed to manage students grades, programs, courses, and transcripts.",
+  title: "SRU Alef University",
+  description: "Alef University's student information system (SRU). A Next.js application with a clean and scalable architecture, designed to manage students grades, programs, courses, and transcripts.",
   icons: {
     icon: "/alef.ico",
   },
