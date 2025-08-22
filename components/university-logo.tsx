@@ -30,7 +30,7 @@ export function UniversityLogo() {
                         <span className="truncate font-serif font-medium text-base">
                             Alef University
                         </span>
-                        <span className="truncate text-xs text-muted-foreground">
+                        <span className="truncate text-xs font-semibold text-sidebar-accent-foreground">
                             Academic Records System
                         </span>
                     </div>
