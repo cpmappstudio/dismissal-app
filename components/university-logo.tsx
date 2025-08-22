@@ -19,7 +19,7 @@ export function UniversityLogo() {
                 <div className={`flex w-full items-center gap-4 rounded-md pb-2 text-left text-sm ${isCollapsed ? 'px-0' : 'px-1'}`}>
                     <div className="flex aspect-square size-8 items-center justify-center">
                         <Image
-                            src="/alef-round.png"
+                            src="/alef-transparent.png"
                             alt="Alef University"
                             width={36}
                             height={36}

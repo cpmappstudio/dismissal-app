@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "SIS Alef University",
   description: "Alef University's student information system (SIS). A Next.js application with a clean and scalable architecture, designed to manage students grades, programs, courses, and transcripts.",
   icons: {
-    icon: "/alef.png",
+    icon: "/alef.ico",
   },
 };
 
