@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { ModeToggle } from "./mode-toggle"
+import { UserButtonWrapper } from "./user-button-wrapper"
 
 // This is sample data.
 const data = {
@@ -173,17 +174,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <ModeToggle showText={state !== "collapsed"} />
-        <UserButton
-          appearance={{
-            elements: {
-              userButtonBox: {
-                flexDirection: "row-reverse",
-                textAlign: "left",
-                padding: state !== "collapsed" ? "0.5rem 0.5rem" : "0.1rem",
-              },
-            },
-          }}
+        <UserButtonWrapper
           showName={state !== "collapsed"}
+          collapsed={state === "collapsed"}
         />
       </SidebarFooter>
       <SidebarRail />
