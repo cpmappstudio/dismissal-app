@@ -1,0 +1,90 @@
+{
+    "common": {
+        "language": "Idioma",
+        "english": "English",
+        "spanish": "Español",
+        "theme": "Tema",
+        "light": "Claro",
+        "dark": "Oscuro",
+        "system": "Sistema"
+    },
+    "navigation": {
+        "university": "Alef University",
+        "dashboard": "Tablero",
+        "playground": "Área de Pruebas",
+        "models": "Modelos",
+        "documentation": "Documentación",
+        "settings": "Configuración",
+        "history": "Historial",
+        "starred": "Destacados",
+        "general": "General",
+        "introduction": "Introducción",
+        "getStarted": "Comenzar",
+        "tutorials": "Tutoriales",
+        "changelog": "Registro de Cambios",
+        "menu": {
+            "playground": {
+                "title": "Área de Pruebas",
+                "url": "/playground",
+                "items": [
+                    {
+                        "title": "Historial",
+                        "url": "/playground/history"
+                    },
+                    {
+                        "title": "Destacados",
+                        "url": "/playground/starred"
+                    },
+                    {
+                        "title": "Configuración",
+                        "url": "/playground/settings"
+                    }
+                ]
+            },
+            "models": {
+                "title": "Modelos",
+                "url": "/models",
+                "items": [
+                    {
+                        "title": "Genesis",
+                        "url": "/models/genesis"
+                    },
+                    {
+                        "title": "Explorer",
+                        "url": "/models/explorer"
+                    },
+                    {
+                        "title": "Quantum",
+                        "url": "/models/quantum"
+                    }
+                ]
+            },
+            "documentation": {
+                "title": "Documentación",
+                "url": "/documentation",
+                "items": [
+                    {
+                        "title": "Introducción",
+                        "url": "/documentation/introduction"
+                    },
+                    {
+                        "title": "Comenzar",
+                        "url": "/documentation/get-started"
+                    },
+                    {
+                        "title": "Tutoriales",
+                        "url": "/documentation/tutorials"
+                    },
+                    {
+                        "title": "Registro de Cambios",
+                        "url": "/documentation/changelog"
+                    }
+                ]
+            }
+        }
+    },
+    "university": {
+        "name": "Alef University",
+        "academicRecords": "Sistema de Registro Universitario"
+    }
+}

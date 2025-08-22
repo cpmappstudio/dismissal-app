@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Moon, Sun, Monitor, ChevronsUpDown } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useTranslations } from "next-intl"
 
 import {
     DropdownMenu,
@@ -17,21 +18,22 @@ interface ModeToggleProps {
 
 export function ModeToggle({ showText = true }: ModeToggleProps) {
     const { theme, setTheme, resolvedTheme } = useTheme()
+    const t = useTranslations('common')
     const [mounted, setMounted] = React.useState(false)
 
     React.useEffect(() => {
         setMounted(true)
     }, [])
 
-    // Optimización: Solo recalcular cuando cambian los temas, no cuando mounted cambia
+    // Optimización: Solo recalcular cuando cambian los temas o traducciones
     const themeLabel = React.useMemo(() => {
         switch (theme) {
-            case "light": return "Light"
-            case "dark": return "Dark"
-            case "system": return "System"
-            default: return "Theme"
+            case "light": return t("light")
+            case "dark": return t("dark")
+            case "system": return t("system")
+            default: return t("theme")
         }
-    }, [theme])
+    }, [theme, t])
 
     const themeIcon = React.useMemo(() => {
         if (theme === "system") {
@@ -45,7 +47,7 @@ export function ModeToggle({ showText = true }: ModeToggleProps) {
         }
     }, [theme, resolvedTheme])
 
-    // Durante hydration: valores por defecto que coincidan con el tema más común
+    // Durante hydration: valores por defecto neutrales
     if (!mounted) {
         return (
             <div className={`flex items-center ${showText ? 'justify-between w-full px-2' : 'justify-center w-8 h-8'} py-1.5 text-left text-sm rounded-md`}>
@@ -72,15 +74,15 @@ export function ModeToggle({ showText = true }: ModeToggleProps) {
             <DropdownMenuContent align="start" className="w-full">
                 <DropdownMenuItem onClick={() => setTheme("light")}>
                     <Sun className="mr-2 h-4 w-4" />
-                    Light
+                    {t("light")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("dark")}>
                     <Moon className="mr-2 h-4 w-4" />
-                    Dark
+                    {t("dark")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("system")}>
                     <Monitor className="mr-2 h-4 w-4" />
-                    System
+                    {t("system")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

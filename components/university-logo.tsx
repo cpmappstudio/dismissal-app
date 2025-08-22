@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { useTranslations } from "next-intl"
 import {
     SidebarMenu,
     SidebarMenuButton,
@@ -11,6 +12,7 @@ import {
 
 export function UniversityLogo() {
     const { state } = useSidebar()
+    const t = useTranslations('university')
     const isCollapsed = state === "collapsed"
 
     return (
@@ -28,10 +30,10 @@ export function UniversityLogo() {
                     </div>
                     <div className="grid flex-1 text-left text-sm antialiased leading-tight">
                         <span className="truncate font-serif font-medium text-base">
-                            Alef University
+                            {t('name')}
                         </span>
                         <span className="truncate text-xs font-semibold text-sidebar-accent-foreground">
-                            Academic Records System
+                            {t('academicRecords')}
                         </span>
                     </div>
                 </div>

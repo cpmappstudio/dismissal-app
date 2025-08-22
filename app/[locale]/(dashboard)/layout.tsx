@@ -13,12 +13,22 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { getTranslations } from 'next-intl/server';
+import { setupLocale } from '@/lib/locale-setup';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
+  params,
 }: {
   children: React.ReactNode
+  params: Promise<{ locale: string }>
 }) {
+  // Use helper para configuración de locale
+  await setupLocale(params);
+
+  // Get translations (ya no necesitamos pasar locale explícitamente)
+  const t = await getTranslations('navigation');
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -34,12 +44,12 @@ export default function DashboardLayout({
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="#">
-                    Alef University
+                    {t('university')}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                  <BreadcrumbPage>{t('dashboard')}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

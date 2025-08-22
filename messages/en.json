@@ -1,0 +1,90 @@
+{
+    "common": {
+        "language": "Language",
+        "english": "English",
+        "spanish": "Español",
+        "theme": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+    },
+    "navigation": {
+        "university": "Alef University",
+        "dashboard": "Dashboard",
+        "playground": "Playground",
+        "models": "Models",
+        "documentation": "Documentation",
+        "settings": "Settings",
+        "history": "History",
+        "starred": "Starred",
+        "general": "General",
+        "introduction": "Introduction",
+        "getStarted": "Get Started",
+        "tutorials": "Tutorials",
+        "changelog": "Changelog",
+        "menu": {
+            "playground": {
+                "title": "Playground",
+                "url": "/playground",
+                "items": [
+                    {
+                        "title": "History",
+                        "url": "/playground/history"
+                    },
+                    {
+                        "title": "Starred",
+                        "url": "/playground/starred"
+                    },
+                    {
+                        "title": "Settings",
+                        "url": "/playground/settings"
+                    }
+                ]
+            },
+            "models": {
+                "title": "Models",
+                "url": "/models",
+                "items": [
+                    {
+                        "title": "Genesis",
+                        "url": "/models/genesis"
+                    },
+                    {
+                        "title": "Explorer",
+                        "url": "/models/explorer"
+                    },
+                    {
+                        "title": "Quantum",
+                        "url": "/models/quantum"
+                    }
+                ]
+            },
+            "documentation": {
+                "title": "Documentation",
+                "url": "/documentation",
+                "items": [
+                    {
+                        "title": "Introduction",
+                        "url": "/documentation/introduction"
+                    },
+                    {
+                        "title": "Get Started",
+                        "url": "/documentation/get-started"
+                    },
+                    {
+                        "title": "Tutorials",
+                        "url": "/documentation/tutorials"
+                    },
+                    {
+                        "title": "Changelog",
+                        "url": "/documentation/changelog"
+                    }
+                ]
+            }
+        }
+    },
+    "university": {
+        "name": "Alef University",
+        "academicRecords": "University Registration System"
+    }
+}
