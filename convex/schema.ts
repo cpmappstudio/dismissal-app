@@ -44,7 +44,8 @@ export default defineSchema({
     role: v.union(
       v.literal("student"),
       v.literal("professor"),
-      v.literal("admin")
+      v.literal("admin"),
+      v.literal("superadmin"),
     ),
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
@@ -82,19 +83,28 @@ export default defineSchema({
    */
   programs: defineTable({
     code: v.string(),
-    name: v.string(),
+    nameEs: v.string(),
+    nameEn: v.optional(v.string()),
+    descriptionEs: v.string(),
+    descriptionEn: v.optional(v.string()),
     type: v.union(
       v.literal("diploma"),
       v.literal("bachelor"),
       v.literal("master"),
       v.literal("doctorate")
     ),
+    language: v.union(
+      v.literal("es"),
+      v.literal("en"),
+      v.literal("both")
+    ),
     totalCredits: v.number(),
-    durationSemesters: v.number(),
+    durationBimesters: v.number(),
     isActive: v.boolean(),
   })
     .index("by_code", ["code"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_language", ["language"]),
 
   /**
    * Academic periods (semesters, quarters, intensive)
@@ -102,15 +112,10 @@ export default defineSchema({
   periods: defineTable({
     code: v.string(),              // "2024-2"
     year: v.number(),
-    sequence: v.number(),          // 1, 2, 3 within year
+    bimesterNumber: v.number(),          // 1-6 (six bimesters per year)
     startDate: v.number(),
     endDate: v.number(),
     name: v.string(),              // "AGOSTO/2024 - DICIEMBRE/2024"
-    type: v.union(
-      v.literal("regular"),
-      v.literal("intensive"),
-      v.literal("special")
-    ),
 
     // Key dates
     enrollmentStart: v.number(),
@@ -127,7 +132,7 @@ export default defineSchema({
 
     isCurrentPeriod: v.boolean(),
   })
-    .index("by_year_sequence", ["year", "sequence"])
+    .index("by_year_bimester", ["year", "bimesterNumber"])
     .index("by_status", ["status"])
     .index("by_current", ["isCurrentPeriod"]),
 
@@ -136,10 +141,19 @@ export default defineSchema({
    */
   courses: defineTable({
     code: v.string(),
-    name: v.string(),
-    description: v.string(),
+    nameEs: v.string(),
+    nameEn: v.optional(v.string()),
+    descriptionEs: v.string(),
+    descriptionEn: v.optional(v.string()),
     credits: v.number(),
     programId: v.id("programs"),
+
+    language: v.union(             // Language of instruction
+      v.literal("es"),
+      v.literal("en"),
+      v.literal("both")
+    ),
+
     // Category for requirements (40 humanities, 60 core, 20 electives)
     category: v.union(
       v.literal("humanities"),
@@ -154,7 +168,8 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_program_active", ["programId", "isActive"])
-    .index("by_program_category", ["programId", "category"]),
+    .index("by_program_category", ["programId", "category"])
+    .index("by_language", ["language"]),
 
   /**
    * Course sections (simplified - no separate groups table)
@@ -213,25 +228,27 @@ export default defineSchema({
       v.literal("cancelled"),      // With cancellation date
       v.literal("completed"),
       v.literal("failed"),
-      v.literal("withdrawn")
+      v.literal("incomplete")
     ),
 
     // Cancellation tracking
     cancellationDate: v.optional(v.number()),
     reactivationDate: v.optional(v.number()),
 
-    // GRADES (CAL and HAB from requirements)
-    finalGrade: v.optional(v.number()),         // CAL - Grade (0-5)
-    makeupGrade: v.optional(v.number()),        // HAB - Makeup exam
-    effectiveGrade: v.optional(v.number()),     // What counts (makeup replaces final)
-    letterGrade: v.optional(v.string()),        // For transcripts
+    // AMERICAN GRADING SYSTEM
+    percentageGrade: v.optional(v.number()),    // 0-100 numerical grade
+    letterGrade: v.optional(v.string()),        // A, B, C, D, F, I
+    gradePoints: v.optional(v.number()),        // 4.0, 3.0, 2.0, 1.0, 0.0
+    qualityPoints: v.optional(v.number()),      // gradePoints * credits
 
     // Metadata
     gradedBy: v.optional(v.id("users")),
     gradedAt: v.optional(v.number()),
+    gradeNotes: v.optional(v.string()),
 
     // Flags
     isRetake: v.boolean(),
+    countsForGPA: v.boolean(),
   })
     .index("by_student_period", ["studentId", "periodId"])
     .index("by_student_period_status", ["studentId", "periodId", "status"])
@@ -246,13 +263,15 @@ export default defineSchema({
     programId: v.id("programs"),
 
     // Credit requirements
-    humanitiesCredits: v.number(),      // 40
-    coreCredits: v.number(),            // 60 
-    electiveCredits: v.number(),        // 20
-    totalCredits: v.number(),           // 120
+    humanitiesCredits: v.number(),
+    coreCredits: v.number(),
+    electiveCredits: v.number(),
+    generalCredits: v.number(),        // General education credits
+    totalCredits: v.number(),
 
     // Graduation requirements
     minGPA: v.number(),                 // Minimum GPA to graduate
+    maxBimesters: v.number(),
 
     effectiveDate: v.number(),
     isActive: v.boolean(),
