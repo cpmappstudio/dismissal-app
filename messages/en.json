@@ -1,0 +1,27 @@
+{
+    "common": {
+        "language": "Language",
+        "theme": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+    },
+    "navigation": {
+        "dashboard": "Dashboard",
+        "playground": "Playground",
+        "models": "Models",
+        "documentation": "Documentation",
+        "settings": "Settings",
+        "history": "History",
+        "starred": "Starred",
+        "general": "General",
+        "introduction": "Introduction",
+        "getStarted": "Get Started",
+        "tutorials": "Tutorials",
+        "changelog": "Changelog"
+    },
+    "university": {
+        "name": "Alef University",
+        "academicRecords": "Academic Records System"
+    }
+}

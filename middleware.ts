@@ -1,13 +1,26 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest } from 'next/server'
+import createIntlMiddleware from 'next-intl/middleware'
+import { routing } from './i18n/routing'
 
-// Solo definir rutas públicas - TODO lo demás está protegido
+// Crear el middleware de internacionalización usando la configuración centralizada
+const intlMiddleware = createIntlMiddleware(routing)
+
+// Solo definir rutas públicas - TODO lo demás está protegido  
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
+  '/:locale/sign-in(.*)',
+  '/:locale/sign-up(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
+  // Primero aplicar internacionalización
+  const intlResponse = intlMiddleware(req)
+
+  // Si hay redirección de idioma, aplicarla
+  if (intlResponse) {
+    return intlResponse
+  }
+
   // Proteger TODO excepto rutas públicas
   if (!isPublicRoute(req)) {
     await auth.protect()

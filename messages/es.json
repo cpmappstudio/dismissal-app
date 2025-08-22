@@ -1,0 +1,27 @@
+{
+    "common": {
+        "language": "Idioma",
+        "theme": "Tema",
+        "light": "Claro",
+        "dark": "Oscuro",
+        "system": "Sistema"
+    },
+    "navigation": {
+        "dashboard": "Tablero",
+        "playground": "Área de Pruebas",
+        "models": "Modelos",
+        "documentation": "Documentación",
+        "settings": "Configuración",
+        "history": "Historial",
+        "starred": "Destacados",
+        "general": "General",
+        "introduction": "Introducción",
+        "getStarted": "Comenzar",
+        "tutorials": "Tutoriales",
+        "changelog": "Registro de Cambios"
+    },
+    "university": {
+        "name": "Universidad Alef",
+        "academicRecords": "Sistema de Registros Académicos"
+    }
+}
