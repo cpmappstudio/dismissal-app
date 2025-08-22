@@ -48,6 +48,7 @@ export function UserButtonWrapper({ showName = true, collapsed = false }: UserBu
                             textAlign: "left",
                             width: "100%",
                         },
+                        userButtonPopoverCard: { pointerEvents: "initial" },
                     },
                 }}
                 showName={showName}
