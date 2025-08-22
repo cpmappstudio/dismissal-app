@@ -4,15 +4,11 @@ import * as React from "react"
 import {
   BookOpen,
   Bot,
-  Frame,
-  Map,
-  PieChart,
-  Settings2,
   SquareTerminal,
 } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { UniversityLogo } from "@/components/university-logo"
 import {
   Sidebar,
@@ -26,116 +22,36 @@ import { ModeToggle } from "./mode-toggle"
 import { LangToggle } from "./lang-toggle"
 import { UserButtonWrapper } from "./user-button-wrapper"
 
-// This is sample data.
-const data = {
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    // { // Only for admin users
-    //   title: "Settings",
-    //   url: "#",
-    //   icon: Settings2,
-    //   items: [
-    //     {
-    //       title: "General",
-    //       url: "#",
-    //     },
-    //     {
-    //       title: "Team",
-    //       url: "#",
-    //     },
-    //     {
-    //       title: "Billing",
-    //       url: "#",
-    //     },
-    //     {
-    //       title: "Limits",
-    //       url: "#",
-    //     },
-    //   ],
-    // },
-  ],
-  // projects: [
-  //   {
-  //     name: "Design Engineering",
-  //     url: "#",
-  //     icon: Frame,
-  //   },
-  //   {
-  //     name: "Sales & Marketing",
-  //     url: "#",
-  //     icon: PieChart,
-  //   },
-  //   {
-  //     name: "Travel",
-  //     url: "#",
-  //     icon: Map,
-  //   },
-  // ],
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar()
+  const t = useTranslations('navigation')
+
+  // Configuración de íconos - esto no va en traducciones
+  const iconMap = {
+    playground: SquareTerminal,
+    models: Bot,
+    documentation: BookOpen,
+  } as const
+
+  // Generar estructura de navegación desde traducciones
+  const navItems = React.useMemo(() => {
+    const menuConfig = t.raw('menu') as Record<string, {
+      title: string;
+      url: string;
+      items: Array<{ title: string; url: string }>
+    }>
+
+    return Object.entries(menuConfig).map(([key, config], index) => ({
+      title: config.title,
+      url: config.url,
+      icon: iconMap[key as keyof typeof iconMap],
+      isActive: index === 0, // Solo el primero activo
+      items: config.items.map(item => ({
+        title: item.title,
+        url: item.url,
+      })),
+    }))
+  }, [t])
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -146,8 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        {/* <NavProjects projects={data.projects} /> */}
+        <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
         <LangToggle showText={state !== "collapsed"} />

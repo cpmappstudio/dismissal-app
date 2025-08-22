@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { Languages, ChevronsUpDown } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { useLocale, useTranslations } from "next-intl"
 
 import {
     DropdownMenu,
@@ -14,26 +16,45 @@ interface LangToggleProps {
     showText?: boolean
 }
 
+const LOCALES = ['en', 'es'] as const
+
 export function LangToggle({ showText = true }: LangToggleProps) {
+    const router = useRouter()
+    const pathname = usePathname()
+    const locale = useLocale()
+    const t = useTranslations('common')
     const [mounted, setMounted] = React.useState(false)
-    const [currentLang] = React.useState("en") // Estado temporal hasta implementar funcionalidad
 
     React.useEffect(() => {
         setMounted(true)
     }, [])
 
-    // Optimización: Solo recalcular cuando cambia el idioma
-    const langLabel = React.useMemo(() => {
-        switch (currentLang) {
-            case "en": return "English"
-            case "es": return "Español"
-            default: return "Language"
-        }
-    }, [currentLang])
+    // Memoizar función de cambio de idioma
+    const changeLanguage = React.useCallback((newLocale: string) => {
+        if (newLocale === locale) return // Evitar navegación innecesaria
 
-    const langIcon = React.useMemo(() => {
-        return <Languages className="h-4 w-4" />
-    }, [])
+        // Reemplazar el locale en la URL actual
+        const newPath = pathname.replace(`/${locale}`, `/${newLocale}`)
+        router.push(newPath)
+    }, [router, pathname, locale])
+
+    // Optimización: Solo recalcular cuando cambia el idioma
+    const getCurrentLangLabel = React.useMemo(() => {
+        switch (locale) {
+            case 'en': return t('english')
+            case 'es': return t('spanish')
+            default: return t('language')
+        }
+    }, [locale, t])
+
+    // Helper para obtener label de cualquier locale
+    const getLangLabel = React.useCallback((localeCode: string) => {
+        switch (localeCode) {
+            case 'en': return t('english')
+            case 'es': return t('spanish')
+            default: return t('language')
+        }
+    }, [t])
 
     // Durante hydration: valores por defecto
     if (!mounted) {
@@ -53,21 +74,23 @@ export function LangToggle({ showText = true }: LangToggleProps) {
             <DropdownMenuTrigger asChild>
                 <div className={`flex items-center ${showText ? 'justify-between w-full px-2' : 'justify-center w-8 h-8'} py-1.5 text-left text-sm cursor-pointer hover:bg-[oklch(0.45_0.0568_265.16)] hover:text-white rounded-md transition-colors`}>
                     <div className="flex items-center gap-2">
-                        {langIcon}
-                        {showText && <span className="font-medium">{langLabel}</span>}
+                        <Languages className="h-4 w-4" />
+                        {showText && <span className="font-medium">{getCurrentLangLabel}</span>}
                     </div>
                     {showText && <ChevronsUpDown className="ml-auto h-4 w-4" />}
                 </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-full">
-                <DropdownMenuItem>
-                    <Languages className="mr-2 h-4 w-4" />
-                    English
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                    <Languages className="mr-2 h-4 w-4" />
-                    Español
-                </DropdownMenuItem>
+            <DropdownMenuContent align="start" className="w-40">
+                {LOCALES.map((localeOption) => (
+                    <DropdownMenuItem
+                        key={localeOption}
+                        onClick={() => changeLanguage(localeOption)}
+                        className={locale === localeOption ? "bg-accent" : ""}
+                    >
+                        <Languages className="mr-2 h-4 w-4" />
+                        {getLangLabel(localeOption)}
+                    </DropdownMenuItem>
+                ))}
             </DropdownMenuContent>
         </DropdownMenu>
     )

@@ -8,7 +8,10 @@ import { shadcn } from "@clerk/themes"
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { setRequestLocale } from 'next-intl/server';
+import { hasLocale } from 'next-intl';
 import { routing } from '@/i18n/routing';
+import { enUS, esES } from '@clerk/localizations';
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -37,13 +40,20 @@ export default async function RootLayout({
 }>) {
     const { locale } = await params;
 
-    // Validar locale usando la configuración centralizada
-    if (!routing.locales.includes(locale as any)) {
+    // Solo validar y configurar en el layout raíz
+    // El middleware ya hace validación, pero esto es backup por si acaso
+    if (!hasLocale(routing.locales, locale)) {
         notFound();
     }
 
+    // Enable static rendering - Solo necesario aquí
+    setRequestLocale(locale);
+
     // Obtener mensajes para el locale
     const messages = await getMessages();
+
+    // Configurar localización de Clerk según el idioma
+    const clerkLocalization = locale === 'es' ? esES : enUS;
 
     return (
         <html lang={locale} suppressHydrationWarning>
@@ -60,6 +70,8 @@ export default async function RootLayout({
                         appearance={{
                             baseTheme: shadcn,
                         }}
+                        localization={clerkLocalization}
+                        afterSignOutUrl={`/${locale}/sign-in`}
                     >
                         <ConvexClientProvider>
                             <NextIntlClientProvider messages={messages}>
