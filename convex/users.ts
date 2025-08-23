@@ -20,8 +20,7 @@ import {
     requireAuth,
     requireRole,
     requireAdminOrSelf,
-    isStudentCodeTaken,
-    isEmployeeCodeTaken,
+    calculateGPA,
 } from "./helpers";
 
 // ============================================================================
@@ -185,13 +184,7 @@ export const updateUserProfile = mutation({
 
         // Student-specific updates
         if (user.role === "student" && args.updates.studentCode) {
-            if (await isStudentCodeTaken(ctx, args.updates.studentCode, args.userId)) {
-                throw new AppError(
-                    "Student code already in use",
-                    ErrorCodes.DUPLICATE_ENTRY
-                );
-            }
-
+            // TODO: Add validation for duplicate student codes
             updates.studentProfile = {
                 ...user.studentProfile!,
                 studentCode: args.updates.studentCode,
@@ -200,19 +193,19 @@ export const updateUserProfile = mutation({
 
         // Professor-specific updates
         if (user.role === "professor") {
-            if (args.updates.employeeCode &&
-                await isEmployeeCodeTaken(ctx, args.updates.employeeCode, args.userId)) {
-                throw new AppError(
-                    "Employee code already in use",
-                    ErrorCodes.DUPLICATE_ENTRY
-                );
+            if (args.updates.employeeCode) {
+                // TODO: Add validation for duplicate employee codes
+                updates.professorProfile = {
+                    ...user.professorProfile!,
+                    employeeCode: args.updates.employeeCode,
+                    ...(args.updates.title !== undefined && { title: args.updates.title }),
+                };
+            } else if (args.updates.title !== undefined) {
+                updates.professorProfile = {
+                    ...user.professorProfile!,
+                    title: args.updates.title,
+                };
             }
-
-            updates.professorProfile = {
-                ...user.professorProfile!,
-                ...(args.updates.employeeCode && { employeeCode: args.updates.employeeCode }),
-                ...(args.updates.title !== undefined && { title: args.updates.title }),
-            };
         }
 
         await ctx.db.patch(args.userId, updates);
@@ -261,8 +254,87 @@ export const activateUser = mutation({
 });
 
 /**
- * Deactivate user (Admin only)
+ * Get current user profile - Complete account information
  */
+export const getCurrentUserProfile = query({
+    args: {},
+    handler: async (ctx) => {
+        const currentUser = await requireAuth(ctx);
+
+        let roleSpecificData = null;
+
+        if (currentUser.role === "student" && currentUser.studentProfile) {
+            const program = await ctx.db.get(currentUser.studentProfile.programId);
+
+            // Get recent academic performance
+            const recentEnrollments = await ctx.db
+                .query("enrollments")
+                .filter(q => q.and(
+                    q.eq(q.field("studentId"), currentUser._id),
+                    q.eq(q.field("status"), "completed")
+                ))
+                .order("desc")
+                .take(5);
+
+            const gpa = await calculateGPA(ctx, currentUser._id);
+
+            roleSpecificData = {
+                program: program ? {
+                    name: program.nameEs,
+                    code: program.code,
+                    type: program.type,
+                } : null,
+                recentGrades: recentEnrollments.map(e => ({
+                    percentageGrade: e.percentageGrade,
+                    letterGrade: e.letterGrade,
+                })),
+                currentGPA: gpa,
+            };
+
+        } else if (currentUser.role === "professor" && currentUser.professorProfile) {
+            // Get current teaching load
+            const currentPeriod = await ctx.db
+                .query("periods")
+                .filter(q => q.eq(q.field("isCurrentPeriod"), true))
+                .first();
+
+            let currentSections = 0;
+            if (currentPeriod) {
+                const sections = await ctx.db
+                    .query("sections")
+                    .filter(q => q.and(
+                        q.eq(q.field("professorId"), currentUser._id),
+                        q.eq(q.field("periodId"), currentPeriod._id),
+                        q.eq(q.field("isActive"), true)
+                    ))
+                    .collect();
+                currentSections = sections.length;
+            }
+
+            roleSpecificData = {
+                currentTeachingLoad: currentSections,
+                currentPeriod: currentPeriod?.name,
+            };
+        }
+
+        return {
+            user: {
+                _id: currentUser._id,
+                email: currentUser.email,
+                name: currentUser.name,
+                role: currentUser.role,
+                isActive: currentUser.isActive,
+                createdAt: currentUser.createdAt,
+                lastLoginAt: currentUser.lastLoginAt,
+                phone: currentUser.phone,
+                country: currentUser.country,
+                studentProfile: currentUser.studentProfile,
+                professorProfile: currentUser.professorProfile,
+            },
+            roleSpecificData,
+        };
+    },
+});
 export const deactivateUser = mutation({
     args: {
         userId: v.id("users"),

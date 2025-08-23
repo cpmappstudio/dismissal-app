@@ -20,6 +20,9 @@ import {
     requireAuth,
     requireRole,
     requireAdminOrSelf,
+    calculateLetterGrade,
+    calculateGradePoints,
+    calculateQualityPoints,
 } from "./helpers";
 
 // ============================================================================
@@ -147,6 +150,7 @@ export const enrollStudent = mutation({
             enrolledAt: Date.now(),
             status: "enrolled" as const,
             isRetake: false, // TODO: Detect if this is a retake
+            countsForGPA: true,
         });
 
         // Update section enrollment count
@@ -221,7 +225,8 @@ export const submitGrades = mutation({
         sectionId: v.id("sections"),
         grades: v.array(v.object({
             enrollmentId: v.id("enrollments"),
-            finalGrade: v.number(),
+            percentageGrade: v.number(), // 0-100 American system
+            gradeNotes: v.optional(v.string()),
         })),
     },
     handler: async (ctx, args) => {
@@ -256,25 +261,41 @@ export const submitGrades = mutation({
                     continue;
                 }
 
-                // Validate grade (1.0 to 5.0 Colombian scale)
-                if (gradeData.finalGrade < 1 || gradeData.finalGrade > 5) {
+                // Validate percentage grade (0-100 American system)
+                if (gradeData.percentageGrade < 0 || gradeData.percentageGrade > 100) {
                     results.failed.push({
                         enrollmentId: gradeData.enrollmentId,
-                        reason: "Grade must be between 1.0 and 5.0",
+                        reason: "Grade must be between 0 and 100",
                     });
                     continue;
                 }
 
-                // Calculate effective grade (initially same as final)
-                const effectiveGrade = gradeData.finalGrade;
+                const course = await ctx.db.get(enrollment.courseId);
+                if (!course) {
+                    results.failed.push({
+                        enrollmentId: gradeData.enrollmentId,
+                        reason: "Course not found",
+                    });
+                    continue;
+                }
 
-                // Update enrollment
+                // Calculate American system values
+                const letterGrade = calculateLetterGrade(gradeData.percentageGrade);
+                const gradePoints = calculateGradePoints(gradeData.percentageGrade);
+                const qualityPoints = calculateQualityPoints(gradePoints, course.credits);
+                const finalStatus = gradeData.percentageGrade >= 65 ? "completed" : "failed";
+
+                // Update enrollment with American grading system
                 await ctx.db.patch(gradeData.enrollmentId, {
-                    finalGrade: gradeData.finalGrade,
-                    effectiveGrade,
-                    status: "completed" as const,
+                    percentageGrade: gradeData.percentageGrade,
+                    letterGrade,
+                    gradePoints,
+                    qualityPoints,
+                    status: finalStatus,
                     gradedBy: currentUser._id,
                     gradedAt: Date.now(),
+                    gradeNotes: gradeData.gradeNotes,
+                    countsForGPA: true,
                 });
 
                 results.successful++;
@@ -304,7 +325,8 @@ export const submitGrades = mutation({
 export const submitMakeupGrade = mutation({
     args: {
         enrollmentId: v.id("enrollments"),
-        makeupGrade: v.number(),
+        percentageGrade: v.number(), // 0-100 American system
+        gradeNotes: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const currentUser = await requireAuth(ctx);
@@ -327,23 +349,41 @@ export const submitMakeupGrade = mutation({
             );
         }
 
-        // Validate makeup grade
-        if (args.makeupGrade < 1 || args.makeupGrade > 5) {
+        // Validate percentage grade (0-100 American system)
+        if (args.percentageGrade < 0 || args.percentageGrade > 100) {
             throw new AppError(
-                "Makeup grade must be between 1.0 and 5.0",
+                "Grade must be between 0 and 100",
                 ErrorCodes.INVALID_INPUT
             );
         }
 
-        // Effective grade becomes the makeup grade (replaces final)
+        const course = await ctx.db.get(enrollment.courseId);
+        if (!course) {
+            throw new AppError("Course not found", ErrorCodes.COURSE_NOT_FOUND);
+        }
+
+        // Calculate American system values
+        const letterGrade = calculateLetterGrade(args.percentageGrade);
+        const gradePoints = calculateGradePoints(args.percentageGrade);
+        const qualityPoints = calculateQualityPoints(gradePoints, course.credits);
+        const finalStatus = args.percentageGrade >= 65 ? "completed" : "failed";
+
+        // Update enrollment with makeup grade
         await ctx.db.patch(args.enrollmentId, {
-            makeupGrade: args.makeupGrade,
-            effectiveGrade: args.makeupGrade,
+            percentageGrade: args.percentageGrade,
+            letterGrade,
+            gradePoints,
+            qualityPoints,
+            status: finalStatus,
+            gradedBy: currentUser._id,
+            gradedAt: Date.now(),
+            gradeNotes: args.gradeNotes,
+            countsForGPA: true,
         });
 
         return {
             success: true,
-            message: `Makeup grade ${args.makeupGrade} submitted successfully`,
+            message: `Makeup grade ${args.percentageGrade}% (${letterGrade}) submitted successfully`,
         };
     },
 });
@@ -394,16 +434,18 @@ export const getTranscript = query({
             const course = await ctx.db.get(enrollment.courseId);
             const periodData = transcriptByPeriod.get(enrollment.periodId);
 
-            const passed = (enrollment.effectiveGrade || 0) >= 3.0;
+            const passed = (enrollment.percentageGrade || 0) >= 65; // American passing threshold
             const creditsEarned = passed ? (course?.credits || 0) : 0;
 
             periodData.courses.push({
                 course,
                 enrollment: {
-                    finalGrade: enrollment.finalGrade,
-                    makeupGrade: enrollment.makeupGrade,
-                    effectiveGrade: enrollment.effectiveGrade,
+                    percentageGrade: enrollment.percentageGrade,
+                    letterGrade: enrollment.letterGrade,
+                    gradePoints: enrollment.gradePoints,
+                    qualityPoints: enrollment.qualityPoints,
                     creditsEarned,
+                    gradeNotes: enrollment.gradeNotes,
                 },
             });
 
@@ -423,14 +465,24 @@ export const getTranscript = query({
         // Convert to array and calculate totals
         const transcript = Array.from(transcriptByPeriod.values());
 
+        // Calculate overall GPA using quality points
+        let totalQualityPoints = 0;
+        let totalCredits = 0;
+
+        for (const enrollment of enrollments) {
+            if (enrollment.countsForGPA && enrollment.qualityPoints !== undefined) {
+                const course = await ctx.db.get(enrollment.courseId);
+                totalQualityPoints += enrollment.qualityPoints;
+                totalCredits += course?.credits || 0;
+            }
+        }
+
         const summary = {
             humanitiesCredits: transcript.reduce((sum, p) => sum + p.humanitiesCredits, 0),
             coreCredits: transcript.reduce((sum, p) => sum + p.coreCredits, 0),
             electiveCredits: transcript.reduce((sum, p) => sum + p.electiveCredits, 0),
             totalCreditsEarned: transcript.reduce((sum, p) => sum + p.creditsEarned, 0),
-            overallGPA: enrollments.length > 0
-                ? enrollments.reduce((sum, e) => sum + (e.effectiveGrade || 0), 0) / enrollments.length
-                : 0,
+            overallGPA: totalCredits > 0 ? totalQualityPoints / totalCredits : 0,
             coursesCompleted: enrollments.length,
         };
 
