@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useMemo, memo } from "react"
 import { ChevronRight, Home, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 
@@ -21,7 +22,7 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
-export function NavMain({
+export const NavMain = memo(function NavMain({
   items,
   dashboardLabel,
   navigationLabel,
@@ -41,11 +42,26 @@ export function NavMain({
 }) {
   const pathname = usePathname()
 
+  // Memoize the path processing to avoid regex on every render
+  const pathWithoutLocale = useMemo(() => {
+    return pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '')
+  }, [pathname])
+
+  // Memoize the dashboard active state
+  const isDashboardActive = useMemo(() => {
+    return pathWithoutLocale === '' || pathWithoutLocale === '/'
+  }, [pathWithoutLocale])
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{navigationLabel}</SidebarGroupLabel>
       <SidebarMenu>
-        <SidebarMenuButton asChild>
+        <SidebarMenuButton
+          asChild
+          className={clsx({
+            'bg-sidebar-accent text-sidebar-accent-foreground': isDashboardActive,
+          })}
+        >
           <Link href="/">
             <Home />
             <span>{dashboardLabel}</span>
@@ -59,7 +75,6 @@ export function NavMain({
             className="group/collapsible"
           >
             <SidebarMenuItem>
-
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip={item.title}>
                   {item.icon && <item.icon />}
@@ -74,7 +89,7 @@ export function NavMain({
                       <SidebarMenuSubButton
                         asChild
                         className={clsx({
-                          'bg-sidebar-accent text-sidebar-accent-foreground': pathname === subItem.url,
+                          'bg-sidebar-accent text-sidebar-accent-foreground': pathWithoutLocale === subItem.url,
                         })}
                       >
                         <Link href={subItem.url}>
@@ -91,4 +106,4 @@ export function NavMain({
       </SidebarMenu>
     </SidebarGroup>
   )
-}
+})

@@ -1,19 +1,11 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { getTranslations } from 'next-intl/server';
 import { setupLocale } from '@/lib/locale-setup';
 
 export default async function DashboardLayout({
@@ -26,9 +18,6 @@ export default async function DashboardLayout({
   // Use helper para configuración de locale
   await setupLocale(params);
 
-  // Get translations (ya no necesitamos pasar locale explícitamente)
-  const t = await getTranslations('navigation');
-
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -40,19 +29,7 @@ export default async function DashboardLayout({
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
             />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    {t('university')}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{t('dashboard')}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+            <DynamicBreadcrumb />
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
