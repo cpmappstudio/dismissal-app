@@ -15,7 +15,8 @@ export const programTypeValidator = v.union(
 export const userRoleValidator = v.union(
     v.literal("student"),
     v.literal("professor"),
-    v.literal("admin")
+    v.literal("admin"),
+    v.literal("superadmin")
 );
 
 export const studentStatusValidator = v.union(
@@ -470,3 +471,15 @@ export type UpdateInput<T> = Partial<WithoutSystemFields<T>>;
 export type RequireAtLeastOne<T> = {
     [K in keyof T]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<keyof T, K>>>;
 }[keyof T];
+
+// ============================================================================
+// CLERK RBAC INTEGRATION
+// ============================================================================
+
+declare global {
+    interface CustomJwtSessionClaims {
+        metadata: {
+            role?: UserRole;
+        }
+    }
+}

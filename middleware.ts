@@ -1,7 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
+import type { UserRole } from '@/convex/types'
 
 // Crear el middleware de internacionalización usando la configuración centralizada
 const intlMiddleware = createIntlMiddleware(routing)
@@ -10,6 +11,19 @@ const intlMiddleware = createIntlMiddleware(routing)
 const isPublicRoute = createRouteMatcher([
   '/:locale/sign-in(.*)',
   '/:locale/sign-up(.*)',
+])
+
+// Protección RBAC - Rutas específicas por rol
+const isStudentOnlyRoute = createRouteMatcher([
+  '/:locale/academic(.*)',
+])
+
+const isProfessorOnlyRoute = createRouteMatcher([
+  '/:locale/teaching(.*)',
+])
+
+const isAdminOnlyRoute = createRouteMatcher([
+  '/:locale/admin(.*)',
 ])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
@@ -24,11 +38,31 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   // Proteger TODO excepto rutas públicas
   if (!isPublicRoute(req)) {
     await auth.protect()
-  }
 
-  // Debugging en desarrollo
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[Auth] ${req.nextUrl.pathname} - Public: ${isPublicRoute(req)}`)
+    // RBAC - Solo aplicar si el usuario está autenticado
+    const userRole = (await auth()).sessionClaims?.metadata?.role as UserRole | undefined
+
+    // Proteger rutas específicas de estudiantes
+    if (isStudentOnlyRoute(req) && userRole !== 'student') {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
+    // Proteger rutas específicas de profesores
+    if (isProfessorOnlyRoute(req) &&
+      userRole !== 'professor' && userRole !== 'admin' && userRole !== 'superadmin') {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
+    // Proteger rutas específicas de administradores
+    if (isAdminOnlyRoute(req) &&
+      userRole !== 'admin' && userRole !== 'superadmin') {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
+    // Debugging en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Auth] ${req.nextUrl.pathname} - Public: ${isPublicRoute(req)} - Role: ${userRole || 'none'}`)
+    }
   }
 })
 
