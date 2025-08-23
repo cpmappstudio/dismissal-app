@@ -1,6 +1,9 @@
 "use client"
 
-import { ChevronRight, type LucideIcon } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { ChevronRight, Home, type LucideIcon } from "lucide-react"
+import { clsx } from "clsx"
 
 import {
   Collapsible,
@@ -20,6 +23,8 @@ import {
 
 export function NavMain({
   items,
+  dashboardLabel,
+  navigationLabel,
 }: {
   items: {
     title: string
@@ -31,11 +36,21 @@ export function NavMain({
       url: string
     }[]
   }[]
+  dashboardLabel: string
+  navigationLabel: string
 }) {
+  const pathname = usePathname()
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>{navigationLabel}</SidebarGroupLabel>
       <SidebarMenu>
+        <SidebarMenuButton asChild>
+          <Link href="/">
+            <Home />
+            <span>{dashboardLabel}</span>
+          </Link>
+        </SidebarMenuButton>
         {items.map((item) => (
           <Collapsible
             key={item.title}
@@ -44,6 +59,7 @@ export function NavMain({
             className="group/collapsible"
           >
             <SidebarMenuItem>
+
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip={item.title}>
                   {item.icon && <item.icon />}
@@ -55,10 +71,15 @@ export function NavMain({
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
+                      <SidebarMenuSubButton
+                        asChild
+                        className={clsx({
+                          'bg-sidebar-accent text-sidebar-accent-foreground': pathname === subItem.url,
+                        })}
+                      >
+                        <Link href={subItem.url}>
                           <span>{subItem.title}</span>
-                        </a>
+                        </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

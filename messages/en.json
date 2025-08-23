@@ -11,6 +11,7 @@
     "navigation": {
         "university": "Alef University",
         "dashboard": "Dashboard",
+        "navigation": "Navigation",
         "playground": "Playground",
         "models": "Models",
         "documentation": "Documentation",

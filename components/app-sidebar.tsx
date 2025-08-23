@@ -5,7 +5,6 @@ import {
   BookOpen,
   User,
   GraduationCap,
-  Users,
   Settings,
   UserCog,
   FileText,
@@ -176,7 +175,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navItems} />
+        <NavMain
+          items={navItems}
+          dashboardLabel={t('dashboard')}
+          navigationLabel={t('navigation')}
+        />
       </SidebarContent>
       <SidebarFooter>
         <LangToggle showText={state !== "collapsed"} />
