@@ -2,6 +2,42 @@ import { v, Infer } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 
 // ============================================================================
+// SCHEDULE TYPES (Virtual education)
+// ============================================================================
+
+export interface ScheduleSession {
+    day: string;                    // "Monday", "Wednesday"
+    startTime: string;              // "14:00"
+    endTime: string;                // "16:00"
+}
+
+export interface VirtualSchedule {
+    sessions: ScheduleSession[];
+    timezone: string;               // "America/Bogota"
+    notes?: string;
+}
+
+// ============================================================================
+// ANNOUNCEMENT TYPES
+// ============================================================================
+
+export interface AnnouncementWithDetails {
+    announcement: Doc<"announcements">;
+    professor: Doc<"users"> | null;
+    section: Doc<"sections"> | null;
+    course: Doc<"courses"> | null;
+}
+
+export interface CreateAnnouncementInput {
+    sectionId: Id<"sections">;
+    content: string;
+}
+
+export interface UpdateAnnouncementInput {
+    content: string;
+}
+
+// ============================================================================
 // REUSABLE VALIDATORS
 // ============================================================================
 
@@ -15,7 +51,8 @@ export const programTypeValidator = v.union(
 export const userRoleValidator = v.union(
     v.literal("student"),
     v.literal("professor"),
-    v.literal("admin")
+    v.literal("admin"),
+    v.literal("superadmin")
 );
 
 export const studentStatusValidator = v.union(
@@ -29,7 +66,7 @@ export const enrollmentStatusValidator = v.union(
     v.literal("cancelled"),
     v.literal("completed"),
     v.literal("failed"),
-    v.literal("withdrawn")
+    v.literal("incomplete")
 );
 
 export const courseCategoryValidator = v.union(
@@ -78,25 +115,28 @@ export type SectionStatus = Infer<typeof sectionStatusValidator>;
 // ============================================================================
 
 /**
- * Student progress tracking for the 40-60-20 credit requirement
+ * Student progress tracking for the 40-60-20-X credit requirement
  */
 export interface StudentProgress {
     // Current credits by category
     humanitiesCredits: number;      // Current / 40 required
     coreCredits: number;            // Current / 60 required  
     electiveCredits: number;        // Current / 20 required
+    generalCredits: number;         // Current / X required (general education)
     totalCredits: number;           // Current / 120 total
 
     // Required credits from program_requirements
     requiredHumanities: number;     // 40
     requiredCore: number;           // 60
     requiredElective: number;       // 20
+    requiredGeneral: number;        // X (from program requirements)
     requiredTotal: number;          // 120
 
     // Progress percentages
     humanitiesProgress: number;     // percentage
     coreProgress: number;           // percentage
     electiveProgress: number;       // percentage
+    generalProgress: number;        // percentage
     overallProgress: number;        // percentage
 
     program: Doc<"programs"> | null;
@@ -113,6 +153,10 @@ export interface EnrollmentWithDetails {
     period: Doc<"periods"> | null;
 }
 
+// ============================================================================
+// SECTION TYPES (Updated for virtual education)
+// ============================================================================
+
 /**
  * Section with course and professor details
  */
@@ -122,6 +166,20 @@ export interface SectionWithDetails {
     professor: Doc<"users"> | null;
     enrolledCount: number;
     availableSlots: number;
+    schedule?: VirtualSchedule;
+}
+
+/**
+ * Section availability for enrollment
+ */
+export interface SectionAvailability {
+    section: Doc<"sections">;
+    course: Doc<"courses">;
+    professor: Doc<"users">;
+    available: boolean;
+    capacity: number;
+    enrolled: number;
+    schedule?: VirtualSchedule;
 }
 
 /**
@@ -199,9 +257,9 @@ export interface CourseGradeSummary {
     groupNumber: string;           // GRUPO
     category: CourseCategory;       // FUN
     credits: number;               // CRD
-    finalGrade: number | null;     // CAL
+    percentageGrade: number | null; // CAL (matches schema)
     makeupGrade: number | null;    // HAB
-    effectiveGrade: number | null; // Grade that counts
+    effectiveGrade: number | null; // Final calculated grade
     letterGrade: string | null;
     status: EnrollmentStatus;
 
@@ -246,6 +304,7 @@ export interface StudentTranscript {
     humanitiesCredits: number;
     coreCredits: number;
     electiveCredits: number;
+    generalCredits: number;
 
     // Status
     academicStatus: StudentStatus;
@@ -267,16 +326,6 @@ export interface EnrollmentValidation {
     warnings: string[];
 }
 
-export interface SectionAvailability {
-    section: Doc<"sections">;
-    course: Doc<"courses">;
-    professor: Doc<"users">;
-    available: boolean;
-    capacity: number;
-    enrolled: number;
-    scheduleNote?: string;
-}
-
 // ============================================================================
 // PENDING COURSES (Pensum faltante)
 // ============================================================================
@@ -289,11 +338,13 @@ export interface PendingCourses {
     humanitiesPending: Doc<"courses">[];
     corePending: Doc<"courses">[];
     electivePending: Doc<"courses">[];
+    generalPending: Doc<"courses">[];
 
     // Credits needed
     humanitiesNeeded: number;
     coreNeeded: number;
     electiveNeeded: number;
+    generalNeeded: number;
     totalNeeded: number;
 
     // Can take now (prerequisites met)
@@ -307,39 +358,11 @@ export interface PendingCourses {
 }
 
 // ============================================================================
-// ACCESS CONTROL TYPES
+// ENROLLMENT TYPES
 // ============================================================================
 
-export interface AccessListEntry {
-    _id: Id<"accessList">;
-    email: string;
-    role: UserRole;
-    createdBy: Id<"users">;
-    createdAt: number;
-    expiresAt?: number;
-    isUsed: boolean;
-    usedAt?: number;
-    usedBy?: Id<"users">;
-}
-
-export interface UserTemplate {
-    _id: Id<"userTemplates">;
-    email: string;
-    name: string;
-
-    // Student-specific
-    programId?: Id<"programs">;
-    studentCode?: string;
-
-    // Professor-specific
-    employeeCode?: string;
-
-    createdBy: Id<"users">;
-    createdAt: number;
-}
-
 // ============================================================================
-// SEARCH AND FILTER TYPES
+// SEARCH AND FILTER TYPES (Updated)
 // ============================================================================
 
 export interface CourseSearchFilters {
@@ -363,8 +386,15 @@ export interface SectionSearchFilters {
     onlyAvailable?: boolean;
 }
 
+export interface AnnouncementSearchFilters {
+    sectionId?: Id<"sections">;
+    professorId?: Id<"users">;
+    periodId?: Id<"periods">;
+    limit?: number;
+}
+
 // ============================================================================
-// PROFESSOR VIEW TYPES
+// PROFESSOR VIEW TYPES (Updated)
 // ============================================================================
 
 /**
@@ -381,8 +411,9 @@ export interface ProfessorClass {
         makeupGrade: number | null;
         status: EnrollmentStatus;
     }>;
-    scheduleNote?: string;
+    schedule?: VirtualSchedule;
     gradesSubmitted: boolean;
+    announcements?: Doc<"announcements">[];
 }
 
 /**
@@ -413,6 +444,47 @@ export interface PeriodStatistics {
     averageGPA: number;
     completionRate: number;
     dropRate: number;
+}
+
+// ============================================================================
+// DASHBOARD TYPES
+// ============================================================================
+
+/**
+ * Complete student dashboard data
+ */
+export interface StudentDashboardData {
+    student: Doc<"users">;
+    program: Doc<"programs">;
+    currentPeriod: Doc<"periods"> | null;
+    progress: StudentProgress | null;
+    pendingCourses: PendingCourses | null;
+    currentEnrollments: EnrollmentWithDetails[];
+    cumulativeGPA: number;
+}
+
+/**
+ * Complete professor dashboard data
+ */
+export interface ProfessorDashboardData {
+    professor: Doc<"users">;
+    currentPeriod: Doc<"periods">;
+    classes: ProfessorClass[];
+    totalStudents: number;
+    pendingGrades: number;
+}
+
+/**
+ * Complete admin dashboard data
+ */
+export interface AdminDashboardData {
+    currentPeriod: Doc<"periods"> | null;
+    activeProfessorsCount: number;
+    activeStudentsCount: number;
+    activeProgramsCount: number;
+    activeCoursesCount: number;
+    recentEnrollments: any[]; // TODO: define specific type
+    upcomingDeadlines: any[]; // TODO: define specific type
 }
 
 // ============================================================================

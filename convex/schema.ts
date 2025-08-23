@@ -14,17 +14,17 @@
  * - Progress visualization
  * - Transcript generation
  * - Professor grade submission
+ * - Section announcements and communication
  * 
  * Tables (only what's needed):
  * 1. users - Students, professors, admins
  * 2. programs - Academic programs  
  * 3. periods - Academic periods
  * 4. courses - Course catalog with categories
- * 5. sections - Course sections (combines section + group concept)
+ * 5. sections - Course sections with virtual schedules
  * 6. enrollments - Student enrollments with grades
  * 7. program_requirements - Credit requirements for progress bar
- * 8. accessList - Registration whitelist
- * 9. userTemplates - Pre-registration data
+ * 8. announcements - Professor announcements for sections
  */
 
 import { defineSchema, defineTable } from "convex/server";
@@ -120,6 +120,7 @@ export default defineSchema({
     // Key dates
     enrollmentStart: v.number(),
     enrollmentEnd: v.number(),
+    gradingStart: v.optional(v.number()),
     gradingDeadline: v.number(),
 
     status: v.union(
@@ -187,8 +188,16 @@ export default defineSchema({
     capacity: v.number(),
     enrolled: v.number(),
 
-    // Simple schedule (when professor needs to know class times)
-    scheduleNote: v.optional(v.string()),   // "Mon/Wed 2-4pm, Room A-101"
+    // Virtual schedule (times can vary by day)
+    schedule: v.optional(v.object({
+      sessions: v.array(v.object({
+        day: v.string(),             // "Monday", "Wednesday"
+        startTime: v.string(),       // "14:00"
+        endTime: v.string(),         // "16:00"
+      })),
+      timezone: v.string(),          // "America/Bogota"
+      notes: v.optional(v.string()),
+    })),
 
     // Status
     isActive: v.boolean(),
@@ -236,10 +245,10 @@ export default defineSchema({
     reactivationDate: v.optional(v.number()),
 
     // AMERICAN GRADING SYSTEM
-    percentageGrade: v.optional(v.number()),    // 0-100 numerical grade
-    letterGrade: v.optional(v.string()),        // A, B, C, D, F, I
-    gradePoints: v.optional(v.number()),        // 4.0, 3.0, 2.0, 1.0, 0.0
-    qualityPoints: v.optional(v.number()),      // gradePoints * credits
+    percentageGrade: v.optional(v.number()),
+    letterGrade: v.optional(v.string()),
+    gradePoints: v.optional(v.number()),
+    qualityPoints: v.optional(v.number()),
 
     // Metadata
     gradedBy: v.optional(v.id("users")),
@@ -279,46 +288,23 @@ export default defineSchema({
     .index("by_program_active", ["programId", "isActive"]),
 
   /**
-   * Access control - Whitelist for registration
+   * Section announcements
+   * Simple text notes that professors can leave for their sections
    */
-  accessList: defineTable({
-    email: v.string(),
-    role: v.union(
-      v.literal("student"),
-      v.literal("professor"),
-      v.literal("admin")
-    ),
+  announcements: defineTable({
+    // Core references
+    sectionId: v.id("sections"),
+    professorId: v.id("users"),
 
-    createdBy: v.id("users"),
+    // Content
+    content: v.string(),              // The announcement text
+
+    // Metadata
     createdAt: v.number(),
-    expiresAt: v.optional(v.number()),
-
-    isUsed: v.boolean(),
-    usedAt: v.optional(v.number()),
-    usedBy: v.optional(v.id("users")),
+    updatedAt: v.optional(v.number()),
   })
-    .index("by_email_unused", ["email", "isUsed"]),
+    .index("by_section", ["sectionId"])
+    .index("by_professor", ["professorId"])
+    .index("by_created_at", ["createdAt"]),
 
-  /**
-   * User templates - Pre-registration data
-   */
-  userTemplates: defineTable({
-    email: v.string(),
-    name: v.string(),
-    phone: v.optional(v.string()),
-    country: v.optional(v.string()),
-    city: v.optional(v.string()),
-
-    // Student-specific
-    programId: v.optional(v.id("programs")),
-    studentCode: v.optional(v.string()),
-
-    // Professor-specific
-    employeeCode: v.optional(v.string()),
-    title: v.optional(v.string()),
-
-    createdBy: v.id("users"),
-    createdAt: v.number(),
-  })
-    .index("by_email", ["email"]),
 });
