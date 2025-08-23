@@ -80,7 +80,7 @@ export default function ProgramInfoCard({ programData }: ProgramInfoCardProps) {
                     <div>
                         <div className="text-sm font-medium text-white/70">{t('program.status')}</div>
                         <Badge className="bg-green-500/20 text-green-100 border-green-400/30 hover:bg-green-500/30">
-                            {programData.status === 'active' ? t('program.active') : 'Inactivo'} • {t('program.modalityPresential')}
+                            {programData.status === 'active' ? t('program.active') : 'Inactivo'}
                         </Badge>
                     </div>
                 </div>
