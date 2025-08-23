@@ -214,5 +214,76 @@
                 "academicCalendar": "Academic Calendar"
             }
         }
+    },
+    "academicHistory": {
+        "title": "Academic History",
+        "subtitle": "Complete record of academic performance",
+        "printTranscript": "Print Transcript",
+        "printPeriod": "Print Period",
+        "filters": {
+            "searchSubject": "Search subject...",
+            "filterByPeriod": "Filter by period",
+            "allPeriods": "All periods",
+            "columns": "Columns"
+        },
+        "table": {
+            "code": "Code",
+            "group": "Group",
+            "subject": "Subject",
+            "credits": "Credits",
+            "category": "Category",
+            "letterGrade": "Letter Grade",
+            "percentGrade": "Percent",
+            "gpaScale": "GPA Scale",
+            "status": "Status",
+            "professor": "Professor",
+            "actions": "Actions"
+        },
+        "status": {
+            "passed": "Passed",
+            "failed": "Failed",
+            "inProgress": "In Progress",
+            "withdrawn": "Withdrawn",
+            "incomplete": "Incomplete"
+        },
+        "categories": {
+            "core": "Core",
+            "humanities": "Humanities",
+            "electives": "Electives",
+            "prerequisite": "Prerequisite"
+        },
+        "periodSummary": {
+            "title": "Period Completion Summary",
+            "creditsEnrolled": "Credits Enrolled",
+            "creditsApproved": "Credits Approved",
+            "percentApproved": "% Credits Approved",
+            "cumulativeCredits": "Cumulative Credits",
+            "cumulativeApproved": "Cumulative Credits Approved",
+            "periodGPA": "Period GPA",
+            "cumulativeGPA": "Cumulative GPA"
+        },
+        "overallSummary": {
+            "title": "Overall Academic Summary",
+            "totalCreditsCompleted": "Total Credits Completed",
+            "totalCreditsRequired": "Total Credits Required",
+            "overallGPA": "Overall GPA",
+            "academicStanding": "Academic Standing",
+            "expectedGraduation": "Expected Graduation"
+        },
+        "standing": {
+            "excellent": "Excellent",
+            "good": "Good Standing",
+            "probation": "Academic Probation",
+            "warning": "Academic Warning"
+        },
+        "subjectDetails": {
+            "title": "Subject Details",
+            "description": "Description",
+            "prerequisites": "Prerequisites",
+            "schedule": "Schedule",
+            "notes": "Notes",
+            "none": "None"
+        },
+        "noResults": "No subjects found matching your criteria"
     }
 }

@@ -11,7 +11,7 @@ import {
     transformToSubjectsData,
     // transformToCreditDistribution,
     // getMockUpcomingDates
-} from './student/data'
+} from './student/dashboard-data'
 
 export default function StudentDashboard() {
     // TODO: Replace with real Convex query

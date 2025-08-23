@@ -214,5 +214,76 @@
                 "academicCalendar": "Calendario Académico"
             }
         }
+    },
+    "academicHistory": {
+        "title": "Historial Académico",
+        "subtitle": "Registro completo del rendimiento académico",
+        "printTranscript": "Imprimir Histórico",
+        "printPeriod": "Imprimir Periodo",
+        "filters": {
+            "searchSubject": "Buscar asignatura...",
+            "filterByPeriod": "Filtrar por periodo",
+            "allPeriods": "Todos los periodos",
+            "columns": "Columnas"
+        },
+        "table": {
+            "code": "Código",
+            "group": "Grupo",
+            "subject": "Asignatura",
+            "credits": "Créditos",
+            "category": "Categoría",
+            "letterGrade": "Nota Literal",
+            "percentGrade": "Porcentaje",
+            "gpaScale": "Escala 4.0",
+            "status": "Estado",
+            "professor": "Profesor",
+            "actions": "Acciones"
+        },
+        "status": {
+            "passed": "Aprobado",
+            "failed": "Reprobado",
+            "inProgress": "Cursando",
+            "withdrawn": "Retirado",
+            "incomplete": "Incompleto"
+        },
+        "categories": {
+            "core": "Troncal",
+            "humanities": "Humanística",
+            "electives": "Electiva",
+            "prerequisite": "Prerrequisito"
+        },
+        "periodSummary": {
+            "title": "Resumen de Finalización por Periodo",
+            "creditsEnrolled": "Créditos Matriculados",
+            "creditsApproved": "Núm. Créd. Aprobados",
+            "percentApproved": "% Créd. Aprobados",
+            "cumulativeCredits": "Créditos Acumulados",
+            "cumulativeApproved": "Núm. Créd. Aprobados Acumulados",
+            "periodGPA": "Promedio Semestral",
+            "cumulativeGPA": "Promedio Acumulado"
+        },
+        "overallSummary": {
+            "title": "Resumen Académico General",
+            "totalCreditsCompleted": "Total Créditos Completados",
+            "totalCreditsRequired": "Total Créditos Requeridos",
+            "overallGPA": "Promedio Total Acumulado",
+            "academicStanding": "Estado Académico",
+            "expectedGraduation": "Graduación Esperada"
+        },
+        "standing": {
+            "excellent": "Excelente",
+            "good": "Buen Rendimiento",
+            "probation": "Probatoria Académica",
+            "warning": "Advertencia Académica"
+        },
+        "subjectDetails": {
+            "title": "Detalles de la Asignatura",
+            "description": "Descripción",
+            "prerequisites": "Prerrequisitos",
+            "schedule": "Horario",
+            "notes": "Notas",
+            "none": "Ninguno"
+        },
+        "noResults": "No se encontraron asignaturas que coincidan con los criterios"
     }
 }
