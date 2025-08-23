@@ -27,11 +27,11 @@ interface CurrentSubjectsProps {
     subjects: Subject[]
 }
 
-export default function CurrentSubjectsCard({ 
-    currentPeriod, 
-    enrolledSubjects, 
-    creditsInProgress, 
-    subjects 
+export default function CurrentSubjectsCard({
+    currentPeriod,
+    enrolledSubjects,
+    creditsInProgress,
+    subjects
 }: CurrentSubjectsProps) {
     const t = useTranslations('dashboard.student')
 
@@ -75,9 +75,9 @@ export default function CurrentSubjectsCard({
                     </div>
                     <div className="space-y-3">
                         {subjects.map((subject, index) => (
-                            <Link 
-                                key={subject.code} 
-                                href={`/courses/${subject.code.toLowerCase()}`} 
+                            <Link
+                                key={subject.code}
+                                href={`/courses/${subject.code.toLowerCase()}`}
                                 className="grid grid-cols-5 gap-4 text-sm hover:bg-muted/50 p-2 rounded-md transition-colors cursor-pointer"
                             >
                                 <div className="font-mono">{subject.code}</div>
