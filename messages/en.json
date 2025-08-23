@@ -22,62 +22,124 @@
         "getStarted": "Get Started",
         "tutorials": "Tutorials",
         "changelog": "Changelog",
+        "profile": "My Account",
+        "myStudy": "My Study",
+        "studentDocs": "Documentation",
+        "myClasses": "My Classes",
+        "professorDocs": "Documentation",
+        "academicAdmin": "Academic Administration",
+        "personalAdmin": "Personal Administration",
+        "adminDocs": "Documentation",
         "menu": {
-            "playground": {
-                "title": "Playground",
-                "url": "/playground",
+            "profile": {
+                "title": "My Account",
+                "url": "/profile",
                 "items": [
                     {
-                        "title": "History",
-                        "url": "/playground/history"
-                    },
-                    {
-                        "title": "Starred",
-                        "url": "/playground/starred"
-                    },
-                    {
-                        "title": "Settings",
-                        "url": "/playground/settings"
+                        "title": "Personal Information",
+                        "url": "/profile"
                     }
                 ]
             },
-            "models": {
-                "title": "Models",
-                "url": "/models",
+            "student": {
+                "title": "My Study",
+                "url": "/academic",
                 "items": [
                     {
-                        "title": "Genesis",
-                        "url": "/models/genesis"
+                        "title": "Academic History",
+                        "url": "/academic/history"
                     },
                     {
-                        "title": "Explorer",
-                        "url": "/models/explorer"
-                    },
-                    {
-                        "title": "Quantum",
-                        "url": "/models/quantum"
+                        "title": "Academic Progress",
+                        "url": "/academic/progress"
                     }
                 ]
             },
-            "documentation": {
+            "studentDocs": {
                 "title": "Documentation",
-                "url": "/documentation",
+                "url": "/docs",
                 "items": [
                     {
-                        "title": "Introduction",
-                        "url": "/documentation/introduction"
+                        "title": "Certificates & Transcripts",
+                        "url": "/docs/transcripts"
                     },
                     {
-                        "title": "Get Started",
-                        "url": "/documentation/get-started"
+                        "title": "Academic Progress Guide",
+                        "url": "/docs/progress"
+                    }
+                ]
+            },
+            "professor": {
+                "title": "My Classes",
+                "url": "/teaching",
+                "items": [
+                    {
+                        "title": "Gradebook",
+                        "url": "/teaching/gradebook"
                     },
                     {
-                        "title": "Tutorials",
-                        "url": "/documentation/tutorials"
+                        "title": "Teaching Progress",
+                        "url": "/teaching/progress"
+                    }
+                ]
+            },
+            "professorDocs": {
+                "title": "Documentation",
+                "url": "/docs/teaching",
+                "items": [
+                    {
+                        "title": "Grading Guide",
+                        "url": "/docs/teaching/grading"
                     },
                     {
-                        "title": "Changelog",
-                        "url": "/documentation/changelog"
+                        "title": "Teaching Resources",
+                        "url": "/docs/teaching/resources"
+                    }
+                ]
+            },
+            "adminAcademic": {
+                "title": "Academic Administration",
+                "url": "/admin",
+                "items": [
+                    {
+                        "title": "Program Management",
+                        "url": "/admin/programs"
+                    },
+                    {
+                        "title": "Course Management",
+                        "url": "/admin/courses"
+                    },
+                    {
+                        "title": "Period Management",
+                        "url": "/admin/periods"
+                    }
+                ]
+            },
+            "adminPersonal": {
+                "title": "Personal Administration",
+                "url": "/admin/users",
+                "items": [
+                    {
+                        "title": "Professor Management",
+                        "url": "/admin/professors"
+                    },
+                    {
+                        "title": "Student Management",
+                        "url": "/admin/students"
+                    }
+                ]
+            },
+            "adminDocs": {
+                "title": "Documentation",
+                "url": "/docs/admin",
+                "items": [
+                    {
+                        "title": "Administration Manual",
+                        "url": "/docs/admin/manual"
+                    },
+                    {
+                        "title": "System Guides",
+                        "url": "/docs/admin/guides"
                     }
                 ]
             }
