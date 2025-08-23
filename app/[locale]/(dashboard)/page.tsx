@@ -1,6 +1,7 @@
 import { getCurrentUserRole } from '@/lib/rbac';
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import StudentDashboard from '@/components/dashboard/student-dashboard'
 
 export default async function DashboardPage({
   params,
@@ -18,7 +19,7 @@ export default async function DashboardPage({
   return (
     <div className="dashboard-container">
       {/* Render condicional por rol - AQUÍ van los componentes */}
-      {userRole === 'student' && <div>Student Dashboard Placeholder</div>}
+      {userRole === 'student' && <StudentDashboard />}
       {userRole === 'professor' && <div>Professor Dashboard Placeholder</div>}
       {(userRole === 'admin' || userRole === 'superadmin') && <div>Admin Dashboard Placeholder</div>}
 

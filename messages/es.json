@@ -86,5 +86,70 @@
     "university": {
         "name": "Alef University",
         "academicRecords": "Sistema de Registro Universitario"
+    },
+    "dashboard": {
+        "student": {
+            "metrics": {
+                "completedCredits": "Créditos Completados",
+                "cumulativeGPA": "GPA Acumulado",
+                "currentBimester": "Bimestre Actual",
+                "careerProgress": "Progreso Carrera",
+                "excellentProgress": "Progreso excelente",
+                "creditsRemaining": "{count} créditos restantes para graduarte",
+                "outstandingPerformance": "Rendimiento destacado",
+                "maintainLevel": "Mantén este nivel para graduarte con honores",
+                "currentlyEnrolled": "Inscrito actualmente",
+                "creditsInProgress": "{count} créditos en curso este bimestre",
+                "almostGraduating": "Casi graduándote",
+                "bimestersRemaining": "{count} bimestre restante previsto",
+                "excellent": "Excelente",
+                "bimesters": "bimestres",
+                "subjects": "materias"
+            },
+            "program": {
+                "title": "Ingeniería de Software",
+                "subtitle": "Programa de Pregrado • Código: IDS-001",
+                "admissionDate": "Fecha de Ingreso",
+                "estimatedGraduation": "Graduación Estimada",
+                "status": "Estado",
+                "active": "Activo",
+                "totalCredits": "Créditos Totales",
+                "duration": "Duración",
+                "languages": "Idiomas",
+                "modalityPresential": "Presencial",
+                "viewDetails": "Ver Detalles"
+            },
+            "currentSubjects": {
+                "title": "Materias del Bimestre",
+                "subtitle": "{period} • {count} materias inscritas • {credits} créditos",
+                "code": "Código",
+                "subject": "Materia",
+                "credits": "Créditos",
+                "grade": "Nota",
+                "status": "Estado",
+                "inProgress": "Cursando",
+                "pending": "Pendiente",
+                "viewHistory": "Ver Historial"
+            },
+            "creditDistribution": {
+                "title": "Distribución de Créditos",
+                "core": "Troncales",
+                "humanities": "Humanísticas",
+                "electives": "Electivas"
+            },
+            "upcomingDates": {
+                "title": "Próximas Fechas",
+                "gradesDeadline": "Fecha límite calificaciones",
+                "nextBimesterStart": "Inicio próximo bimestre",
+                "earlyEnrollment": "Matrícula anticipada"
+            },
+            "documents": {
+                "title": "Documentos",
+                "transcriptCertificate": "Certificado de Notas",
+                "academicHistory": "Historial Académico",
+                "progressAnalysis": "Análisis de Progreso",
+                "academicCalendar": "Calendario Académico"
+            }
+        }
     }
 }

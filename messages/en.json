@@ -86,5 +86,70 @@
     "university": {
         "name": "Alef University",
         "academicRecords": "University Registration System"
+    },
+    "dashboard": {
+        "student": {
+            "metrics": {
+                "completedCredits": "Completed Credits",
+                "cumulativeGPA": "Cumulative GPA",
+                "currentBimester": "Current Bimester",
+                "careerProgress": "Career Progress",
+                "excellentProgress": "Excellent progress",
+                "creditsRemaining": "{count} credits remaining to graduate",
+                "outstandingPerformance": "Outstanding performance",
+                "maintainLevel": "Maintain this level to graduate with honors",
+                "currentlyEnrolled": "Currently enrolled",
+                "creditsInProgress": "{count} credits in progress this bimester",
+                "almostGraduating": "Almost graduating",
+                "bimestersRemaining": "{count} bimester remaining expected",
+                "excellent": "Excellent",
+                "bimesters": "bimesters",
+                "subjects": "subjects"
+            },
+            "program": {
+                "title": "Software Engineering",
+                "subtitle": "Undergraduate Program • Code: IDS-001",
+                "admissionDate": "Admission Date",
+                "estimatedGraduation": "Estimated Graduation",
+                "status": "Status",
+                "active": "Active",
+                "totalCredits": "Total Credits",
+                "duration": "Duration",
+                "languages": "Languages",
+                "modalityPresential": "Presential",
+                "viewDetails": "View Details"
+            },
+            "currentSubjects": {
+                "title": "Bimester Subjects",
+                "subtitle": "{period} • {count} enrolled subjects • {credits} credits",
+                "code": "Code",
+                "subject": "Subject",
+                "credits": "Credits",
+                "grade": "Grade",
+                "status": "Status",
+                "inProgress": "In Progress",
+                "pending": "Pending",
+                "viewHistory": "View History"
+            },
+            "creditDistribution": {
+                "title": "Credit Distribution",
+                "core": "Core",
+                "humanities": "Humanities",
+                "electives": "Electives"
+            },
+            "upcomingDates": {
+                "title": "Upcoming Dates",
+                "gradesDeadline": "Grades deadline",
+                "nextBimesterStart": "Next bimester start",
+                "earlyEnrollment": "Early enrollment"
+            },
+            "documents": {
+                "title": "Documents",
+                "transcriptCertificate": "Transcript Certificate",
+                "academicHistory": "Academic History",
+                "progressAnalysis": "Progress Analysis",
+                "academicCalendar": "Academic Calendar"
+            }
+        }
     }
 }
