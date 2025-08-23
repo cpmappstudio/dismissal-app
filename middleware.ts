@@ -2,67 +2,106 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
+import { getLocaleFromPathname } from './lib/locale-setup'
+import { checkRoleAccess } from './lib/rbac'
 import type { UserRole } from '@/convex/types'
 
-// Crear el middleware de internacionalización usando la configuración centralizada
 const intlMiddleware = createIntlMiddleware(routing)
 
-// Solo definir rutas públicas - TODO lo demás está protegido  
 const isPublicRoute = createRouteMatcher([
   '/:locale/sign-in(.*)',
   '/:locale/sign-up(.*)',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/:locale/pending-role',
+  '/pending-role',
+  '/:locale',
+  '/',
 ])
 
-// Protección RBAC - Rutas específicas por rol
-const isStudentOnlyRoute = createRouteMatcher([
-  '/:locale/academic(.*)',
-])
+const DEFAULT_PATHS = {
+  student: '/academic',
+  professor: '/teaching',
+  admin: '/admin',
+  superadmin: '/admin',
+} satisfies Record<UserRole, string>
 
-const isProfessorOnlyRoute = createRouteMatcher([
-  '/:locale/teaching(.*)',
-])
-
-const isAdminOnlyRoute = createRouteMatcher([
-  '/:locale/admin(.*)',
+const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([
+  '/:locale/profile(.*)',
+  '/profile(.*)',
+  '/:locale/settings(.*)',
+  '/settings(.*)',
+  '/:locale/dashboard',
+  '/dashboard',
 ])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
-  // Primero aplicar internacionalización
-  const intlResponse = intlMiddleware(req)
+  const { pathname, search } = req.nextUrl
 
-  // Si hay redirección de idioma, aplicarla
-  if (intlResponse) {
-    return intlResponse
+  // Fast path: archivos estáticos
+  if (pathname.match(/\.(jpg|jpeg|gif|png|svg|ico|webp|mp4|pdf|js|css|woff2?)$/)) {
+    return NextResponse.next()
   }
 
-  // Proteger TODO excepto rutas públicas
-  if (!isPublicRoute(req)) {
-    await auth.protect()
+  const locale = getLocaleFromPathname(pathname)
 
-    // RBAC - Solo aplicar si el usuario está autenticado
-    const userRole = (await auth()).sessionClaims?.metadata?.role as UserRole | undefined
+  if (isPublicRoute(req)) {
+    return intlMiddleware(req)
+  }
 
-    // Proteger rutas específicas de estudiantes
-    if (isStudentOnlyRoute(req) && userRole !== 'student') {
-      return NextResponse.redirect(new URL('/', req.url))
+  try {
+    const authObject = await auth()
+
+    if (!authObject.userId) {
+      const signInUrl = new URL(`/${locale}/sign-in`, req.url)
+
+      const isInternalPath = pathname.startsWith('/') &&
+        !pathname.startsWith('//') &&
+        !pathname.includes('@')
+
+      if (isInternalPath && pathname !== '/' && pathname !== `/${locale}`) {
+        signInUrl.searchParams.set('redirect_url', pathname + search)
+      }
+
+      return NextResponse.redirect(signInUrl)
     }
 
-    // Proteger rutas específicas de profesores
-    if (isProfessorOnlyRoute(req) &&
-      userRole !== 'professor' && userRole !== 'admin' && userRole !== 'superadmin') {
-      return NextResponse.redirect(new URL('/', req.url))
+    const userRole = authObject.sessionClaims?.metadata?.role as UserRole | undefined
+
+    if (!userRole) {
+      if (!pathname.includes('/pending-role')) {
+        return NextResponse.redirect(new URL(`/${locale}/pending-role`, req.url))
+      }
+      return intlMiddleware(req)
     }
 
-    // Proteger rutas específicas de administradores
-    if (isAdminOnlyRoute(req) &&
-      userRole !== 'admin' && userRole !== 'superadmin') {
-      return NextResponse.redirect(new URL('/', req.url))
+    if (COMMON_AUTHENTICATED_ROUTES(req)) {
+      return intlMiddleware(req)
     }
 
-    // Debugging en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Auth] ${req.nextUrl.pathname} - Public: ${isPublicRoute(req)} - Role: ${userRole || 'none'}`)
+    const deniedRoute = checkRoleAccess(req, userRole)
+
+    if (deniedRoute === 'denied') {
+      const redirectPath = `/${locale}${DEFAULT_PATHS[userRole]}`
+
+      // Prevenir loop de redirección
+      if (!pathname.startsWith(redirectPath)) {
+        return NextResponse.redirect(new URL(redirectPath, req.url))
+      }
+    } else if (deniedRoute === 'unknown') {
+      console.warn(`[Security] Unknown route attempted: ${pathname} by ${userRole}`)
+      return NextResponse.redirect(new URL(`/${locale}${DEFAULT_PATHS[userRole]}`, req.url))
     }
+
+    return intlMiddleware(req)
+
+  } catch (error) {
+    console.error('[Middleware] Critical error:', error)
+
+    // En error, siempre denegar acceso
+    const errorUrl = new URL(`/${locale}/sign-in`, req.url)
+    errorUrl.searchParams.set('error', 'auth_error')
+    return NextResponse.redirect(errorUrl)
   }
 })
 
