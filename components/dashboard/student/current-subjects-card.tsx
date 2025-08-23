@@ -7,6 +7,7 @@ import {
     Card,
     CardContent,
     CardDescription,
+    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card'
@@ -72,13 +73,6 @@ export default function CurrentSubjectsCard({
                             <BookOpen className="size-5" />
                             {t('currentSubjects.title')}
                         </CardTitle>
-                        <CardDescription>
-                            {t('currentSubjects.subtitle', {
-                                period: currentPeriod,
-                                count: enrolledSubjects,
-                                credits: creditsInProgress
-                            })}
-                        </CardDescription>
                     </div>
                     <Link href="/academic/history">
                         <Button variant="outline" size="sm">
@@ -126,6 +120,15 @@ export default function CurrentSubjectsCard({
                         </TableBody>
                     </Table>
                 </CardContent>
+                <CardFooter>
+                    <CardDescription>
+                        {t('currentSubjects.subtitle', {
+                            period: currentPeriod,
+                            count: enrolledSubjects,
+                            credits: creditsInProgress
+                        })}
+                    </CardDescription>
+                </CardFooter>
             </Card>
         </div>
     )
