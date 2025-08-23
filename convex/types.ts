@@ -542,3 +542,15 @@ export type UpdateInput<T> = Partial<WithoutSystemFields<T>>;
 export type RequireAtLeastOne<T> = {
     [K in keyof T]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<keyof T, K>>>;
 }[keyof T];
+
+// ============================================================================
+// CLERK RBAC INTEGRATION
+// ============================================================================
+
+declare global {
+    interface CustomJwtSessionClaims {
+        metadata: {
+            role?: UserRole;
+        }
+    }
+}

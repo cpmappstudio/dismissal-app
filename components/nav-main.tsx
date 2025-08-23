@@ -1,6 +1,10 @@
 "use client"
 
-import { ChevronRight, type LucideIcon } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useMemo, memo } from "react"
+import { ChevronRight, Home, type LucideIcon } from "lucide-react"
+import { clsx } from "clsx"
 
 import {
   Collapsible,
@@ -18,8 +22,10 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
-export function NavMain({
+export const NavMain = memo(function NavMain({
   items,
+  dashboardLabel,
+  navigationLabel,
 }: {
   items: {
     title: string
@@ -31,11 +37,36 @@ export function NavMain({
       url: string
     }[]
   }[]
+  dashboardLabel: string
+  navigationLabel: string
 }) {
+  const pathname = usePathname()
+
+  // Memoize the path processing to avoid regex on every render
+  const pathWithoutLocale = useMemo(() => {
+    return pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '')
+  }, [pathname])
+
+  // Memoize the dashboard active state
+  const isDashboardActive = useMemo(() => {
+    return pathWithoutLocale === '' || pathWithoutLocale === '/'
+  }, [pathWithoutLocale])
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>{navigationLabel}</SidebarGroupLabel>
       <SidebarMenu>
+        <SidebarMenuButton
+          asChild
+          className={clsx({
+            'bg-sidebar-accent text-sidebar-accent-foreground': isDashboardActive,
+          })}
+        >
+          <Link href="/">
+            <Home />
+            <span>{dashboardLabel}</span>
+          </Link>
+        </SidebarMenuButton>
         {items.map((item) => (
           <Collapsible
             key={item.title}
@@ -55,10 +86,15 @@ export function NavMain({
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
+                      <SidebarMenuSubButton
+                        asChild
+                        className={clsx({
+                          'bg-sidebar-accent text-sidebar-accent-foreground': pathWithoutLocale === subItem.url,
+                        })}
+                      >
+                        <Link href={subItem.url}>
                           <span>{subItem.title}</span>
-                        </a>
+                        </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}
@@ -70,4 +106,4 @@ export function NavMain({
       </SidebarMenu>
     </SidebarGroup>
   )
-}
+})

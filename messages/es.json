@@ -11,6 +11,7 @@
     "navigation": {
         "university": "Alef University",
         "dashboard": "Tablero",
+        "navigation": "Navegación",
         "playground": "Área de Pruebas",
         "models": "Modelos",
         "documentation": "Documentación",
@@ -22,62 +23,124 @@
         "getStarted": "Comenzar",
         "tutorials": "Tutoriales",
         "changelog": "Registro de Cambios",
+        "profile": "Mi Cuenta",
+        "myStudy": "Mi Estudio",
+        "studentDocs": "Documentación",
+        "myClasses": "Mis Clases",
+        "professorDocs": "Documentación",
+        "academicAdmin": "Administración Académica",
+        "personalAdmin": "Administración Personal",
+        "adminDocs": "Documentación",
         "menu": {
-            "playground": {
-                "title": "Área de Pruebas",
-                "url": "/playground",
+            "profile": {
+                "title": "Mi Cuenta",
+                "url": "/profile",
                 "items": [
                     {
-                        "title": "Historial",
-                        "url": "/playground/history"
-                    },
-                    {
-                        "title": "Destacados",
-                        "url": "/playground/starred"
-                    },
-                    {
-                        "title": "Configuración",
-                        "url": "/playground/settings"
+                        "title": "Información Personal",
+                        "url": "/profile"
                     }
                 ]
             },
-            "models": {
-                "title": "Modelos",
-                "url": "/models",
+            "student": {
+                "title": "Mi Estudio",
+                "url": "/academic",
                 "items": [
                     {
-                        "title": "Genesis",
-                        "url": "/models/genesis"
+                        "title": "Historial Académico",
+                        "url": "/academic/history"
                     },
                     {
-                        "title": "Explorer",
-                        "url": "/models/explorer"
-                    },
-                    {
-                        "title": "Quantum",
-                        "url": "/models/quantum"
+                        "title": "Progreso Académico",
+                        "url": "/academic/progress"
                     }
                 ]
             },
-            "documentation": {
+            "studentDocs": {
                 "title": "Documentación",
-                "url": "/documentation",
+                "url": "/docs",
                 "items": [
                     {
-                        "title": "Introducción",
-                        "url": "/documentation/introduction"
+                        "title": "Certificados y Transcripciones",
+                        "url": "/docs/transcripts"
                     },
                     {
-                        "title": "Comenzar",
-                        "url": "/documentation/get-started"
+                        "title": "Guía de Progreso Académico",
+                        "url": "/docs/progress"
+                    }
+                ]
+            },
+            "professor": {
+                "title": "Mis Clases",
+                "url": "/teaching",
+                "items": [
+                    {
+                        "title": "Libro de Calificaciones",
+                        "url": "/teaching/gradebook"
                     },
                     {
-                        "title": "Tutoriales",
-                        "url": "/documentation/tutorials"
+                        "title": "Progreso de Enseñanza",
+                        "url": "/teaching/progress"
+                    }
+                ]
+            },
+            "professorDocs": {
+                "title": "Documentación",
+                "url": "/docs/teaching",
+                "items": [
+                    {
+                        "title": "Guía de Calificaciones",
+                        "url": "/docs/teaching/grading"
                     },
                     {
-                        "title": "Registro de Cambios",
-                        "url": "/documentation/changelog"
+                        "title": "Recursos Pedagógicos",
+                        "url": "/docs/teaching/resources"
+                    }
+                ]
+            },
+            "adminAcademic": {
+                "title": "Administración Académica",
+                "url": "/admin",
+                "items": [
+                    {
+                        "title": "Gestión de Programas",
+                        "url": "/admin/programs"
+                    },
+                    {
+                        "title": "Gestión de Cursos",
+                        "url": "/admin/courses"
+                    },
+                    {
+                        "title": "Gestión de Períodos",
+                        "url": "/admin/periods"
+                    }
+                ]
+            },
+            "adminPersonal": {
+                "title": "Administración Personal",
+                "url": "/admin/users",
+                "items": [
+                    {
+                        "title": "Gestión de Profesores",
+                        "url": "/admin/professors"
+                    },
+                    {
+                        "title": "Gestión de Estudiantes",
+                        "url": "/admin/students"
+                    }
+                ]
+            },
+            "adminDocs": {
+                "title": "Documentación",
+                "url": "/docs/admin",
+                "items": [
+                    {
+                        "title": "Manual de Administración",
+                        "url": "/docs/admin/manual"
+                    },
+                    {
+                        "title": "Guías del Sistema",
+                        "url": "/docs/admin/guides"
                     }
                 ]
             }
@@ -86,5 +149,141 @@
     "university": {
         "name": "Alef University",
         "academicRecords": "Sistema de Registro Universitario"
+    },
+    "dashboard": {
+        "student": {
+            "metrics": {
+                "completedCredits": "Créditos Completados",
+                "cumulativeGPA": "GPA Acumulado",
+                "currentBimester": "Bimestre Actual",
+                "careerProgress": "Progreso Carrera",
+                "excellentProgress": "Progreso excelente",
+                "creditsRemaining": "{count} créditos restantes para graduarte",
+                "outstandingPerformance": "Rendimiento destacado",
+                "maintainLevel": "Mantén este nivel para graduarte con honores",
+                "currentlyEnrolled": "Inscrito actualmente",
+                "creditsInProgress": "{count} créditos en curso este bimestre",
+                "almostGraduating": "Casi graduándote",
+                "bimestersRemaining": "{count} bimestre restante previsto",
+                "excellent": "Excelente",
+                "bimesters": "bimestres",
+                "subjects": "materias"
+            },
+            "program": {
+                "title": "Ingeniería de Software",
+                "subtitle": "Programa de Pregrado • Código: IDS-001",
+                "admissionDate": "Fecha de Ingreso",
+                "estimatedGraduation": "Graduación Estimada",
+                "status": "Estado",
+                "active": "Activo",
+                "totalCredits": "Créditos Totales",
+                "duration": "Duración",
+                "languages": "Idiomas",
+                "modalityPresential": "Presencial",
+                "viewDetails": "Ver Detalles"
+            },
+            "currentSubjects": {
+                "title": "Materias del Bimestre",
+                "subtitle": "{period} • {count} materias inscritas • {credits} créditos",
+                "code": "Código",
+                "subject": "Materia",
+                "credits": "Créditos",
+                "grade": "Nota",
+                "status": "Estado",
+                "inProgress": "Cursando",
+                "pending": "Pendiente",
+                "viewHistory": "Ver Historial"
+            },
+            "creditDistribution": {
+                "title": "Distribución de Créditos",
+                "core": "Troncales",
+                "humanities": "Humanísticas",
+                "electives": "Electivas"
+            },
+            "upcomingDates": {
+                "title": "Próximas Fechas",
+                "gradesDeadline": "Fecha límite calificaciones",
+                "nextBimesterStart": "Inicio próximo bimestre",
+                "earlyEnrollment": "Matrícula anticipada"
+            },
+            "documents": {
+                "title": "Documentos",
+                "transcriptCertificate": "Certificado de Notas",
+                "academicHistory": "Historial Académico",
+                "progressAnalysis": "Análisis de Progreso",
+                "academicCalendar": "Calendario Académico"
+            }
+        }
+    },
+    "academicHistory": {
+        "title": "Historial Académico",
+        "subtitle": "Registro completo del rendimiento académico",
+        "printTranscript": "Imprimir Histórico",
+        "printPeriod": "Imprimir Periodo",
+        "filters": {
+            "searchSubject": "Buscar asignatura...",
+            "filterByPeriod": "Filtrar por periodo",
+            "allPeriods": "Todos los periodos",
+            "columns": "Columnas"
+        },
+        "table": {
+            "code": "Código",
+            "group": "Grupo",
+            "subject": "Asignatura",
+            "credits": "Créditos",
+            "category": "Categoría",
+            "letterGrade": "Nota Literal",
+            "percentGrade": "Porcentaje",
+            "gpaScale": "Escala 4.0",
+            "status": "Estado",
+            "professor": "Profesor",
+            "actions": "Acciones"
+        },
+        "status": {
+            "passed": "Aprobado",
+            "failed": "Reprobado",
+            "inProgress": "Cursando",
+            "withdrawn": "Retirado",
+            "incomplete": "Incompleto"
+        },
+        "categories": {
+            "core": "Troncal",
+            "humanities": "Humanística",
+            "electives": "Electiva",
+            "prerequisite": "Prerrequisito"
+        },
+        "periodSummary": {
+            "title": "Resumen de Finalización por Periodo",
+            "creditsEnrolled": "Créditos Matriculados",
+            "creditsApproved": "Núm. Créd. Aprobados",
+            "percentApproved": "% Créd. Aprobados",
+            "cumulativeCredits": "Créditos Acumulados",
+            "cumulativeApproved": "Núm. Créd. Aprobados Acumulados",
+            "periodGPA": "Promedio Semestral",
+            "cumulativeGPA": "Promedio Acumulado"
+        },
+        "overallSummary": {
+            "title": "Resumen Académico General",
+            "totalCreditsCompleted": "Total Créditos Completados",
+            "totalCreditsRequired": "Total Créditos Requeridos",
+            "overallGPA": "Promedio Total Acumulado",
+            "academicStanding": "Estado Académico",
+            "expectedGraduation": "Graduación Esperada"
+        },
+        "standing": {
+            "excellent": "Excelente",
+            "good": "Buen Rendimiento",
+            "probation": "Probatoria Académica",
+            "warning": "Advertencia Académica"
+        },
+        "subjectDetails": {
+            "title": "Detalles de la Asignatura",
+            "description": "Descripción",
+            "prerequisites": "Prerrequisitos",
+            "schedule": "Horario",
+            "notes": "Notas",
+            "none": "Ninguno"
+        },
+        "noResults": "No se encontraron asignaturas que coincidan con los criterios"
     }
 }
