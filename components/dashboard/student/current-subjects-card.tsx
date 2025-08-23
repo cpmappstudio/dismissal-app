@@ -2,6 +2,7 @@ import Link from "next/link"
 import { BookOpen } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
     Card,
     CardContent,
@@ -9,7 +10,14 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
 
 interface Subject {
     code: string
@@ -42,58 +50,83 @@ export default function CurrentSubjectsCard({
         return t('currentSubjects.pending')
     }
 
+    const getStatusVariant = (status: Subject['status']) => {
+        switch (status) {
+            case 'in-progress': return 'default'
+            case 'pending': return 'secondary'
+            case 'completed': return 'outline'
+            default: return 'secondary'
+        }
+    }
+
+    const handleSubjectClick = (subjectCode: string) => {
+        window.location.href = `/courses/${subjectCode.toLowerCase()}`
+    }
+
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle className="flex items-center gap-2">
-                        <BookOpen className="size-5" />
-                        {t('currentSubjects.title')}
-                    </CardTitle>
-                    <CardDescription>
-                        {t('currentSubjects.subtitle', {
-                            period: currentPeriod,
-                            count: enrolledSubjects,
-                            credits: creditsInProgress
-                        })}
-                    </CardDescription>
-                </div>
-                <Link href="/academic/history">
-                    <Button variant="outline" size="sm">
-                        {t('currentSubjects.viewHistory')}
-                    </Button>
-                </Link>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-5 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
-                        <div>{t('currentSubjects.code')}</div>
-                        <div>{t('currentSubjects.subject')}</div>
-                        <div>{t('currentSubjects.credits')}</div>
-                        <div>{t('currentSubjects.grade')}</div>
-                        <div>{t('currentSubjects.status')}</div>
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs">
+            <Card data-slot="card">
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <BookOpen className="size-5" />
+                            {t('currentSubjects.title')}
+                        </CardTitle>
+                        <CardDescription>
+                            {t('currentSubjects.subtitle', {
+                                period: currentPeriod,
+                                count: enrolledSubjects,
+                                credits: creditsInProgress
+                            })}
+                        </CardDescription>
                     </div>
-                    <div className="space-y-3">
-                        {subjects.map((subject, index) => (
-                            <Link
-                                key={subject.code}
-                                href={`/courses/${subject.code.toLowerCase()}`}
-                                className="grid grid-cols-5 gap-4 text-sm hover:bg-muted/50 p-2 rounded-md transition-colors cursor-pointer"
-                            >
-                                <div className="font-mono">{subject.code}</div>
-                                <div>{subject.name}</div>
-                                <div>{subject.credits}</div>
-                                <div className={subject.grade ? "font-medium" : "text-muted-foreground"}>
-                                    {formatGrade(subject)}
-                                </div>
-                                <Badge variant="outline" className="w-fit">
-                                    {subject.status === 'in-progress' ? t('currentSubjects.inProgress') : t('currentSubjects.pending')}
-                                </Badge>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
+                    <Link href="/academic/history">
+                        <Button variant="outline" size="sm">
+                            {t('currentSubjects.viewHistory')}
+                        </Button>
+                    </Link>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>{t('currentSubjects.code')}</TableHead>
+                                <TableHead>{t('currentSubjects.subject')}</TableHead>
+                                <TableHead className="text-center">{t('currentSubjects.credits')}</TableHead>
+                                <TableHead className="text-center">{t('currentSubjects.grade')}</TableHead>
+                                <TableHead className="text-center">{t('currentSubjects.status')}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {subjects.map((subject) => (
+                                <TableRow
+                                    key={subject.code}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => handleSubjectClick(subject.code)}
+                                >
+                                    <TableCell className="font-mono font-medium">
+                                        {subject.code}
+                                    </TableCell>
+                                    <TableCell>
+                                        {subject.name}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        {subject.credits}
+                                    </TableCell>
+                                    <TableCell className={`text-center ${subject.grade ? "font-medium" : "text-muted-foreground"}`}>
+                                        {formatGrade(subject)}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant={getStatusVariant(subject.status)}>
+                                            {subject.status === 'in-progress' ? t('currentSubjects.inProgress') : t('currentSubjects.pending')}
+                                        </Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
     )
 }
