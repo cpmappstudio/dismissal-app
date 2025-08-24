@@ -26,35 +26,64 @@ The SIS implements a **complete academic management platform** with specialized 
 
 ## Business Process Model
 
-The system follows a **bimester-based academic calendar** with distinct process flows:
+The system follows a **bimester-based academic calendar** with role-specific interaction sequences:
 
 ```mermaid
-graph TD
-    A[Period Planning] --> B[Enrollment Phase]
-    B --> C[Active Teaching]
-    C --> D[Grade Submission]
-    D --> E[Period Closure]
-    E --> F[Document Generation]
+sequenceDiagram
+    autonumber
+    participant Admin
+    participant Professor
+    participant Student
+    participant SIS as SIS Backend
+    participant Auth as Authentication
     
-    subgraph "Student Journey"
-        G[Dashboard Review] --> H[Course Selection]
-        H --> I[Enrollment Validation]
-        I --> J[Academic Progress]
-        J --> K[Grade Review]
-        K --> L[Document Requests]
+    Note over Admin, Auth: Period Setup & Configuration
+    Admin->>SIS: Create new period
+    Admin->>SIS: Configure enrollment dates
+    Admin->>SIS: Create course sections
+    Admin->>Professor: Assign sections
+    
+    Note over Professor, SIS: Section Preparation
+    Professor->>Auth: Login to system
+    Professor->>SIS: Review assigned sections
+    Professor->>SIS: Update section details
+    
+    Note over Student, SIS: Enrollment Phase
+    Student->>Auth: Login to dashboard
+    Student->>SIS: View available courses
+    Student->>SIS: Check prerequisites
+    SIS->>SIS: Validate enrollment eligibility
+    break when prerequisites not met
+        SIS->>Student: Show prerequisite requirements
+    end
+    Student->>SIS: Submit enrollment request
+    SIS->>Student: Confirm enrollment
+    
+    Note over Professor, Student: Active Teaching Period
+    Professor->>SIS: Access class roster
+    Professor->>SIS: Post announcements
+    loop Throughout period
+        Professor->>SIS: Update attendance/participation
     end
     
-    subgraph "Professor Workflow"
-        M[Section Assignment] --> N[Roster Management]
-        N --> O[Grade Input]
-        O --> P[Performance Analytics]
-    end
+    Note over Professor, SIS: Grade Submission
+    Professor->>SIS: Access gradebook
+    Professor->>SIS: Enter percentage grades
+    SIS->>SIS: Calculate letter grades & GPA
+    Professor->>SIS: Submit final grades
     
-    subgraph "Admin Operations"
-        Q[Program Setup] --> R[Period Configuration]
-        R --> S[User Management]
-        S --> T[System Analytics]
-    end
+    Note over Student, SIS: Grade Review & Progress
+    Student->>SIS: View updated grades
+    SIS->>Student: Display GPA calculation
+    SIS->>Student: Show academic progress
+    Student->>SIS: Request transcript
+    SIS->>Student: Generate document
+    
+    Note over Admin, SIS: Period Closure & Analytics
+    Admin->>SIS: Review period statistics
+    Admin->>SIS: Close enrollment period
+    SIS->>SIS: Calculate final rankings
+    Admin->>SIS: Generate period reports
 ```
 
 ## Academic Model & Grading System
