@@ -16,15 +16,15 @@ import type {
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
 import type * as courses from "../courses.js";
+import type * as dashboard from "../dashboard.js";
 import type * as enrollments from "../enrollments.js";
+import type * as grades from "../grades.js";
 import type * as helpers from "../helpers.js";
-import type * as periods from "../periods.js";
-import type * as professorDashboard from "../professorDashboard.js";
+import type * as professors from "../professors.js";
 import type * as programs from "../programs.js";
-import type * as sections from "../sections.js";
-import type * as studentDashboard from "../studentDashboard.js";
+import type * as reports from "../reports.js";
+import type * as students from "../students.js";
 import type * as types from "../types.js";
-import type * as users from "../users.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -38,15 +38,15 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   auth: typeof auth;
   courses: typeof courses;
+  dashboard: typeof dashboard;
   enrollments: typeof enrollments;
+  grades: typeof grades;
   helpers: typeof helpers;
-  periods: typeof periods;
-  professorDashboard: typeof professorDashboard;
+  professors: typeof professors;
   programs: typeof programs;
-  sections: typeof sections;
-  studentDashboard: typeof studentDashboard;
+  reports: typeof reports;
+  students: typeof students;
   types: typeof types;
-  users: typeof users;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
