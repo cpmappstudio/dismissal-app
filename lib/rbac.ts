@@ -21,8 +21,24 @@ const ROLE_PERMISSIONS = {
  * Get current user role from Clerk session claims
  */
 export async function getCurrentUserRole(): Promise<UserRole | null> {
-    const { sessionClaims } = await auth();
-    return (sessionClaims?.metadata?.role as UserRole) || null;
+    try {
+        const { sessionClaims } = await auth();
+
+        if (!sessionClaims) return null;
+
+        // Clerk stores custom claims in publicMetadata or privateMetadata
+        // Use type assertion for metadata access since Clerk types are dynamic
+        const publicMeta = (sessionClaims as any).publicMetadata;
+        const privateMeta = (sessionClaims as any).privateMetadata;
+        const metadata = (sessionClaims as any).metadata;
+
+        const role = publicMeta?.role || privateMeta?.role || metadata?.role;
+
+        return (role as UserRole) || null;
+    } catch (error) {
+        console.error('Error getting user role:', error);
+        return null;
+    }
 }
 
 /**
