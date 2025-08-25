@@ -19,6 +19,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import { getMockCurrentSubjectsData } from './dashboard-data'
 
 interface Subject {
     code: string
@@ -30,10 +31,11 @@ interface Subject {
 }
 
 interface CurrentSubjectsProps {
-    currentPeriod: string
-    enrolledSubjects: number
-    creditsInProgress: number
-    subjects: Subject[]
+    // Props are now optional since we fetch data internally
+    currentPeriod?: string
+    enrolledSubjects?: number
+    creditsInProgress?: number
+    subjects?: Subject[]
 }
 
 export default function CurrentSubjectsCard({
@@ -43,6 +45,18 @@ export default function CurrentSubjectsCard({
     subjects
 }: CurrentSubjectsProps) {
     const t = useTranslations('dashboard.student')
+
+    // TODO: Replace with real Convex query
+    // const subjectsData = useQuery(api.studentDashboard.getCurrentSubjects)
+    const mockData = getMockCurrentSubjectsData()
+
+    // Use provided props or fallback to mock data
+    const finalData = {
+        currentPeriod: currentPeriod || mockData.currentPeriod,
+        enrolledSubjects: enrolledSubjects ?? mockData.enrolledSubjects,
+        creditsInProgress: creditsInProgress ?? mockData.creditsInProgress,
+        subjects: subjects || mockData.subjects
+    }
 
     const formatGrade = (subject: Subject) => {
         if (subject.grade && subject.percentage) {
@@ -92,7 +106,7 @@ export default function CurrentSubjectsCard({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {subjects.map((subject) => (
+                            {finalData.subjects.map((subject) => (
                                 <TableRow
                                     key={subject.code}
                                     className="cursor-pointer hover:bg-muted/50"
@@ -123,9 +137,9 @@ export default function CurrentSubjectsCard({
                 <CardFooter>
                     <CardDescription>
                         {t('currentSubjects.subtitle', {
-                            period: currentPeriod,
-                            count: enrolledSubjects,
-                            credits: creditsInProgress
+                            period: finalData.currentPeriod,
+                            count: finalData.enrolledSubjects,
+                            credits: finalData.creditsInProgress
                         })}
                     </CardDescription>
                 </CardFooter>

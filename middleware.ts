@@ -66,7 +66,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(signInUrl)
     }
 
-    const userRole = authObject.sessionClaims?.metadata?.role as UserRole | undefined
+    const userRole = (authObject.sessionClaims?.metadata as { role?: UserRole })?.role
 
     if (!userRole) {
       if (!pathname.includes('/pending-role')) {

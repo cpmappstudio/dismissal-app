@@ -1,7 +1,14 @@
 /**
  * Mock data and data transformation utilities for the student dashboard
+ * 
+ * This file provides individual mock functions for each component to prevent
+ * performance issues where a slow query would block the entire dashboard.
+ * Each component now fetches its own data independently.
+ * 
  * TODO: Replace with real Convex queries
  */
+
+import type { Doc } from '@/convex/_generated/dataModel'
 
 export const getMockStudentData = () => {
     return {
@@ -128,3 +135,61 @@ export const getMockUpcomingDates = () => [
         type: "enrollment" as const
     }
 ]
+
+// Individual component mock functions for independent data fetching
+export const getMockProgramData = (): { program: Doc<"programs">; user: Doc<"users"> } => {
+    // This now returns data matching the real Convex schema structure
+    return {
+        program: {
+            _id: "program1" as any, // Mock ID
+            _creationTime: Date.now(),
+            nameEs: "Ingeniería de Software",
+            nameEn: "Software Engineering",
+            code: "IDS-001",
+            type: "bachelor" as const,
+            language: "both" as const,
+            totalCredits: 120,
+            durationBimesters: 8,
+            isActive: true,
+            descriptionEs: "Programa de pregrado enfocado en desarrollo de software",
+            degree: "Ingeniero de Software",
+            createdAt: Date.now()
+        },
+        user: {
+            _id: "user1" as any, // Mock ID
+            _creationTime: Date.now(),
+            clerkId: "clerk_123",
+            email: "student@alef.edu",
+            firstName: "Juan",
+            lastName: "Pérez",
+            role: "student" as const,
+            isActive: true,
+            createdAt: Date.now(),
+            studentProfile: {
+                studentCode: "2021-001",
+                programId: "program1" as any,
+                enrollmentDate: new Date("2021-08-01").getTime(),
+                expectedGraduationDate: new Date("2025-12-15").getTime(),
+                status: "active" as const
+            }
+        }
+    }
+}
+
+export const getMockMetricsData = () => {
+    const baseData = getMockStudentData()
+    return transformToMetricsData(baseData)
+}
+
+export const getMockCurrentSubjectsData = () => {
+    const baseData = getMockStudentData()
+    const metricsData = transformToMetricsData(baseData)
+    const subjectsData = transformToSubjectsData(baseData)
+
+    return {
+        currentPeriod: metricsData.currentPeriod,
+        enrolledSubjects: metricsData.enrolledSubjects,
+        creditsInProgress: metricsData.creditsInProgress,
+        subjects: subjectsData
+    }
+}

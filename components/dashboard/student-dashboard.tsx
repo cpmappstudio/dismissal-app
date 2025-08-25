@@ -1,44 +1,19 @@
 "use client"
 
-import ProgramInfoCard from './student/program-info-card'
-import MetricsGrid from './student/metrics-grid'
-import CurrentSubjectsCard from './student/current-subjects-card'
-// import DashboardWidgets from './student/dashboard-widgets'
-import {
-    getMockStudentData,
-    transformToMetricsData,
-    transformToProgramData,
-    transformToSubjectsData,
-    // transformToCreditDistribution,
-    // getMockUpcomingDates
-} from './student/dashboard-data'
+import ProgramInfoCard from './academic/program-info-card'
+import MetricsGrid from './academic/metrics-grid'
+import CurrentSubjectsCard from './academic/current-subjects-card'
 
 export default function StudentDashboard() {
-    // TODO: Replace with real Convex query
-    // const dashboardData = useQuery(api.studentDashboard.getStudentDashboard)
-
-    const mockData = getMockStudentData()
-
-    const metricsData = transformToMetricsData(mockData)
-    const programData = transformToProgramData(mockData)
-    const subjectsData = transformToSubjectsData(mockData)
-    // const creditDistribution = transformToCreditDistribution(mockData)
-    // const upcomingDates = getMockUpcomingDates()
+    // TODO: Replace with real Convex queries
+    // Each component now handles its own data fetching independently
+    // This prevents blocking the entire dashboard if one query is slow
 
     return (
         <div className="@container/main space-y-4 md:space-y-6 lg:px-6">
-            <ProgramInfoCard programData={programData} />
-            <MetricsGrid metricsData={metricsData} />
-            {/* <DashboardWidgets
-                creditDistribution={creditDistribution}
-                upcomingDates={upcomingDates}
-            /> */}
-            <CurrentSubjectsCard
-                currentPeriod={metricsData.currentPeriod}
-                enrolledSubjects={metricsData.enrolledSubjects}
-                creditsInProgress={metricsData.creditsInProgress}
-                subjects={subjectsData}
-            />
+            <ProgramInfoCard />
+            <MetricsGrid />
+            <CurrentSubjectsCard />
         </div>
     )
 }

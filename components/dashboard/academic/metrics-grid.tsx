@@ -8,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card'
+import { getMockMetricsData } from './dashboard-data'
 
 interface MetricsData {
     completedCredits: number
@@ -70,29 +71,34 @@ function MetricCard({ title, value, badge, footer }: MetricCardProps) {
 }
 
 interface MetricsGridProps {
-    metricsData: MetricsData
+    // Props are now optional since we fetch data internally
+    metricsData?: MetricsData
 }
 
 export default function MetricsGrid({ metricsData }: MetricsGridProps) {
     const t = useTranslations('dashboard.student')
 
+    // TODO: Replace with real Convex query
+    // const metricsData = useQuery(api.studentDashboard.getMetrics)
+    const data = metricsData || getMockMetricsData()
+
     const metricsConfig = [
         {
             title: t('metrics.completedCredits'),
-            value: `${metricsData.completedCredits} / ${metricsData.totalCredits}`,
+            value: `${data.completedCredits} / ${data.totalCredits}`,
             badge: {
                 icon: TrendingUp,
-                text: `${metricsData.completionPercentage}%`
+                text: `${data.completionPercentage}%`
             },
             footer: {
                 title: t('metrics.excellentProgress'),
-                description: t('metrics.creditsRemaining', { count: metricsData.creditsRemaining }),
+                description: t('metrics.creditsRemaining', { count: data.creditsRemaining }),
                 icon: TrendingUp
             }
         },
         {
             title: t('metrics.cumulativeGPA'),
-            value: metricsData.gpa.toString(),
+            value: data.gpa.toString(),
             badge: {
                 icon: Award,
                 text: t('metrics.excellent'),
@@ -107,27 +113,27 @@ export default function MetricsGrid({ metricsData }: MetricsGridProps) {
         },
         {
             title: t('metrics.currentBimester'),
-            value: metricsData.currentPeriod,
+            value: data.currentPeriod,
             badge: {
                 icon: BookOpen,
-                text: `${metricsData.enrolledSubjects} ${t('metrics.subjects')}`
+                text: `${data.enrolledSubjects} ${t('metrics.subjects')}`
             },
             footer: {
                 title: t('metrics.currentlyEnrolled'),
-                description: t('metrics.creditsInProgress', { count: metricsData.creditsInProgress }),
+                description: t('metrics.creditsInProgress', { count: data.creditsInProgress }),
                 icon: BookOpen
             }
         },
         {
             title: t('metrics.careerProgress'),
-            value: `${metricsData.currentBimester}mo`,
+            value: `${data.currentBimester}mo`,
             badge: {
                 icon: Target,
-                text: `${metricsData.progressPercentage}%`
+                text: `${data.progressPercentage}%`
             },
             footer: {
                 title: t('metrics.almostGraduating'),
-                description: t('metrics.bimestersRemaining', { count: metricsData.bimestersRemaining }),
+                description: t('metrics.bimestersRemaining', { count: data.bimestersRemaining }),
                 icon: Target
             }
         }
