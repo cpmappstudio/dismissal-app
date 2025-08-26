@@ -15,14 +15,7 @@ import type {
 } from "convex/server";
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
-import type * as courses from "../courses.js";
-import type * as dashboard from "../dashboard.js";
-import type * as enrollments from "../enrollments.js";
-import type * as grades from "../grades.js";
 import type * as helpers from "../helpers.js";
-import type * as professors from "../professors.js";
-import type * as programs from "../programs.js";
-import type * as reports from "../reports.js";
 import type * as students from "../students.js";
 import type * as types from "../types.js";
 
@@ -37,14 +30,7 @@ import type * as types from "../types.js";
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   auth: typeof auth;
-  courses: typeof courses;
-  dashboard: typeof dashboard;
-  enrollments: typeof enrollments;
-  grades: typeof grades;
   helpers: typeof helpers;
-  professors: typeof professors;
-  programs: typeof programs;
-  reports: typeof reports;
   students: typeof students;
   types: typeof types;
 }>;

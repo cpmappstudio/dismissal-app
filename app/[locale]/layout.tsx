@@ -24,10 +24,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "SRU Alef University",
-    description: "Alef University's student information system (SRU). A Next.js application with a clean and scalable architecture, designed to manage students grades, programs, courses, and transcripts.",
+    title: "DismissalApp",
+    description: "An innovative app that streamlines student dismissal by managing vehicle pickups efficiently and safely, ensuring a smooth process for schools and parents.",
     icons: {
-        icon: "/alef.ico",
+        icon: "/favicon.ico",
     },
 };
 
