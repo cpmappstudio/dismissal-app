@@ -12,7 +12,7 @@ import {
     SortingState,
     useReactTable,
 } from "@tanstack/react-table"
-import { ChevronDown, Search, MapPin, GraduationCap, Plus } from "lucide-react"
+import { ChevronDown, Search, GraduationCap, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -34,15 +34,10 @@ import {
 } from "@/components/ui/table"
 import { columns, useColumns } from "./columns"
 import { mockStudents } from "./mock-data"
-import { Student, CampusLocation, Grade } from "./types"
+import { Student, Grade } from "./types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { StudentFormDialog } from "./student-form-dialog"
-
-// Constants - moved outside for performance
-const CAMPUS_LOCATIONS: readonly CampusLocation[] = [
-    "Poinciana Campus", "Simpson Campus", "Neptune Campus",
-    "Downtown Middle", "Learning Center", "Honduras", "Puerto Rico"
-] as const
+import { CampusSelector, type CampusLocationType as CampusLocation } from "@/components/ui/campus-selector"
 
 const GRADES: readonly Grade[] = [
     "Pre-Kinder", "Kinder", "1st", "2nd", "3rd", "4th", "5th", "6th",
@@ -211,32 +206,11 @@ export function StudentsTable() {
                     </div>
 
                     {/* Campus filter */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className={filterButtonClass} aria-label="Filter by campus">
-                                <div className="flex items-center">
-                                    <MapPin className="mr-2 h-4 w-4" aria-hidden="true" />
-                                    <ResponsiveText
-                                        full={filters.campus === "all" ? t('filters.campus.all') : filters.campus}
-                                        short={filters.campus === "all" ? t('filters.campus.short') : filters.campus}
-                                    />
-                                </div>
-                                <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-56">
-                            <DropdownMenuLabel>{t('filters.campus.label')}</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleCampusChange("all")}>
-                                {t('filters.campus.all')}
-                            </DropdownMenuItem>
-                            {CAMPUS_LOCATIONS.map((campus) => (
-                                <DropdownMenuItem key={campus} onClick={() => handleCampusChange(campus)}>
-                                    {campus}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <CampusSelector
+                        value={filters.campus}
+                        onChange={handleCampusChange}
+                        placeholder={t('filters.campus.all')}
+                    />
 
                     {/* Grade filter */}
                     <DropdownMenu>

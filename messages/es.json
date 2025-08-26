@@ -161,6 +161,43 @@
             }
         }
     },
+    "dismissal": {
+        "title": "Gestión de Filas de Carros",
+        "subtitle": "Gestiona las filas de recogida de estudiantes",
+        "stats": {
+            "totalCars": "Total de Carros",
+            "leftLane": "Carril Izquierdo",
+            "rightLane": "Carril Derecho",
+            "laneBalance": "Balance de Carriles"
+        },
+        "campus": {
+            "select": "Seleccionar Campus",
+            "placeholder": "Elige un campus para comenzar",
+            "required": "Por favor selecciona un campus primero"
+        },
+        "allocator": {
+            "title": "Asignación de Carros",
+            "description": "Añadir carros a los carriles para la recogida",
+            "addCarPlaceholder": "Ingresa número de carro...",
+            "addToLeft": "Añadir al Carril Izquierdo",
+            "addToRight": "Añadir al Carril Derecho",
+            "carAdded": "Carro #{number} añadido al carril {lane}"
+        },
+        "dispatcher": {
+            "title": "Despacho de Carros",
+            "description": "Remover carros cuando los estudiantes son recogidos",
+            "noCars": "No hay carros en la fila",
+            "removeCar": "Remover carro",
+            "carRemoved": "Carro #{number} removido del carril {lane}"
+        },
+        "table": {
+            "carNumber": "Carro #",
+            "studentName": "Estudiante",
+            "assignedTime": "Hora Asignada",
+            "actions": "Acciones",
+            "empty": "No hay carros en este carril"
+        }
+    },
     "university": {
         "name": "App",
         "academicRecords": "Sistema de Registro Universitario"

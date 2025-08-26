@@ -109,7 +109,7 @@ export const useColumns = (): ColumnDef<Student>[] => {
             cell: ({ row }) => {
                 const carNumber = row.getValue("carNumber") as number
                 return (
-                    <Badge variant={carNumber === 0 ? "outline" : "secondary"} className="font-mono text-xs">
+                    <Badge variant={carNumber === 0 ? "outline" : "secondary"} className="font-mono tracking-wider text-xs">
                         {carNumber === 0 ? "N/A" : carNumber}
                     </Badge>
                 )

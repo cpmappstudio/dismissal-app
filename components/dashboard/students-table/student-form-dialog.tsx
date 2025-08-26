@@ -31,7 +31,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Student, CampusLocation, Grade } from "./types"
+import { Student, Grade } from "./types"
+import { CampusSelector, CAMPUS_LOCATIONS, type CampusLocationType as CampusLocation } from "@/components/ui/campus-selector"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
 
 interface StudentFormDialogProps {

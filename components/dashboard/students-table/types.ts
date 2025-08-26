@@ -10,15 +10,6 @@ export type Student = {
     avatarUrl?: string
 }
 
-export type CampusLocation =
-    | "Poinciana Campus"
-    | "Simpson Campus"
-    | "Neptune Campus"
-    | "Downtown Middle"
-    | "Learning Center"
-    | "Honduras"
-    | "Puerto Rico"
-
 export type Grade =
     | "Pre-Kinder"
     | "Kinder"

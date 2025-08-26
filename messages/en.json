@@ -161,6 +161,43 @@
             }
         }
     },
+    "dismissal": {
+        "title": "Car Queue Management",
+        "subtitle": "Manage student pickup queues",
+        "stats": {
+            "totalCars": "Total Cars",
+            "leftLane": "Left Lane",
+            "rightLane": "Right Lane",
+            "laneBalance": "Lane Balance"
+        },
+        "campus": {
+            "select": "Select Campus",
+            "placeholder": "Choose a campus to start",
+            "required": "Please select a campus first"
+        },
+        "allocator": {
+            "title": "Car Assignment",
+            "description": "Add cars to lanes for student pickup",
+            "addCarPlaceholder": "Enter car number...",
+            "addToLeft": "Add to Left Lane",
+            "addToRight": "Add to Right Lane",
+            "carAdded": "Car #{number} added to {lane} lane"
+        },
+        "dispatcher": {
+            "title": "Car Dispatch",
+            "description": "Remove cars when students are picked up",
+            "noCars": "No cars in queue",
+            "removeCar": "Remove car",
+            "carRemoved": "Car #{number} removed from {lane} lane"
+        },
+        "table": {
+            "carNumber": "Car #",
+            "studentName": "Student",
+            "assignedTime": "Assigned Time",
+            "actions": "Actions",
+            "empty": "No cars in this lane"
+        }
+    },
     "university": {
         "name": "App",
         "academicRecords": "University Registration System"
