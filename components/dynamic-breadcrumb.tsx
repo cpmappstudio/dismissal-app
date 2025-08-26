@@ -106,16 +106,21 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
     }, [pathWithoutLocale, getTranslation])
 
     return (
-        <Breadcrumb>
-            <BreadcrumbList>
+        <Breadcrumb className="text-base">
+            <BreadcrumbList className="flex-wrap gap-1">
                 {breadcrumbSegments.map((segment, index) => (
                     <Fragment key={index}>
-                        {index > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-                        <BreadcrumbItem className="hidden md:block">
+                        {index > 0 && <BreadcrumbSeparator className="text-base" />}
+                        <BreadcrumbItem className="text-base">
                             {segment.isCurrentPage ? (
-                                <BreadcrumbPage>{segment.title}</BreadcrumbPage>
+                                <BreadcrumbPage className="text-base font-medium">
+                                    {segment.title}
+                                </BreadcrumbPage>
                             ) : (
-                                <BreadcrumbLink href={segment.href || "#"}>
+                                <BreadcrumbLink
+                                    href={segment.href || "#"}
+                                    className="text-base hover:text-yankees-blue transition-colors"
+                                >
                                     {segment.title}
                                 </BreadcrumbLink>
                             )}

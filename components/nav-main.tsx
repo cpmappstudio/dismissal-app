@@ -59,7 +59,7 @@ export const NavMain = memo(function NavMain({
         <SidebarMenuButton
           asChild
           className={clsx({
-            'bg-sidebar-accent text-sidebar-accent-foreground': isDashboardActive,
+            'text-lime-300': isDashboardActive,
           })}
         >
           <Link href="/">
@@ -89,7 +89,7 @@ export const NavMain = memo(function NavMain({
                       <SidebarMenuSubButton
                         asChild
                         className={clsx({
-                          'bg-sidebar-accent text-sidebar-accent-foreground': pathWithoutLocale === subItem.url,
+                          'text-lime-300': pathWithoutLocale === subItem.url,
                         })}
                       >
                         <Link href={subItem.url}>

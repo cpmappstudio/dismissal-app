@@ -8,6 +8,7 @@ const roleMatchers = {
     student: createRouteMatcher(['/:locale/academic(.*)', '/academic(.*)']),
     professor: createRouteMatcher(['/:locale/teaching(.*)', '/teaching(.*)']),
     admin: createRouteMatcher(['/:locale/admin(.*)', '/admin(.*)']),
+    operators: createRouteMatcher(['/:locale/operators(.*)', '/operators(.*)']),
 } as const;
 
 // Constantes inmutables con type safety completo
@@ -15,6 +16,7 @@ const ROLE_PERMISSIONS = {
     student: ['student'] as const,
     professor: ['professor', 'admin', 'superadmin'] as const,
     admin: ['admin', 'superadmin'] as const,
+    operators: ['admin', 'superadmin'] as const,
 } satisfies Record<keyof typeof roleMatchers, readonly UserRole[]>;
 
 /**

@@ -22,8 +22,8 @@ const isPublicRoute = createRouteMatcher([
 const DEFAULT_PATHS = {
   student: '/academic',
   professor: '/teaching',
-  admin: '/admin',
-  superadmin: '/admin',
+  admin: '/operators',
+  superadmin: '/operators',
 } satisfies Record<UserRole, string>
 
 const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([

@@ -9,8 +9,8 @@
         "system": "System"
     },
     "navigation": {
-        "university": "Alef University",
-        "dashboard": "Dashboard",
+        "university": "Dismissal App",
+        "dashboard": "Students",
         "navigation": "Navigation",
         "playground": "Playground",
         "models": "Models",
@@ -30,6 +30,7 @@
         "professorDocs": "Documentation",
         "academicAdmin": "Academic Administration",
         "personalAdmin": "Personal Administration",
+        "operators": "Operators",
         "adminDocs": "Documentation",
         "menu": {
             "profile": {
@@ -130,6 +131,20 @@
                     }
                 ]
             },
+            "operators": {
+                "title": "Operators",
+                "url": "/operators",
+                "items": [
+                    {
+                        "title": "Allocator",
+                        "url": "/operators/allocator"
+                    },
+                    {
+                        "title": "Dispatcher",
+                        "url": "/operators/dispatcher"
+                    }
+                ]
+            },
             "adminDocs": {
                 "title": "Documentation",
                 "url": "/docs/admin",
@@ -147,7 +162,7 @@
         }
     },
     "university": {
-        "name": "Alef University",
+        "name": "App",
         "academicRecords": "University Registration System"
     },
     "dashboard": {
@@ -212,6 +227,116 @@
                 "academicHistory": "Academic History",
                 "progressAnalysis": "Progress Analysis",
                 "academicCalendar": "Academic Calendar"
+            }
+        }
+    },
+    "studentsManagement": {
+        "title": "Students",
+        "subtitle": "Manage and view all students in the system",
+        "search": {
+            "placeholder": "Search students..."
+        },
+        "filters": {
+            "campus": {
+                "all": "All Campus",
+                "short": "Campus",
+                "label": "Campus Location"
+            },
+            "grade": {
+                "all": "All Grades",
+                "short": "Grade",
+                "label": "Grade Level"
+            }
+        },
+        "actions": {
+            "add": "Add Student",
+            "addShort": "Add",
+            "delete": "Delete Students",
+            "deleteShort": "Delete"
+        },
+        "table": {
+            "headers": {
+                "name": "Name",
+                "grade": "Grade",
+                "campus": "Campus",
+                "carNumber": "Car #"
+            },
+            "noResults": "No students found.",
+            "pagination": {
+                "selected": "{selected} of {total} row(s) selected.",
+                "selectedShort": "{selected}/{total} selected",
+                "previous": "Previous",
+                "previousShort": "Prev",
+                "next": "Next"
+            }
+        },
+        "createDialog": {
+            "title": "Create New Student",
+            "subtitle": "Add a new student to the system. Fill in all required information below.",
+            "sections": {
+                "personal": "Personal Information",
+                "academic": "Academic Information",
+                "additional": "Additional Information"
+            },
+            "fields": {
+                "firstName": {
+                    "label": "First Name",
+                    "placeholder": "Enter first name"
+                },
+                "lastName": {
+                    "label": "Last Name",
+                    "placeholder": "Enter last name"
+                },
+                "birthday": {
+                    "label": "Birthday",
+                    "placeholder": "Pick a date"
+                },
+                "grade": {
+                    "label": "Grade Level",
+                    "placeholder": "Select grade"
+                },
+                "campus": {
+                    "label": "Campus Location",
+                    "placeholder": "Select campus"
+                },
+                "carNumber": {
+                    "label": "Car Number"
+                },
+                "avatarUrl": {
+                    "label": "Avatar URL"
+                }
+            },
+            "required": "Required fields",
+            "avatarNote": "If no avatar URL is provided, one will be generated automatically.",
+            "actions": {
+                "cancel": "Cancel",
+                "create": "Create Student"
+            }
+        },
+        "editDialog": {
+            "title": "Edit Student",
+            "subtitle": "Update student information. Make your changes and save.",
+            "actions": {
+                "cancel": "Cancel",
+                "save": "Save Changes",
+                "delete": "Delete Student"
+            },
+            "deleteConfirm": {
+                "title": "Delete Student",
+                "description": "Are you sure you want to delete {name}? This action cannot be undone.",
+                "cancel": "Cancel",
+                "confirm": "Delete"
+            }
+        },
+        "deleteDialog": {
+            "title": "Delete Student",
+            "titlePlural": "Delete Students",
+            "description": "Are you sure you want to delete {count, plural, one {this student} other {these # students}}? This action cannot be undone.",
+            "listTitle": "Students to be deleted:",
+            "actions": {
+                "cancel": "Cancel",
+                "delete": "Delete Student",
+                "deletePlural": "Delete Students"
             }
         }
     },

@@ -8,6 +8,7 @@ import {
   Settings,
   UserCog,
   FileText,
+  Users,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useUser } from "@clerk/nextjs"
@@ -42,8 +43,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     studentDocs: FileText,
     professor: GraduationCap,
     professorDocs: FileText,
-    adminAcademic: Settings,
-    adminPersonal: UserCog,
+    operators: Users,
     adminDocs: FileText,
   } as const
 
@@ -120,28 +120,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     if ((userRole === 'admin' || userRole === 'superadmin')) {
-      // Administración Académica
-      if (menuConfig.adminAcademic) {
+      // Operadores
+      if (menuConfig.operators) {
         items.push({
-          title: menuConfig.adminAcademic.title,
-          url: menuConfig.adminAcademic.url,
-          icon: iconMap.adminAcademic,
+          title: menuConfig.operators.title,
+          url: menuConfig.operators.url,
+          icon: iconMap.operators,
           isActive: true,
-          items: menuConfig.adminAcademic.items.map(item => ({
-            title: item.title,
-            url: item.url,
-          })),
-        })
-      }
-
-      // Administración Personal
-      if (menuConfig.adminPersonal) {
-        items.push({
-          title: menuConfig.adminPersonal.title,
-          url: menuConfig.adminPersonal.url,
-          icon: iconMap.adminPersonal,
-          isActive: false,
-          items: menuConfig.adminPersonal.items.map(item => ({
+          items: menuConfig.operators.items.map(item => ({
             title: item.title,
             url: item.url,
           })),
@@ -183,7 +169,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <LangToggle showText={state !== "collapsed"} />
-        <ModeToggle showText={state !== "collapsed"} />
+        {/* <ModeToggle showText={state !== "collapsed"} /> */}
         <UniversityLogo />
       </SidebarFooter>
       <SidebarRail />
