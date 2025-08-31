@@ -60,26 +60,26 @@ export default async function RootLayout({
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >
-                <ThemeProvider
+                {/* <ThemeProvider
                     attribute="class"
                     defaultTheme="light"
                     enableSystem
                     disableTransitionOnChange
+                > */}
+                <ClerkProvider
+                    appearance={{
+                        baseTheme: shadcn,
+                    }}
+                    localization={clerkLocalization}
+                    afterSignOutUrl={`/${locale}/sign-in`}
                 >
-                    <ClerkProvider
-                        appearance={{
-                            baseTheme: shadcn,
-                        }}
-                        localization={clerkLocalization}
-                        afterSignOutUrl={`/${locale}/sign-in`}
-                    >
-                        <ConvexClientProvider>
-                            <NextIntlClientProvider messages={messages}>
-                                {children}
-                            </NextIntlClientProvider>
-                        </ConvexClientProvider>
-                    </ClerkProvider>
-                </ThemeProvider>
+                    <ConvexClientProvider>
+                        <NextIntlClientProvider messages={messages}>
+                            {children}
+                        </NextIntlClientProvider>
+                    </ConvexClientProvider>
+                </ClerkProvider>
+                {/* </ThemeProvider> */}
             </body>
         </html>
     );
