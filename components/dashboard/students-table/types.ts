@@ -1,3 +1,5 @@
+import { Grade, CampusLocation } from "@/lib/constants"
+
 export type Student = {
     id: string
     fullName: string
@@ -5,23 +7,10 @@ export type Student = {
     lastName: string
     birthday: string
     carNumber: number
-    grade: string
-    campusLocation: string
+    grade: Grade
+    campusLocation: CampusLocation
     avatarUrl?: string
 }
 
-export type Grade =
-    | "Pre-Kinder"
-    | "Kinder"
-    | "1st"
-    | "2nd"
-    | "3rd"
-    | "4th"
-    | "5th"
-    | "6th"
-    | "7th"
-    | "8th"
-    | "9th"
-    | "10th"
-    | "11th"
-    | "12th"
+// Re-export types for convenience
+export type { Grade, CampusLocation }

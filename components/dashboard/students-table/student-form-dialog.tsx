@@ -32,8 +32,8 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Student, Grade } from "./types"
-import { CampusSelector, CAMPUS_LOCATIONS, type CampusLocationType as CampusLocation } from "@/components/ui/campus-selector"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
+import { CAMPUS_LOCATIONS as CAMPUS_OPTIONS, GRADES, type CampusLocation } from "@/lib/constants"
 
 interface StudentFormDialogProps {
     mode: 'create' | 'edit'
@@ -44,33 +44,6 @@ interface StudentFormDialogProps {
     onSubmit: (student: Omit<Student, 'id'>) => void
     onDelete?: (studentId: string) => void
 }
-
-const campusLocations: CampusLocation[] = [
-    "Poinciana Campus",
-    "Simpson Campus",
-    "Neptune Campus",
-    "Downtown Middle",
-    "Learning Center",
-    "Honduras",
-    "Puerto Rico"
-]
-
-const grades: Grade[] = [
-    "Pre-Kinder",
-    "Kinder",
-    "1st",
-    "2nd",
-    "3rd",
-    "4th",
-    "5th",
-    "6th",
-    "7th",
-    "8th",
-    "9th",
-    "10th",
-    "11th",
-    "12th"
-]
 
 export function StudentFormDialog({
     mode,
@@ -269,7 +242,7 @@ export function StudentFormDialog({
                                         <SelectValue placeholder={t('createDialog.fields.grade.placeholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {grades.map((grade) => (
+                                        {GRADES.map((grade) => (
                                             <SelectItem key={grade} value={grade}>
                                                 {grade}
                                             </SelectItem>
@@ -286,7 +259,7 @@ export function StudentFormDialog({
                                         <SelectValue placeholder={t('createDialog.fields.campus.placeholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {campusLocations.map((campus) => (
+                                        {CAMPUS_OPTIONS.map((campus) => (
                                             <SelectItem key={campus} value={campus}>
                                                 {campus}
                                             </SelectItem>

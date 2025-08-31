@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Trash2, Plus, Car, Users, BarChart3, ChevronLeft, ChevronRight } from "lucide-react"
+import { Trash2, Plus, Car, Users, BarChart3, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { CampusSelector, type CampusLocationType } from "@/components/ui/campus-selector"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { CAMPUS_LOCATIONS, type CampusLocation } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 
 export interface CarData {
@@ -152,11 +153,15 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             {/* Campus Selection and Lane Balance */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6 flex-shrink-0">
                 <div className="flex-shrink-0">
-                    <CampusSelector
-                        value={selectedCampus}
-                        onChange={setSelectedCampus}
+                    <FilterDropdown<CampusLocation>
+                        value={selectedCampus as CampusLocation}
+                        onChange={(value) => setSelectedCampus(value)}
+                        options={CAMPUS_LOCATIONS}
+                        icon={MapPin}
+                        label={t('campus.select')}
                         placeholder={t('campus.select')}
                         className="w-full md:w-64"
+                        showAllOption={false}
                     />
                 </div>
 
