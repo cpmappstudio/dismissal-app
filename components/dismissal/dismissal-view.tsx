@@ -2,30 +2,25 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Trash2, Plus, Car, Users, BarChart3, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
+import { Car, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { CAMPUS_LOCATIONS, type CampusLocation } from "@/lib/constants"
 import { cn } from "@/lib/utils"
+import { Road } from "./road"
+import { CarData, ModeType, LaneType } from "./types"
 
-export interface CarData {
-    id: string
-    carNumber: number
-    lane: 'left' | 'right'
-    position: number
-    assignedTime: Date
-    studentName: string
-    campus: string
+// Helper function to get random car colors
+const getRandomCarColor = () => {
+    const colors = ['#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#f97316', '#06b6d4', '#84cc16', '#f59e0b']
+    return colors[Math.floor(Math.random() * colors.length)]
 }
 
 interface DismissalViewProps {
-    mode: 'allocator' | 'dispatcher'
+    mode: ModeType
     className?: string
 }
 
@@ -40,8 +35,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: 'left',
             position: 1,
             assignedTime: new Date(Date.now() - 5 * 60000),
-            studentName: 'María González',
-            campus: 'Poinciana Campus'
+            students: [{ id: 'student-1', name: 'María González', grade: 'Grado 5' }],
+            campus: 'Poinciana Campus',
+            imageColor: '#3b82f6' // Azul
         },
         {
             id: 'car-2',
@@ -49,8 +45,12 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: 'left',
             position: 2,
             assignedTime: new Date(Date.now() - 3 * 60000),
-            studentName: 'Carlos Rodríguez',
-            campus: 'Poinciana Campus'
+            students: [
+                { id: 'student-2', name: 'Carlos Rodríguez', grade: 'Grado 4' },
+                { id: 'student-3', name: 'Ana Sofía Rodríguez', grade: 'Grado 2' }
+            ],
+            campus: 'Poinciana Campus',
+            imageColor: '#8b5cf6' // Púrpura
         },
         {
             id: 'car-3',
@@ -58,8 +58,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: 'right',
             position: 1,
             assignedTime: new Date(Date.now() - 7 * 60000),
-            studentName: 'Ana Martínez',
-            campus: 'Poinciana Campus'
+            students: [{ id: 'student-4', name: 'Ana Martínez', grade: 'Grado 6' }],
+            campus: 'Poinciana Campus',
+            imageColor: '#10b981' // Verde
         },
         {
             id: 'car-4',
@@ -67,8 +68,13 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: 'right',
             position: 2,
             assignedTime: new Date(Date.now() - 2 * 60000),
-            studentName: 'Pedro Sánchez',
-            campus: 'Poinciana Campus'
+            students: [
+                { id: 'student-5', name: 'Pedro Sánchez', grade: 'Grado 3' },
+                { id: 'student-6', name: 'Isabella Sánchez', grade: 'Grado 1' },
+                { id: 'student-7', name: 'Diego Sánchez', grade: 'Grado 5' }
+            ],
+            campus: 'Poinciana Campus',
+            imageColor: '#ef4444' // Rojo
         },
         {
             id: 'car-5',
@@ -76,8 +82,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: 'right',
             position: 3,
             assignedTime: new Date(Date.now() - 1 * 60000),
-            studentName: 'Laura Torres',
-            campus: 'Poinciana Campus'
+            students: [{ id: 'student-8', name: 'Laura Torres', grade: 'Grado 4' }],
+            campus: 'Poinciana Campus',
+            imageColor: '#f97316' // Naranja
         }
     ])
     const [nextId, setNextId] = React.useState(6)
@@ -106,8 +113,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane,
             position: cars.filter(c => c.lane === lane && c.campus === selectedCampus).length + 1,
             assignedTime: new Date(),
-            studentName: `Student ${carNumber}`, // Mock data
-            campus: selectedCampus
+            students: [{ id: `student-${nextId}`, name: `Student ${carNumber}`, grade: 'Grado 5' }], // Mock data
+            campus: selectedCampus,
+            imageColor: getRandomCarColor()
         }
 
         setCars(prev => [...prev, newCar])
@@ -151,7 +159,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     return (
         <div className={cn("w-full h-full flex flex-col", className)}>
             {/* Campus Selection and Lane Balance */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6 flex-shrink-0">
+            <div className="flex flex-col gap-4  md:flex-row md:items-center md:gap-6 flex-shrink-0">
                 <div className="flex-shrink-0">
                     <FilterDropdown<CampusLocation>
                         value={selectedCampus as CampusLocation}
@@ -203,101 +211,27 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </div>
             ) : (
                 <>
-                    <div className="flex-1 min-h-0" style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
-                        {/* Single Card for Both Lanes */}
-                        <Card className="border-2 border-yankees-blue flex flex-col h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] py-0 overflow-hidden">
-                            <CardContent className="flex-1 overflow-y-auto min-h-0 p-0">
-                                <div className="grid grid-cols-2 h-full">
-                                    {/* Left Lane */}
-                                    <div className="border-r border-gray-200 p-4">
-                                        {leftLaneCars.length > 0 ? (
-                                            <div className="gap-3 flex flex-col">
-                                                {leftLaneCars.map((car) => (
-                                                    <div key={car.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 flex-shrink-0 shadow-sm">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="font-medium text-blue-900">Car #{car.carNumber}</span>
-                                                            <span className="text-sm text-blue-700">{car.studentName}</span>
-                                                            <span className="text-xs text-blue-600">{formatTime(car.assignedTime)}</span>
-                                                        </div>
-                                                        {mode === 'dispatcher' && (
-                                                            <Button
-                                                                onClick={() => handleRemoveCar(car.id)}
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                className="h-8 w-8 p-0"
-                                                            >
-                                                                <Trash2 className="h-3 w-3" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-center text-muted-foreground h-48">
-                                                <div className="text-center">
-                                                    <div className="text-blue-400 mb-2">
-                                                        <Car className="h-8 w-8 mx-auto" />
-                                                    </div>
-                                                    {t('table.empty')}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                    <Road
+                        leftLaneCars={leftLaneCars}
+                        rightLaneCars={rightLaneCars}
+                        mode={mode}
+                        onRemoveCar={handleRemoveCar}
+                    />
 
-                                    {/* Right Lane */}
-                                    <div className="p-4">
-                                        {rightLaneCars.length > 0 ? (
-                                            <div className="gap-3 flex flex-col">
-                                                {rightLaneCars.map((car) => (
-                                                    <div key={car.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 flex-shrink-0 shadow-sm">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="font-medium text-green-900">Car #{car.carNumber}</span>
-                                                            <span className="text-sm text-green-700">{car.studentName}</span>
-                                                            <span className="text-xs text-green-600">{formatTime(car.assignedTime)}</span>
-                                                        </div>
-                                                        {mode === 'dispatcher' && (
-                                                            <Button
-                                                                onClick={() => handleRemoveCar(car.id)}
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                className="h-8 w-8 p-0"
-                                                            >
-                                                                <Trash2 className="h-3 w-3" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-center text-muted-foreground h-48">
-                                                <div className="text-center">
-                                                    <div className="text-green-400 mb-2">
-                                                        <Car className="h-8 w-8 mx-auto" />
-                                                    </div>
-                                                    {t('table.empty')}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Floating Input for Allocator Mode */}
+                    {/* Allocator Control with Finish Line - Responsive */}
                     {mode === 'allocator' && (
-                        <div className="absolute bottom-3 left-0 right-0 px-4">
-                            <div className="max-w-sm mx-auto">
-                                <div className="bg-white/95 backdrop-blur-sm border-2 border-yankees-blue rounded-xl shadow-lg p-3">
-                                    <div className="flex items-center gap-2">
+                        <div className="absolute bottom-3 left-0 right-0 z-20 px-2">
+                            <div className="flex justify-center">
+                                <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-white/30 relative overflow-hidden">
+                                    <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
                                         {/* Left Arrow Button */}
                                         <Button
                                             onClick={() => handleAddCarToLane('left')}
                                             disabled={!carInputValue.trim()}
                                             size="sm"
-                                            className="bg-blue-600 hover:bg-blue-700 text-white p-2 h-10 w-10 rounded-lg shrink-0"
+                                            className="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
                                         >
-                                            <ChevronLeft className="h-4 w-4" />
+                                            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                                         </Button>
 
                                         {/* Car Input */}
@@ -313,7 +247,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                                 setCarInputValue(value)
                                             }}
                                             onKeyDown={handleKeyPress}
-                                            className="text-center text-base font-medium border-2 border-gray-200 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 rounded-lg"
+                                            className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white"
                                             autoFocus
                                         />
 
@@ -322,9 +256,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                             onClick={() => handleAddCarToLane('right')}
                                             disabled={!carInputValue.trim()}
                                             size="sm"
-                                            className="bg-green-600 hover:bg-green-700 text-white p-2 h-10 w-10 rounded-lg shrink-0"
+                                            className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
                                         >
-                                            <ChevronRight className="h-4 w-4" />
+                                            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                                         </Button>
                                     </div>
                                 </div>

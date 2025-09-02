@@ -178,7 +178,7 @@
         "allocator": {
             "title": "Asignación de Carros",
             "description": "Añadir carros a los carriles para la recogida",
-            "addCarPlaceholder": "Ingresa número de carro...",
+            "addCarPlaceholder": "Número de carro",
             "addToLeft": "Añadir al Carril Izquierdo",
             "addToRight": "Añadir al Carril Derecho",
             "carAdded": "Carro #{number} añadido al carril {lane}"

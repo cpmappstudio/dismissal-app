@@ -178,7 +178,7 @@
         "allocator": {
             "title": "Car Assignment",
             "description": "Add cars to lanes for student pickup",
-            "addCarPlaceholder": "Enter car number...",
+            "addCarPlaceholder": "Car number",
             "addToLeft": "Add to Left Lane",
             "addToRight": "Add to Right Lane",
             "carAdded": "Car #{number} added to {lane} lane"
