@@ -12,12 +12,24 @@ export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
     const [removingCarId, setRemovingCarId] = useState<string | null>(null)
     const [newCarIds, setNewCarIds] = useState<Set<string>>(new Set())
     const prevCarIdsRef = useRef<Set<string>>(new Set())
+    const isInitializedRef = useRef(false)
 
     // Create stable dependency for car IDs
     const carIds = useMemo(() => cars.map(car => car.id).sort().join(','), [cars])
 
+    // Initialize the ref on first render to avoid false positives for new cars
+    useEffect(() => {
+        if (!isInitializedRef.current) {
+            prevCarIdsRef.current = new Set(cars.map(car => car.id))
+            isInitializedRef.current = true
+        }
+    }, []) // Run only once on mount
+
     // Track new cars for entrance animation - Optimized to only track car IDs
     useEffect(() => {
+        // Skip the effect if we haven't initialized yet
+        if (!isInitializedRef.current) return
+
         const currentCarIds = new Set(cars.map(car => car.id))
         const prevCarIds = prevCarIdsRef.current
 

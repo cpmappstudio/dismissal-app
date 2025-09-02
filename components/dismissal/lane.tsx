@@ -43,8 +43,14 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                                 <div
                                     key={car.id}
                                     className={`transition-all duration-500 ease-in-out ${isNew ? 'animate-fade-in-down' :
-                                            isRemoving ? 'animate-fade-out-down' : ''
+                                        isRemoving ? 'animate-fade-out-down' : ''
                                         }`}
+                                    style={{
+                                        // Fallback styles in case animations don't load
+                                        transform: isRemoving ? 'translateY(20px) scale(0.95)' : 'translateY(0) scale(1)',
+                                        opacity: isRemoving ? 0 : 1,
+                                        transition: 'all 0.5s ease-in-out'
+                                    }}
                                 >
                                     <CarCard
                                         car={car}

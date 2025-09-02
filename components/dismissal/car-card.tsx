@@ -67,10 +67,10 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     }}
                                     className="p-1.5 hover:bg-red-700 rounded-l-full transition-colors duration-200"
                                 >
-                                    <Trash2 className="h-3 w-3" />
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
                             )}
-                            <span className={`px-2 py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
+                            <span className={`px-2 text-xl py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
                                 {car.carNumber}
                             </span>
                         </div>
