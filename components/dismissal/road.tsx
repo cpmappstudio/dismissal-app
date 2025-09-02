@@ -19,8 +19,8 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
     return (
         <div className="flex-1 min-h-0" style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
             <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${mode === 'viewer' || mode === 'dispatcher'
-                    ? 'h-[calc(100vh-10rem)] max-h-[calc(100vh-10rem)]'
-                    : 'h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)]'
+                ? 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
+                : 'h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)]'
                 }`} style={{ backgroundColor: '#9CA3AF' }}>
                 <CardContent
                     className={`flex-1 min-h-0 p-0 relative ${isViewer ? 'overflow-x-scroll overflow-y-hidden' : 'overflow-y-scroll'}`}
