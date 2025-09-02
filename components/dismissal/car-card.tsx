@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/drawer"
 import { Badge } from "@/components/ui/badge"
 import { Car } from "./car"
+import { useTranslations } from "next-intl"
 
 export interface StudentData {
     id: string
@@ -43,6 +44,8 @@ interface CarCardProps {
 }
 
 export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCardProps) {
+    const t = useTranslations('dismissal')
+
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
@@ -108,7 +111,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                                     <Trash2 className="h-3 w-3" />
                                 </button>
                             )}
-                            <span className={`px-2 py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
+                            <span className={`px-2 py-1 text-xl ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
                                 {car.carNumber}
                             </span>
                         </div>
@@ -122,10 +125,10 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                                 <div className={`${laneColors.badge} text-white px-3 py-1 rounded-lg text-xl`}>
                                     #{car.carNumber}
                                 </div>
-                                Car Information
+                                {t('car.information')}
                             </DrawerTitle>
                             <DrawerDescription>
-                                Detalles del vehículo y estudiantes asignados
+                                {t('car.details')}
                             </DrawerDescription>
                         </DrawerHeader>
 
@@ -144,7 +147,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-gray-600" />
-                                    <span className="text-sm font-medium">Hora de llegada</span>
+                                    <span className="text-sm font-medium">{t('car.arrivalTime')}</span>
                                 </div>
                                 <Badge variant="outline">{formatTime(car.assignedTime)}</Badge>
                             </div>
@@ -154,7 +157,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                                 <div className="flex items-center gap-2">
                                     <Users className="h-5 w-5 text-gray-600" />
                                     <h3 className="text-lg font-semibold">
-                                        Estudiantes ({car.students.length})
+                                        {t('car.students')} ({car.students.length})
                                     </h3>
                                 </div>
 
@@ -171,7 +174,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                                                 <div className="font-semibold text-gray-900">{student.name}</div>
                                                 <div className="flex items-center gap-1 text-sm text-gray-500">
                                                     <GraduationCap className="h-3 w-3" />
-                                                    {student.grade || 'Grado 5'}
+                                                    {student.grade || `${t('car.grade')} 5`}
                                                 </div>
                                             </div>
                                         </div>
@@ -182,7 +185,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
 
                         <DrawerFooter>
                             <DrawerClose asChild>
-                                <Button variant="outline">Cerrar</Button>
+                                <Button variant="outline">{t('car.close')}</Button>
                             </DrawerClose>
                         </DrawerFooter>
                     </div>

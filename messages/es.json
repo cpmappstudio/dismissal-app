@@ -196,6 +196,14 @@
             "assignedTime": "Hora Asignada",
             "actions": "Acciones",
             "empty": "No hay carros en este carril"
+        },
+        "car": {
+            "information": "Información del Carro",
+            "details": "Detalles del vehículo y estudiantes asignados",
+            "arrivalTime": "Hora de llegada",
+            "students": "Estudiantes",
+            "grade": "Grado",
+            "close": "Cerrar"
         }
     },
     "university": {

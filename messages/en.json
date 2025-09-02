@@ -196,6 +196,14 @@
             "assignedTime": "Assigned Time",
             "actions": "Actions",
             "empty": "No cars in this lane"
+        },
+        "car": {
+            "information": "Car Information",
+            "details": "Vehicle and assigned students details",
+            "arrivalTime": "Arrival Time",
+            "students": "Students",
+            "grade": "Grade",
+            "close": "Close"
         }
     },
     "university": {
