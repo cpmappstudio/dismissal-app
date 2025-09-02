@@ -1,7 +1,10 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from 'next-intl'
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Maximize, Minimize } from "lucide-react"
 import { Lane } from "./lane"
 import { CarData, LaneType, ModeType } from "./types"
 
@@ -10,18 +13,55 @@ interface RoadProps {
     rightLaneCars: CarData[]
     mode: ModeType
     onRemoveCar: (carId: string) => void
+    isFullscreen?: boolean
+    onToggleFullscreen?: () => void
     className?: string
 }
 
-export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, onRemoveCar, className }) => {
+export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, onRemoveCar, isFullscreen = false, onToggleFullscreen, className }) => {
+    const t = useTranslations('common')
     const isViewer = mode === 'viewer'
 
+    // Handle ESC key to exit fullscreen
+    React.useEffect(() => {
+        const handleEscKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isFullscreen && onToggleFullscreen) {
+                onToggleFullscreen()
+            }
+        }
+
+        if (isFullscreen) {
+            document.addEventListener('keydown', handleEscKey)
+            return () => document.removeEventListener('keydown', handleEscKey)
+        }
+    }, [isFullscreen, onToggleFullscreen])
+
     return (
-        <div className="flex-1 min-h-0" style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
-            <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${mode === 'viewer' || mode === 'dispatcher'
-                ? 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
-                : 'h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)]'
+        <div className={`flex-1 min-h-0 ${isFullscreen ? 'fixed inset-0 z-[9999] bg-white' : ''}`} style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
+            <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${isFullscreen
+                ? 'h-screen max-h-screen'
+                : mode === 'viewer' || mode === 'dispatcher'
+                    ? 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
+                    : 'h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)]'
                 }`} style={{ backgroundColor: '#9CA3AF' }}>
+
+                {/* Fullscreen Toggle Button - Only visible in viewer mode */}
+                {isViewer && onToggleFullscreen && (
+                    <Button
+                        onClick={onToggleFullscreen}
+                        variant="secondary"
+                        size="sm"
+                        title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+                        className="absolute top-2 right-2 z-50 bg-white/90 hover:bg-white border border-gray-300 p-2 h-8 w-8 rounded-lg shadow-sm transition-all duration-200"
+                    >
+                        {isFullscreen ? (
+                            <Minimize className="h-4 w-4 text-gray-700" />
+                        ) : (
+                            <Maximize className="h-4 w-4 text-gray-700" />
+                        )}
+                    </Button>
+                )}
+
                 <CardContent
                     className={`flex-1 min-h-0 p-0 relative ${isViewer ? 'overflow-x-scroll overflow-y-hidden' : 'overflow-y-scroll'}`}
                     style={{

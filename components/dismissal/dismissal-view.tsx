@@ -26,6 +26,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const [selectedCampus, setSelectedCampus] = React.useState<string>("Poinciana Campus")
     const [cars, setCars] = React.useState<CarData[]>(MOCK_CARS)
     const [nextId, setNextId] = React.useState(INITIAL_NEXT_ID)
+    const [isFullscreen, setIsFullscreen] = React.useState(false)
 
     // Single input for allocator mode
     const [carInputValue, setCarInputValue] = React.useState<string>('')
@@ -103,6 +104,11 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         }
     }, [handleAddCarToLane])
 
+    // Toggle fullscreen for viewer mode
+    const toggleFullscreen = () => {
+        setIsFullscreen(!isFullscreen)
+    }
+
     return (
         <div className={cn("w-full h-full flex flex-col", className)}>
             {/* Campus Selection and Lane Balance */}
@@ -163,6 +169,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         rightLaneCars={rightLaneCars}
                         mode={mode}
                         onRemoveCar={handleRemoveCar}
+                        isFullscreen={isFullscreen}
+                        onToggleFullscreen={toggleFullscreen}
                     />
 
                     {/* Allocator Control with Finish Line - Responsive */}

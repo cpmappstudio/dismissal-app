@@ -6,7 +6,9 @@
         "theme": "Tema",
         "light": "Claro",
         "dark": "Oscuro",
-        "system": "Sistema"
+        "system": "Sistema",
+        "enterFullscreen": "Pantalla completa",
+        "exitFullscreen": "Salir de pantalla completa"
     },
     "navigation": {
         "university": "Dismissal App",
