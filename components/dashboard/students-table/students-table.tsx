@@ -119,7 +119,7 @@ export function StudentsTable() {
     return (
         <div className="w-full">
             {/* Filters */}
-            <div className="py-4">
+            <div className="py-4 pt-0">
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:justify-between md:gap-4">
                     {/* Search */}
                     <div className="relative col-span-2 md:col-span-1">
