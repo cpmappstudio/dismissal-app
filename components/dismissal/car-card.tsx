@@ -26,9 +26,10 @@ interface CarCardProps {
     onRemove?: (carId: string) => void
     showRemoveButton?: boolean
     lane: 'left' | 'right'
+    isViewerMode?: boolean
 }
 
-export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButton = false, lane }) => {
+export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButton = false, lane, isViewerMode = false }) => {
     const t = useTranslations('dismissal')
 
     // Helper function to get display name for multiple students
@@ -46,19 +47,20 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
     const laneColors = LANE_COLORS[lane]
 
     return (
-        <div className="relative flex justify-center">
+        <div className={`relative z-30 ${isViewerMode ? 'flex flex-col items-center justify-center mx-8 mt-8 md:mt-0' : 'flex justify-center'}`}>
             <Drawer>
                 <DrawerTrigger asChild>
-                    <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group">
+                    <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30">
                         {/* SVG Car with dynamic color */}
                         <Car
-                            size="xl"
+                            size="lg"
                             color={car.imageColor}
                             className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
+                            isViewer={isViewerMode}
                         />
 
                         {/* Combined Car Number Badge and Remove Button */}
-                        <div className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-20 flex items-center`}>
+                        <div className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-50 flex items-center`}>
                             {showRemoveButton && (
                                 <button
                                     onClick={(e) => {
@@ -77,6 +79,33 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                     </div>
                 </DrawerTrigger>
 
+                {/* Students Information - Only shown in Viewer Mode */}
+                {isViewerMode && (
+                    <div className="max-h-16 xl:max-h-32 overflow-y-auto bg-transparent z-30 relative -mt-10 xl:-mt-14"
+                        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
+                        <div className="flex flex-col space-y-2">
+                            {car.students.map((student, index) => (
+                                <div key={student.id} className="flex items-center gap-2">
+                                    <Avatar className={`w-8 h-8 ${laneColors.background}`}>
+                                        <AvatarImage src={student.imageUrl} alt={student.name} />
+                                        <AvatarFallback className={`text-xs font-bold ${laneColors.textColor} bg-transparent`}>
+                                            {getStudentInitials(student.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="-ml-1">
+                                        <div className="text-sm text-white font-medium">
+                                            {student.name}
+                                        </div>
+                                        <div className="text-xs text-white/80">
+                                            {student.grade || `${t('car.grade')} 5`}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <DrawerContent>
                     <div className="mx-auto w-full max-w-md">
                         <DrawerHeader>
@@ -84,11 +113,8 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                 <div className={`${laneColors.badge} text-white px-3 py-1 rounded-lg text-xl`}>
                                     #{car.carNumber}
                                 </div>
-                                {t('car.information')}
+                                {formatTime(car.assignedTime)}
                             </DrawerTitle>
-                            <DrawerDescription>
-                                {t('car.details')}
-                            </DrawerDescription>
                         </DrawerHeader>
 
                         <div className="p-4 space-y-6">
@@ -102,15 +128,6 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                 </div>
                             </div>
 
-                            {/* Time and Position Info */}
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-gray-600" />
-                                    <span className="text-sm font-medium">{t('car.arrivalTime')}</span>
-                                </div>
-                                <Badge variant="outline">{formatTime(car.assignedTime)}</Badge>
-                            </div>
-
                             {/* Students Section */}
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
@@ -120,7 +137,8 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     </h3>
                                 </div>
 
-                                <div className="space-y-3">
+                                <div className="max-h-32 xl:max-h-64 overflow-y-auto space-y-3 pr-2"
+                                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB #F3F4F6' }}>
                                     {car.students.map((student) => (
                                         <div key={student.id} className="flex items-center gap-3 p-3 bg-white border rounded-lg">
                                             <Avatar className={`w-12 h-12 ${laneColors.background}`}>
@@ -141,12 +159,6 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                 </div>
                             </div>
                         </div>
-
-                        <DrawerFooter>
-                            <DrawerClose asChild>
-                                <Button variant="outline">{t('car.close')}</Button>
-                            </DrawerClose>
-                        </DrawerFooter>
                     </div>
                 </DrawerContent>
             </Drawer>

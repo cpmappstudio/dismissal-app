@@ -8,6 +8,7 @@ interface CarProps {
     size?: 'sm' | 'md' | 'lg' | 'xl'
     style?: React.CSSProperties
     variant?: 'default' | 'blue' | 'green' | 'red' | 'purple' | 'orange'
+    isViewer?: boolean
 }
 
 // Predefined color variants
@@ -23,11 +24,11 @@ const colorVariants = {
 const sizeClasses = {
     sm: 'w-16 h-20',
     md: 'w-24 h-32',
-    lg: 'w-32 h-40',
+    lg: 'w-32 h-40 xl:w-48 xl:h-60',
     xl: 'w-32 h-40 md:w-48 md:h-60'
 }
 
-export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default' }) => {
+export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default', isViewer = false }) => {
     const sizeClass = sizeClasses[size]
 
     // Use variant color if no custom color provided
@@ -61,7 +62,7 @@ export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', s
     return (
         <svg
             viewBox="0 0 335.34 603.48"
-            className={`${sizeClass} object-contain ${className}`}
+            className={`${sizeClass} object-contain ${isViewer ? 'transform rotate-90' : ''} ${className}`}
             style={{
                 '--car-primary': finalColor,
                 '--car-darker': darkerColor,

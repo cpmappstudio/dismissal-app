@@ -18,6 +18,7 @@ interface LaneProps {
 
 export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, emptyMessage }) => {
     const t = useTranslations('dismissal')
+    const isViewer = mode === 'viewer'
 
     // Use custom hook for animation logic
     const { removingCarId, newCarIds, handleRemoveCar } = useCarAnimations(cars)
@@ -31,10 +32,19 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
     const colors = LANE_COLORS[lane]
 
     return (
-        <div className="w-1/2 p-2 md:p-4 pb-20 md:pb-20 flex flex-col min-h-full relative" style={{ backgroundColor: '#9CA3AF' }}>
-            <div className="flex-1 flex flex-col justify-end gap-4">
+        <div className={`p-2 md:p-4 flex relative ${isViewer
+            ? `h-1/2 pl-20 md:pl-20 flex-row min-w-full ${lane === 'left' ? 'pb-1' : 'pt-1'}`
+            : 'w-1/2 pb-20 md:pb-20 flex-col min-h-full'
+            }`} style={{ backgroundColor: '#9CA3AF' }}>
+            <div className={`flex-1 flex ${isViewer
+                ? 'flex-row justify-start gap-8'
+                : 'flex-col justify-end gap-4'
+                }`}>
                 {cars.length > 0 ? (
-                    <div className="flex flex-col gap-4 transition-all duration-500 ease-in-out">
+                    <div className={`flex transition-all duration-500 ease-in-out ${isViewer
+                        ? 'flex-row-reverse gap-6'
+                        : 'flex-col gap-4'
+                        }`}>
                         {cars.slice().reverse().map((car, index) => {
                             const isNew = newCarIds.has(car.id)
                             const isRemoving = removingCarId === car.id
@@ -42,12 +52,14 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                             return (
                                 <div
                                     key={car.id}
-                                    className={`transition-all duration-500 ease-in-out ${isNew ? 'animate-fade-in-down' :
-                                        isRemoving ? 'animate-fade-out-down' : ''
+                                    className={`transition-all duration-500 ease-in-out ${isNew ? (isViewer ? 'animate-fade-in-left' : 'animate-fade-in-down') :
+                                        isRemoving ? (isViewer ? 'animate-fade-out-right' : 'animate-fade-out-down') : ''
                                         }`}
                                     style={{
                                         // Fallback styles in case animations don't load
-                                        transform: isRemoving ? 'translateY(20px) scale(0.95)' : 'translateY(0) scale(1)',
+                                        transform: isRemoving
+                                            ? (isViewer ? 'translateX(20px) scale(0.95)' : 'translateY(20px) scale(0.95)')
+                                            : (isViewer ? 'translateX(0) scale(1)' : 'translateY(0) scale(1)'),
                                         opacity: isRemoving ? 0 : 1,
                                         transition: 'all 0.5s ease-in-out'
                                     }}
@@ -57,13 +69,15 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                                         lane={lane}
                                         onRemove={onRemove}
                                         showRemoveButton={mode === 'dispatcher'}
+                                        isViewerMode={mode === 'viewer'}
                                     />
                                 </div>
                             )
                         })}
                     </div>
                 ) : (
-                    <div className="flex items-center justify-center text-muted-foreground h-48">
+                    <div className={`flex items-center justify-center text-muted-foreground ${isViewer ? 'w-48 h-full' : 'h-48'
+                        }`}>
                         <div className="text-center">
                             <div className={`${colors.iconColor} mb-2`}>
                                 <Car className="h-8 w-8 mx-auto opacity-50" />
