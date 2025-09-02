@@ -17,4 +17,4 @@ export interface CarData {
 }
 
 export type LaneType = 'left' | 'right'
-export type ModeType = 'allocator' | 'dispatcher'
+export type ModeType = 'allocator' | 'dispatcher' | 'viewer'

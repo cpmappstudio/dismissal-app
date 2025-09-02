@@ -142,6 +142,10 @@
                     {
                         "title": "Dispatcher",
                         "url": "/operators/dispatcher"
+                    },
+                    {
+                        "title": "Viewer",
+                        "url": "/operators/viewer"
                     }
                 ]
             },
