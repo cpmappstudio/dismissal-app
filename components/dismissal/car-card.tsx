@@ -65,7 +65,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                         e.stopPropagation()
                                         onRemove?.(car.id)
                                     }}
-                                    className="p-1.5 hover:bg-red-700 rounded-l-full transition-colors duration-200"
+                                    className="p-1.5 hover:text-red-500 rounded-l-full transition-colors duration-200"
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
