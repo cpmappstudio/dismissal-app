@@ -34,7 +34,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
         <div className="w-1/2 p-2 md:p-4 pb-20 md:pb-20 flex flex-col min-h-full relative" style={{ backgroundColor: '#9CA3AF' }}>
             <div className="flex-1 flex flex-col justify-end gap-4">
                 {cars.length > 0 ? (
-                    <div className="flex flex-col gap-4 transition-all duration-300 ease-in-out">
+                    <div className="flex flex-col gap-4 transition-all duration-500 ease-in-out">
                         {cars.slice().reverse().map((car, index) => {
                             const isNew = newCarIds.has(car.id)
                             const isRemoving = removingCarId === car.id
@@ -42,12 +42,9 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                             return (
                                 <div
                                     key={car.id}
-                                    className={`transition-all duration-300 ease-in-out transform ${isNew ? 'animate-fade-in-down' : ''
+                                    className={`transition-all duration-500 ease-in-out ${isNew ? 'animate-fade-in-down' :
+                                            isRemoving ? 'animate-fade-out-down' : ''
                                         }`}
-                                    style={{
-                                        transform: isRemoving ? 'translateY(100px) scale(0.8)' : 'translateY(0) scale(1)',
-                                        opacity: isRemoving ? 0 : 1
-                                    }}
                                 >
                                     <CarCard
                                         car={car}

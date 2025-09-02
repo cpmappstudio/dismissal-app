@@ -25,6 +25,6 @@ export const CAR_COLORS = [
 
 export const ANIMATION_DURATIONS = {
     ENTRANCE: 500,
-    EXIT: 300,
+    EXIT: 500, // Increased from 300 to 500 for smoother exit animation
     REPOSITION: 300
 } as const

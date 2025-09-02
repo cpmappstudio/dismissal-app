@@ -33,9 +33,17 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     // Campus selection validation
     const isCampusSelected = selectedCampus !== "all"
 
-    // Stats - filtered by selected campus
-    const leftLaneCars = cars.filter(car => car.lane === 'left' && car.campus === selectedCampus)
-    const rightLaneCars = cars.filter(car => car.lane === 'right' && car.campus === selectedCampus)
+    // Stats - filtered by selected campus - Memoized to prevent unnecessary re-renders
+    const leftLaneCars = React.useMemo(() =>
+        cars.filter(car => car.lane === 'left' && car.campus === selectedCampus),
+        [cars, selectedCampus]
+    )
+
+    const rightLaneCars = React.useMemo(() =>
+        cars.filter(car => car.lane === 'right' && car.campus === selectedCampus),
+        [cars, selectedCampus]
+    )
+
     const totalCars = leftLaneCars.length + rightLaneCars.length
 
     // Add car function for allocator with new single input approach
@@ -45,21 +53,27 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         const carNumber = parseInt(carInputValue.trim())
         if (isNaN(carNumber)) return
 
-        const newCar: CarData = {
-            id: `car-${nextId}`,
-            carNumber,
-            lane,
-            position: cars.filter(c => c.lane === lane && c.campus === selectedCampus).length + 1,
-            assignedTime: getConsistentTime(carNumber),
-            students: [{ id: `student-${nextId}`, name: `Student ${carNumber}`, grade: 'Grado 5' }], // Mock data
-            campus: selectedCampus,
-            imageColor: getCarColor(carNumber)
-        }
+        setCars(prev => {
+            // Calculate position based on current state
+            const existingCarsInLane = prev.filter(c => c.lane === lane && c.campus === selectedCampus).length
 
-        setCars(prev => [...prev, newCar])
+            const newCar: CarData = {
+                id: `car-${nextId}`,
+                carNumber,
+                lane,
+                position: existingCarsInLane + 1,
+                assignedTime: getConsistentTime(carNumber),
+                students: [{ id: `student-${nextId}`, name: `Student ${carNumber}`, grade: 'Grado 5' }], // Mock data
+                campus: selectedCampus,
+                imageColor: getCarColor(carNumber)
+            }
+
+            return [...prev, newCar]
+        })
+
         setNextId(prev => prev + 1)
         setCarInputValue('') // Clear input after adding
-    }, [carInputValue, cars, nextId, selectedCampus])
+    }, [carInputValue, nextId, selectedCampus]) // Removed 'cars' dependency
 
     // Remove car function for dispatcher
     const handleRemoveCar = React.useCallback((carId: string) => {
