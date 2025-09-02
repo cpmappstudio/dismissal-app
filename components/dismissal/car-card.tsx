@@ -95,25 +95,23 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                             className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
                         />
 
-                        {/* Car Number Badge - Floating */}
-                        <div className={`absolute -top-4 -right-4 ${laneColors.badge} text-white text-base font-bold px-3 py-2 rounded-full shadow-xl`}>
-                            {car.carNumber}
+                        {/* Combined Car Number Badge and Remove Button */}
+                        <div className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-20 flex items-center`}>
+                            {showRemoveButton && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onRemove?.(car.id)
+                                    }}
+                                    className="p-1.5 hover:bg-red-700 rounded-l-full transition-colors duration-200"
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </button>
+                            )}
+                            <span className={`px-2 py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
+                                {car.carNumber}
+                            </span>
                         </div>
-
-                        {/* Remove button for dispatcher mode */}
-                        {showRemoveButton && (
-                            <Button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    onRemove?.(car.id)
-                                }}
-                                size="sm"
-                                variant="destructive"
-                                className="absolute -top-5 -left-5 h-10 w-10 p-0 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 z-20"
-                            >
-                                <Trash2 className="h-5 w-5" />
-                            </Button>
-                        )}
                     </div>
                 </DrawerTrigger>
 

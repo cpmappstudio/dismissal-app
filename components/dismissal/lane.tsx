@@ -31,7 +31,7 @@ export function Lane({ cars, lane, mode, onRemoveCar, emptyMessage }: LaneProps)
     const colors = laneColors[lane]
 
     return (
-        <div className="w-1/2 p-2 md:p-4 pb-16 md:pb-20 flex flex-col min-h-full relative" style={{ backgroundColor: '#9CA3AF' }}>
+        <div className="w-1/2 p-2 md:p-4 pb-20 md:pb-20 flex flex-col min-h-full relative" style={{ backgroundColor: '#9CA3AF' }}>
             <div className="flex-1 flex flex-col justify-end gap-4">
                 {cars.length > 0 ? (
                     <>
