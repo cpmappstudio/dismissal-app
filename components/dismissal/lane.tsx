@@ -5,6 +5,8 @@ import { Car } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { CarCard } from "./car-card"
 import { CarData, LaneType, ModeType } from "./types"
+import { LANE_COLORS } from "./constants"
+import { useCarAnimations } from "./hooks"
 
 interface LaneProps {
     cars: CarData[]
@@ -14,52 +16,19 @@ interface LaneProps {
     emptyMessage?: string
 }
 
-export function Lane({ cars, lane, mode, onRemoveCar, emptyMessage }: LaneProps) {
+export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, emptyMessage }) => {
     const t = useTranslations('dismissal')
-    const [removingCarId, setRemovingCarId] = React.useState<string | null>(null)
-    const [newCarIds, setNewCarIds] = React.useState<Set<string>>(new Set())
-    const prevCarsRef = React.useRef<CarData[]>([])
 
-    // Track new cars for entrance animation
-    React.useEffect(() => {
-        const prevCarIds = new Set(prevCarsRef.current.map(car => car.id))
-        const currentCarIds = new Set(cars.map(car => car.id))
+    // Use custom hook for animation logic
+    const { removingCarId, newCarIds, handleRemoveCar } = useCarAnimations(cars)
 
-        // Find newly added cars
-        const newIds = cars.filter(car => !prevCarIds.has(car.id)).map(car => car.id)
+    // Handle remove car with animation
+    const onRemove = React.useCallback((carId: string) => {
+        handleRemoveCar(carId, onRemoveCar)
+    }, [handleRemoveCar, onRemoveCar])
 
-        if (newIds.length > 0) {
-            setNewCarIds(new Set(newIds))
-            // Remove the new car flag after animation completes
-            setTimeout(() => {
-                setNewCarIds(new Set())
-            }, 500) // Duration for entrance animation
-        }
-
-        prevCarsRef.current = cars
-    }, [cars])
-
-    const handleRemoveCar = React.useCallback((carId: string) => {
-        setRemovingCarId(carId)
-        // Wait for animation to complete before actually removing
-        setTimeout(() => {
-            onRemoveCar(carId)
-            setRemovingCarId(null)
-        }, 300) // Duration matches the animation
-    }, [onRemoveCar])
-
-    const laneColors = {
-        left: {
-            iconColor: 'text-blue-400',
-            textColor: 'text-blue-500'
-        },
-        right: {
-            iconColor: 'text-green-400',
-            textColor: 'text-green-500'
-        }
-    }
-
-    const colors = laneColors[lane]
+    // Get lane colors from constants
+    const colors = LANE_COLORS[lane]
 
     return (
         <div className="w-1/2 p-2 md:p-4 pb-20 md:pb-20 flex flex-col min-h-full relative" style={{ backgroundColor: '#9CA3AF' }}>
@@ -83,7 +52,7 @@ export function Lane({ cars, lane, mode, onRemoveCar, emptyMessage }: LaneProps)
                                     <CarCard
                                         car={car}
                                         lane={lane}
-                                        onRemove={handleRemoveCar}
+                                        onRemove={onRemove}
                                         showRemoveButton={mode === 'dispatcher'}
                                     />
                                 </div>
@@ -105,4 +74,6 @@ export function Lane({ cars, lane, mode, onRemoveCar, emptyMessage }: LaneProps)
             </div>
         </div>
     )
-}
+})
+
+Lane.displayName = 'Lane'

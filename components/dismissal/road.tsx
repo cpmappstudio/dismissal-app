@@ -13,7 +13,7 @@ interface RoadProps {
     className?: string
 }
 
-export function Road({ leftLaneCars, rightLaneCars, mode, onRemoveCar, className }: RoadProps) {
+export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, onRemoveCar, className }) => {
     return (
         <div className="flex-1 min-h-0" style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
             <Card className="border-2 border-yankees-blue flex flex-col h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] py-0 overflow-hidden relative" style={{ backgroundColor: '#9CA3AF' }}>
@@ -80,4 +80,6 @@ export function Road({ leftLaneCars, rightLaneCars, mode, onRemoveCar, className
             </Card>
         </div>
     )
-}
+})
+
+Road.displayName = 'Road'

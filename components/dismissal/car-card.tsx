@@ -17,24 +17,9 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Car } from "./car"
 import { useTranslations } from "next-intl"
-
-export interface StudentData {
-    id: string
-    name: string
-    grade?: string
-    imageUrl?: string
-}
-
-export interface CarData {
-    id: string
-    carNumber: number
-    lane: 'left' | 'right'
-    position: number
-    assignedTime: Date
-    students: StudentData[] // Cambio de studentName a students array
-    campus: string
-    imageColor: string // Cambio de imageUrl a imageColor
-}
+import { CarData } from "./types"
+import { LANE_COLORS } from "./constants"
+import { formatTime, getStudentInitials } from "./utils"
 
 interface CarCardProps {
     car: CarData
@@ -43,48 +28,22 @@ interface CarCardProps {
     lane: 'left' | 'right'
 }
 
-export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCardProps) {
+export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButton = false, lane }) => {
     const t = useTranslations('dismissal')
 
-    const formatTime = (date: Date) => {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-
-    // Helper function to get initials from student name
-    const getStudentInitials = (name: string) => {
-        return name.split(' ').map((n: string) => n[0]).join('')
-    }
-
     // Helper function to get display name for multiple students
-    const getDisplayName = () => {
-        if (car.students.length === 1) {
-            return car.students[0].name
-        }
-        if (car.students.length === 2) {
-            return `${car.students[0].name} y ${car.students[1].name}`
-        }
-        return `${car.students[0].name} +${car.students.length - 1} más`
-    }
+    // const getDisplayName = React.useMemo(() => {
+    //     if (car.students.length === 1) {
+    //         return car.students[0].name
+    //     }
+    //     if (car.students.length === 2) {
+    //         return `${car.students[0].name} y ${car.students[1].name}`
+    //     }
+    //     return `${car.students[0].name} +${car.students.length - 1} más`
+    // }, [car.students])
 
-    // Define colors based on lane
-    const colors = {
-        left: {
-            primary: 'text-blue-600',
-            background: 'bg-blue-100',
-            textColor: 'text-blue-600',
-            badge: 'bg-blue-500',
-            carColor: '#3b82f6' // Blue for left lane
-        },
-        right: {
-            primary: 'text-green-600',
-            background: 'bg-green-100',
-            textColor: 'text-green-600',
-            badge: 'bg-green-500',
-            carColor: '#10b981' // Green for right lane
-        }
-    }
-
-    const laneColors = colors[lane]
+    // Get lane colors from constants
+    const laneColors = LANE_COLORS[lane]
 
     return (
         <div className="relative flex justify-center">
@@ -111,7 +70,7 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
                                     <Trash2 className="h-3 w-3" />
                                 </button>
                             )}
-                            <span className={`px-2 py-1 text-xl ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
+                            <span className={`px-2 py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
                                 {car.carNumber}
                             </span>
                         </div>
@@ -193,4 +152,6 @@ export function CarCard({ car, onRemove, showRemoveButton = false, lane }: CarCa
             </Drawer>
         </div>
     )
-}
+})
+
+CarCard.displayName = 'CarCard'

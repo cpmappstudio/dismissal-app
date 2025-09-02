@@ -27,7 +27,7 @@ const sizeClasses = {
     xl: 'w-32 h-40 md:w-48 md:h-60'
 }
 
-export function Car({ className = '', color, size = 'md', style, variant = 'default' }: CarProps) {
+export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default' }) => {
     const sizeClass = sizeClasses[size]
 
     // Use variant color if no custom color provided
@@ -120,4 +120,6 @@ export function Car({ className = '', color, size = 'md', style, variant = 'defa
             </g>
         </svg>
     )
-}
+})
+
+Car.displayName = 'Car'

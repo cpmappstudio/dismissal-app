@@ -12,12 +12,8 @@ import { CAMPUS_LOCATIONS, type CampusLocation } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { Road } from "./road"
 import { CarData, ModeType, LaneType } from "./types"
-
-// Helper function to get random car colors
-const getRandomCarColor = () => {
-    const colors = ['#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#f97316', '#06b6d4', '#84cc16', '#f59e0b']
-    return colors[Math.floor(Math.random() * colors.length)]
-}
+import { getCarColor, getConsistentTime } from "./utils"
+import { MOCK_CARS, INITIAL_NEXT_ID } from "./mock-cars-data"
 
 interface DismissalViewProps {
     mode: ModeType
@@ -28,66 +24,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
 
     const [selectedCampus, setSelectedCampus] = React.useState<string>("Poinciana Campus")
-    const [cars, setCars] = React.useState<CarData[]>([
-        {
-            id: 'car-1',
-            carNumber: 101,
-            lane: 'left',
-            position: 1,
-            assignedTime: new Date(Date.now() - 5 * 60000),
-            students: [{ id: 'student-1', name: 'María González', grade: 'Grado 5' }],
-            campus: 'Poinciana Campus',
-            imageColor: '#3b82f6' // Azul
-        },
-        {
-            id: 'car-2',
-            carNumber: 205,
-            lane: 'left',
-            position: 2,
-            assignedTime: new Date(Date.now() - 3 * 60000),
-            students: [
-                { id: 'student-2', name: 'Carlos Rodríguez', grade: 'Grado 4' },
-                { id: 'student-3', name: 'Ana Sofía Rodríguez', grade: 'Grado 2' }
-            ],
-            campus: 'Poinciana Campus',
-            imageColor: '#8b5cf6' // Púrpura
-        },
-        {
-            id: 'car-3',
-            carNumber: 89,
-            lane: 'right',
-            position: 1,
-            assignedTime: new Date(Date.now() - 7 * 60000),
-            students: [{ id: 'student-4', name: 'Ana Martínez', grade: 'Grado 6' }],
-            campus: 'Poinciana Campus',
-            imageColor: '#10b981' // Verde
-        },
-        {
-            id: 'car-4',
-            carNumber: 156,
-            lane: 'right',
-            position: 2,
-            assignedTime: new Date(Date.now() - 2 * 60000),
-            students: [
-                { id: 'student-5', name: 'Pedro Sánchez', grade: 'Grado 3' },
-                { id: 'student-6', name: 'Isabella Sánchez', grade: 'Grado 1' },
-                { id: 'student-7', name: 'Diego Sánchez', grade: 'Grado 5' }
-            ],
-            campus: 'Poinciana Campus',
-            imageColor: '#ef4444' // Rojo
-        },
-        {
-            id: 'car-5',
-            carNumber: 78,
-            lane: 'right',
-            position: 3,
-            assignedTime: new Date(Date.now() - 1 * 60000),
-            students: [{ id: 'student-8', name: 'Laura Torres', grade: 'Grado 4' }],
-            campus: 'Poinciana Campus',
-            imageColor: '#f97316' // Naranja
-        }
-    ])
-    const [nextId, setNextId] = React.useState(6)
+    const [cars, setCars] = React.useState<CarData[]>(MOCK_CARS)
+    const [nextId, setNextId] = React.useState(INITIAL_NEXT_ID)
 
     // Single input for allocator mode
     const [carInputValue, setCarInputValue] = React.useState<string>('')
@@ -112,10 +50,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             carNumber,
             lane,
             position: cars.filter(c => c.lane === lane && c.campus === selectedCampus).length + 1,
-            assignedTime: new Date(),
+            assignedTime: getConsistentTime(carNumber),
             students: [{ id: `student-${nextId}`, name: `Student ${carNumber}`, grade: 'Grado 5' }], // Mock data
             campus: selectedCampus,
-            imageColor: getRandomCarColor()
+            imageColor: getCarColor(carNumber)
         }
 
         setCars(prev => [...prev, newCar])
@@ -150,11 +88,6 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             handleAddCarToLane('right')
         }
     }, [handleAddCarToLane])
-
-    // Format time
-    const formatTime = React.useCallback((date: Date) => {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }, [])
 
     return (
         <div className={cn("w-full h-full flex flex-col", className)}>
