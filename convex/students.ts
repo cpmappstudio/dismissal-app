@@ -390,6 +390,7 @@ export const removeCarNumber = mutation({
 
 /**
  * Get students by car number for a specific campus
+ * Lightweight query for queue operations
  */
 export const getByCarNumber = query({
     args: {
@@ -397,9 +398,11 @@ export const getByCarNumber = query({
         campus: v.string()
     },
     handler: async (ctx, args) => {
+        // Basic authentication check - any authenticated user can query
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
+        // Use optimized helper function
         return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
     }
 });

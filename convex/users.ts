@@ -8,6 +8,7 @@ import {
     createAuditLogFromContext
 } from "./helpers";
 import { operatorPermissionsValidator } from "./types";
+import { extractRoleFromMetadata } from "../lib/role-utils";
 
 /**
  * List users in the system (admin/superadmin only)
@@ -39,10 +40,8 @@ export const list = query({
                 .collect();
         }
 
-        // Filter by campus if specified and user is not superadmin
-        if (args.campus && role !== 'superadmin') {
-            users = users.filter(u => u.assignedCampuses.includes(args.campus!));
-        } else if (args.campus) {
+        // Filter by campus if specified
+        if (args.campus) {
             users = users.filter(u => u.assignedCampuses.includes(args.campus!));
         }
 
@@ -278,7 +277,8 @@ export const getCurrentProfile = query({
         const user = await getUserByClerkId(ctx.db, identity.subject);
         if (!user) return null;
 
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
+        // Use centralized role extraction from shared utilities
+        const role = extractRoleFromMetadata(identity);
 
         return {
             _id: user._id,

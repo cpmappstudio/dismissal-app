@@ -4,6 +4,9 @@ import { v, Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { WithoutSystemFields } from "convex/server";
 
+// Import centralized role utilities to avoid duplication
+import type { DismissalRole } from "../lib/role-utils";
+
 // ============================================================================
 // COMMON VALIDATORS (Reusable across schema and functions)
 // ============================================================================
@@ -16,8 +19,9 @@ export const roleValidator = v.union(
     v.literal("viewer"),
     v.literal("operator")
 );
-export type UserRole = Infer<typeof roleValidator>;
-export type DismissalRole = UserRole; // Alias para compatibilidad
+
+// Use DismissalRole from role-utils for consistency
+export type UserRole = DismissalRole; // Keep UserRole as alias for backward compatibility
 
 /**
  * Lane validator
@@ -486,34 +490,8 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 
 /**
- * Type guard to check if user is admin (necesita rol de Clerk)
- */
-export function isAdmin(role: UserRole | null): boolean {
-    return role === "admin" || role === "superadmin";
-}
-
-/**
- * Type guard to check if user can allocate cars (necesita rol de Clerk)
- */
-export function canAllocateWithRole(role: UserRole | null, operatorPermissions?: OperatorPermissions | null): boolean {
-    return role === "admin" ||
-        role === "superadmin" ||
-        role === "allocator" ||
-        (role === "operator" && operatorPermissions?.canAllocate === true);
-}
-
-/**
- * Type guard to check if user can dispatch cars (necesita rol de Clerk)
- */
-export function canDispatchWithRole(role: UserRole | null, operatorPermissions?: OperatorPermissions | null): boolean {
-    return role === "admin" ||
-        role === "superadmin" ||
-        role === "dispatcher" ||
-        (role === "operator" && operatorPermissions?.canDispatch === true);
-}
-
-/**
  * Check if user has access to a campus
+ * Campus-specific logic that belongs in types rather than role-utils
  */
 export function hasAccessToCampus(user: UserProfile, campus: string, role: UserRole): boolean {
     if (role === "admin" || role === "superadmin") {
@@ -524,6 +502,7 @@ export function hasAccessToCampus(user: UserProfile, campus: string, role: UserR
 
 /**
  * Convert queue entry to car data for frontend
+ * Frontend-specific conversion that belongs in types
  */
 export function queueEntryToCarData(entry: QueueEntry): CarData {
     return {

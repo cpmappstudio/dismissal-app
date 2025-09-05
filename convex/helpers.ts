@@ -4,7 +4,6 @@ import { QueryCtx, MutationCtx, DatabaseReader, DatabaseWriter } from "./_genera
 import { Doc, Id } from "./_generated/dataModel";
 import type {
     UserProfile,
-    UserRole,
     StudentWithCar,
     QueueEntry,
     QueueState,
@@ -14,8 +13,16 @@ import type {
     QueueMetrics,
     DailyDismissalSummary,
     CarPickupHistory,
-    OperatorPermissions,
 } from "./types";
+import {
+    DismissalRole,
+    OperatorPermissions,
+    extractRoleFromMetadata,
+    extractOperatorPermissions,
+    canAccessAdmin,
+    canAllocate,
+    canDispatch
+} from "../lib/role-utils";
 import { CAR_COLORS } from "./types";
 
 // Type aliases for cleaner function signatures
@@ -58,19 +65,18 @@ export async function getUserByEmail(
  */
 export async function validateUserAccess(
     ctx: QueryCtx | MutationCtx,
-    requiredRoles?: UserRole[],
+    requiredRoles?: DismissalRole[],
     campus?: string
 ): Promise<{
     user: Doc<"users">;
-    role: UserRole;
+    role: DismissalRole;
     identity: any;
 }> {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const role = identity.publicMetadata?.dismissalRole ||
-        identity.publicMetadata?.role ||
-        'viewer' as UserRole;
+    // Use centralized role extraction from shared utilities
+    const role = extractRoleFromMetadata(identity);
 
     if (requiredRoles && !requiredRoles.includes(role)) {
         throw new Error(`Requires role: ${requiredRoles.join(' or ')}`);
@@ -92,7 +98,7 @@ export async function validateUserAccess(
 export function userHasAccessToCampus(
     user: Doc<"users">,
     campus: string,
-    role: UserRole
+    role: DismissalRole
 ): boolean {
     if (role === "admin" || role === "superadmin") {
         return true;
@@ -102,28 +108,26 @@ export function userHasAccessToCampus(
 
 /**
  * Check if user can perform allocator actions
+ * Now uses centralized logic from role-utils
  */
 export function userCanAllocate(
-    role: UserRole,
+    role: DismissalRole,
     operatorPermissions?: OperatorPermissions | null
 ): boolean {
-    return role === "admin" ||
-        role === "superadmin" ||
-        role === "allocator" ||
-        (role === "operator" && operatorPermissions?.canAllocate === true);
+    if (canAllocate(role)) return true;
+    return role === "operator" && operatorPermissions?.canAllocate === true;
 }
 
 /**
  * Check if user can perform dispatcher actions
+ * Now uses centralized logic from role-utils
  */
 export function userCanDispatch(
-    role: UserRole,
+    role: DismissalRole,
     operatorPermissions?: OperatorPermissions | null
 ): boolean {
-    return role === "admin" ||
-        role === "superadmin" ||
-        role === "dispatcher" ||
-        (role === "operator" && operatorPermissions?.canDispatch === true);
+    if (canDispatch(role)) return true;
+    return role === "operator" && operatorPermissions?.canDispatch === true;
 }
 
 // ============================================================================
@@ -529,7 +533,7 @@ export async function createAuditLog(
     db: DbWriter,
     userId: Id<"users">,
     userEmail: string,
-    userRole: UserRole,
+    userRole: DismissalRole,
     action: string,
     details: any
 ): Promise<void> {
