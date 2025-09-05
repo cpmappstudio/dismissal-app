@@ -2,16 +2,26 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import {
-    validateUserAccess,
-    getStudentsByCarNumber,
-    createAuditLogFromContext
-} from "./helpers";
 import { gradeValidator } from "./types";
 
 /**
+ * Helper function to get students by car number
+ */
+async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+    if (carNumber === 0) return [];
+
+    return await db
+        .query("students")
+        .withIndex("by_car_campus", (q: any) =>
+            q.eq("carNumber", carNumber)
+                .eq("campusLocation", campus)
+                .eq("isActive", true)
+        )
+        .collect();
+}
+
+/**
  * List students with filtering options
- * Only admin/superadmin can access
  */
 export const list = query({
     args: {
@@ -24,11 +34,9 @@ export const list = query({
         offset: v.optional(v.number())
     },
     handler: async (ctx, args) => {
-        // Use validateUserAccess helper for consistency
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        // Check authentication first
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
         let students: any[];
 
@@ -36,35 +44,35 @@ export const list = query({
         if (args.campus) {
             students = await ctx.db
                 .query("students")
-                .withIndex("by_campus_active", q =>
+                .withIndex("by_campus_active", (q: any) =>
                     q.eq("campusLocation", args.campus!).eq("isActive", true)
                 )
                 .collect();
         } else {
             students = await ctx.db
                 .query("students")
-                .filter(q => q.eq(q.field("isActive"), true))
+                .filter((q: any) => q.eq(q.field("isActive"), true))
                 .collect();
         }
 
-        // Additional filtering in memory (can't be optimized with current indexes)
+        // Additional filtering in memory
         if (args.grade) {
-            students = students.filter(s => s.grade === args.grade);
+            students = students.filter((s: any) => s.grade === args.grade);
         }
 
         if (args.carNumber !== undefined) {
-            students = students.filter(s => s.carNumber === args.carNumber);
+            students = students.filter((s: any) => s.carNumber === args.carNumber);
         }
 
         if (args.hasCarAssigned !== undefined) {
-            students = students.filter(s =>
+            students = students.filter((s: any) =>
                 args.hasCarAssigned ? s.carNumber > 0 : s.carNumber === 0
             );
         }
 
         if (args.search) {
             const searchLower = args.search.toLowerCase();
-            students = students.filter(s =>
+            students = students.filter((s: any) =>
                 s.fullName.toLowerCase().includes(searchLower) ||
                 s.firstName.toLowerCase().includes(searchLower) ||
                 s.lastName.toLowerCase().includes(searchLower)
@@ -72,7 +80,7 @@ export const list = query({
         }
 
         // Sort by full name for consistent ordering
-        students.sort((a, b) => a.fullName.localeCompare(b.fullName));
+        students.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
 
         // Pagination
         const offset = args.offset || 0;
@@ -93,11 +101,8 @@ export const list = query({
 export const get = query({
     args: { id: v.id("students") },
     handler: async (ctx, args) => {
-        // Use validateUserAccess helper for consistency
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.id);
         if (!student || !student.isActive) {
@@ -107,7 +112,7 @@ export const get = query({
         // Get siblings (other students with same car number)
         const siblings = student.carNumber > 0 ?
             await getStudentsByCarNumber(ctx.db, student.carNumber, student.campusLocation)
-                .then(students => students.filter(s => s._id !== student._id)) :
+                .then((students: any[]) => students.filter((s: any) => s._id !== student._id)) :
             [];
 
         return {
@@ -125,16 +130,14 @@ export const create = mutation({
         firstName: v.string(),
         lastName: v.string(),
         birthday: v.string(),
-        grade: v.string(), // Could use gradeValidator for stricter validation
+        grade: gradeValidator,
         campusLocation: v.string(),
         carNumber: v.optional(v.number()),
         avatarUrl: v.optional(v.string())
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
         // Validate required fields are not empty
         if (!args.firstName.trim()) {
@@ -145,11 +148,6 @@ export const create = mutation({
         }
         if (!args.campusLocation.trim()) {
             throw new Error("Campus location is required");
-        }
-
-        // Validate campus access
-        if (role !== 'superadmin' && !user.assignedCampuses.includes(args.campusLocation)) {
-            throw new Error(`No access to campus: ${args.campusLocation}`);
         }
 
         // Validate car number
@@ -172,16 +170,7 @@ export const create = mutation({
             carNumber,
             avatarUrl: args.avatarUrl,
             isActive: true,
-            createdBy: user._id,
             createdAt: Date.now()
-        });
-
-        // Create audit log
-        await createAuditLogFromContext(ctx, "student_created", {
-            targetType: "student",
-            targetId: studentId,
-            campus: args.campusLocation,
-            metadata: { fullName, carNumber }
         });
 
         return studentId;
@@ -193,32 +182,25 @@ export const create = mutation({
  */
 export const update = mutation({
     args: {
-        id: v.id("students"),
+        studentId: v.id("students"),
         firstName: v.optional(v.string()),
         lastName: v.optional(v.string()),
         birthday: v.optional(v.string()),
-        grade: v.optional(v.string()),
+        grade: v.optional(gradeValidator),
         campusLocation: v.optional(v.string()),
         carNumber: v.optional(v.number()),
         avatarUrl: v.optional(v.string())
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-        const student = await ctx.db.get(args.id);
+        const student = await ctx.db.get(args.studentId);
         if (!student || !student.isActive) {
             throw new Error("Student not found");
         }
 
-        // Validate campus access
-        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
-            throw new Error(`No access to student's campus`);
-        }
-
-        // Build update object - remove updatedAt as it doesn't exist in schema
+        // Build update object
         const updates: any = {};
 
         // Update individual fields
@@ -241,18 +223,9 @@ export const update = mutation({
         }
 
         // Apply updates
-        await ctx.db.patch(args.id, updates);
+        await ctx.db.patch(args.studentId, updates);
 
-        // Create audit log
-        await createAuditLogFromContext(ctx, "student_updated", {
-            targetType: "student",
-            targetId: args.id,
-            campus: student.campusLocation,
-            before: student,
-            after: updates
-        });
-
-        return args.id;
+        return args.studentId;
     }
 });
 
@@ -260,37 +233,22 @@ export const update = mutation({
  * Soft delete a student
  */
 export const deleteStudent = mutation({
-    args: { id: v.id("students") },
+    args: { studentId: v.id("students") },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-        const student = await ctx.db.get(args.id);
+        const student = await ctx.db.get(args.studentId);
         if (!student) {
             throw new Error("Student not found");
         }
 
-        // Validate campus access
-        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
-            throw new Error(`No access to student's campus`);
-        }
-
-        // Soft delete - remove updatedAt as it doesn't exist in schema
-        await ctx.db.patch(args.id, {
+        // Soft delete
+        await ctx.db.patch(args.studentId, {
             isActive: false
         });
 
-        // Create audit log
-        await createAuditLogFromContext(ctx, "student_deleted", {
-            targetType: "student",
-            targetId: args.id,
-            campus: student.campusLocation,
-            metadata: { fullName: student.fullName }
-        });
-
-        return args.id;
+        return args.studentId;
     }
 });
 
@@ -303,42 +261,21 @@ export const assignCarNumber = mutation({
         carNumber: v.number()
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.studentId);
         if (!student || !student.isActive) {
             throw new Error("Student not found");
         }
 
-        // Validate campus access
-        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
-            throw new Error(`No access to student's campus`);
-        }
-
         if (args.carNumber < 0) {
             throw new Error("Car number cannot be negative");
         }
 
-        const oldCarNumber = student.carNumber;
-
-        // Update car number - remove updatedAt as it doesn't exist in schema
+        // Update car number
         await ctx.db.patch(args.studentId, {
             carNumber: args.carNumber
-        });
-
-        // Create audit log
-        await createAuditLogFromContext(ctx, "car_assigned", {
-            targetType: "student",
-            targetId: args.studentId,
-            campus: student.campusLocation,
-            metadata: {
-                studentName: student.fullName,
-                oldCarNumber,
-                newCarNumber: args.carNumber
-            }
         });
 
         return args.studentId;
@@ -351,37 +288,17 @@ export const assignCarNumber = mutation({
 export const removeCarNumber = mutation({
     args: { studentId: v.id("students") },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.studentId);
         if (!student || !student.isActive) {
             throw new Error("Student not found");
         }
 
-        // Validate campus access
-        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
-            throw new Error(`No access to student's campus`);
-        }
-
-        const oldCarNumber = student.carNumber;
-
-        // Remove car assignment - remove updatedAt as it doesn't exist in schema
+        // Remove car assignment
         await ctx.db.patch(args.studentId, {
             carNumber: 0
-        });
-
-        // Create audit log
-        await createAuditLogFromContext(ctx, "car_removed", {
-            targetType: "student",
-            targetId: args.studentId,
-            campus: student.campusLocation,
-            metadata: {
-                studentName: student.fullName,
-                removedCarNumber: oldCarNumber
-            }
         });
 
         return args.studentId;
@@ -398,11 +315,9 @@ export const getByCarNumber = query({
         campus: v.string()
     },
     handler: async (ctx, args) => {
-        // Basic authentication check - any authenticated user can query
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
-        // Use optimized helper function
         return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
     }
 });

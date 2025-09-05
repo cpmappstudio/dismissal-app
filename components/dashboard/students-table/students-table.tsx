@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { useTranslations } from 'next-intl'
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import {
     ColumnFiltersState,
     flexRender,
@@ -32,13 +34,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useColumns } from "./columns"
-import { mockStudents } from "./mock-data"
-import { Student, Grade } from "./types"
+import { Student } from "./types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { StudentFormDialog } from "./student-form-dialog"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
-import { CAMPUS_LOCATIONS, GRADES } from "@/lib/constants"
+import { CAMPUS_LOCATIONS, GRADES, Grade, CampusLocation, Id } from "@/convex/types"
 
 
 export function StudentsTable() {
@@ -46,14 +48,50 @@ export function StudentsTable() {
     const columns = useColumns()
 
     // Table state
-    const [data, setData] = React.useState<Student[]>(() => mockStudents)
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [rowSelection, setRowSelection] = React.useState({})
 
+    // Filter state for Convex queries
+    const [searchFilter, setSearchFilter] = React.useState("")
+    const [campusFilter, setCampusFilter] = React.useState<CampusLocation | "">("")
+    const [gradeFilter, setGradeFilter] = React.useState<Grade | "">("")
+
     // Dialog state
     const [editDialogOpen, setEditDialogOpen] = React.useState(false)
     const [selectedStudent, setSelectedStudent] = React.useState<Student | undefined>()
+
+    // Convex hooks
+    const studentsData = useQuery(api.students.list, {
+        search: searchFilter || undefined,
+        campus: campusFilter || undefined,
+        grade: gradeFilter || undefined,
+        limit: 100,
+    })
+
+    const createStudentMutation = useMutation(api.students.create)
+    const updateStudentMutation = useMutation(api.students.update)
+    const deleteStudentMutation = useMutation(api.students.deleteStudent)
+
+    // Transform Convex data to match component expectations
+    const data: Student[] = React.useMemo(() => {
+        if (!studentsData?.students) return []
+
+        return studentsData.students.map((student: any) => ({
+            id: student._id,
+            fullName: student.fullName,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            birthday: student.birthday,
+            carNumber: student.carNumber,
+            grade: student.grade as Grade,
+            campusLocation: student.campusLocation,
+            avatarUrl: student.avatarUrl || "",
+        }))
+    }, [studentsData])
+
+    // Loading state
+    const isLoading = studentsData === undefined
 
     // Table instance
     const table = useReactTable({
@@ -73,39 +111,82 @@ export function StudentsTable() {
         getSortedRowModel: getSortedRowModel(),
     })
 
+    // Update filters when table filters change
+    React.useEffect(() => {
+        const searchValue = table.getColumn("fullName")?.getFilterValue() as string
+        setSearchFilter(searchValue || "")
+    }, [table.getColumn("fullName")?.getFilterValue()])
+
+    React.useEffect(() => {
+        const campusValue = table.getColumn("campusLocation")?.getFilterValue() as CampusLocation
+        setCampusFilter(campusValue || "")
+    }, [table.getColumn("campusLocation")?.getFilterValue()])
+
+    React.useEffect(() => {
+        const gradeValue = table.getColumn("grade")?.getFilterValue() as Grade
+        setGradeFilter(gradeValue || "")
+    }, [table.getColumn("grade")?.getFilterValue()])
+
     // Get selected students
     const selectedStudents = table.getFilteredSelectedRowModel().rows.map(row => row.original)
 
     // Handlers
-    const handleDeleteStudents = (studentIds: string[]) => {
-        setData(prev => prev.filter(student => !studentIds.includes(student.id)))
-        setRowSelection({})
-    }
-
-    const handleCreateStudent = (studentData: Omit<Student, 'id'>) => {
-        const newStudent: Student = {
-            ...studentData,
-            id: `student-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    const handleDeleteStudents = async (studentIds: string[]) => {
+        try {
+            for (const id of studentIds) {
+                await deleteStudentMutation({ studentId: id as Id<"students"> })
+            }
+            setRowSelection({})
+        } catch (error) {
+            console.error("Error deleting students:", error)
         }
-        setData(prev => [newStudent, ...prev])
     }
 
-    const handleUpdateStudent = (studentData: Omit<Student, 'id'>) => {
+    const handleCreateStudent = async (studentData: Omit<Student, 'id'>) => {
+        try {
+            await createStudentMutation({
+                firstName: studentData.firstName,
+                lastName: studentData.lastName,
+                grade: studentData.grade,
+                campusLocation: studentData.campusLocation,
+                birthday: studentData.birthday,
+                carNumber: studentData.carNumber,
+                avatarUrl: studentData.avatarUrl,
+            })
+        } catch (error) {
+            console.error("Error creating student:", error)
+        }
+    }
+
+    const handleUpdateStudent = async (studentData: Omit<Student, 'id'>) => {
         if (!selectedStudent) return
 
-        setData(prev => prev.map(student =>
-            student.id === selectedStudent.id
-                ? { ...studentData, id: selectedStudent.id }
-                : student
-        ))
-        setEditDialogOpen(false)
-        setSelectedStudent(undefined)
+        try {
+            await updateStudentMutation({
+                studentId: selectedStudent.id as Id<"students">,
+                firstName: studentData.firstName,
+                lastName: studentData.lastName,
+                grade: studentData.grade,
+                campusLocation: studentData.campusLocation,
+                birthday: studentData.birthday,
+                carNumber: studentData.carNumber,
+                avatarUrl: studentData.avatarUrl,
+            })
+            setEditDialogOpen(false)
+            setSelectedStudent(undefined)
+        } catch (error) {
+            console.error("Error updating student:", error)
+        }
     }
 
-    const handleDeleteStudent = (studentId: string) => {
-        setData(prev => prev.filter(student => student.id !== studentId))
-        setEditDialogOpen(false)
-        setSelectedStudent(undefined)
+    const handleDeleteStudent = async (studentId: string) => {
+        try {
+            await deleteStudentMutation({ studentId: studentId as Id<"students"> })
+            setEditDialogOpen(false)
+            setSelectedStudent(undefined)
+        } catch (error) {
+            console.error("Error deleting student:", error)
+        }
     }
 
     const handleRowClick = (student: Student, event: React.MouseEvent) => {
@@ -114,6 +195,24 @@ export function StudentsTable() {
 
         setSelectedStudent(student)
         setEditDialogOpen(true)
+    }
+
+    if (isLoading) {
+        return (
+            <div className="w-full space-y-4">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-8 w-[200px]" />
+                    <Skeleton className="h-8 w-[100px]" />
+                </div>
+                <div className="rounded-md border">
+                    <div className="space-y-2 p-4">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (

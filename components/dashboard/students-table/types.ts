@@ -1,4 +1,4 @@
-import { Grade, CampusLocation } from "@/lib/constants"
+import { Grade, CampusLocation } from "@/convex/types"
 
 export type Student = {
     id: string

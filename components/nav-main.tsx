@@ -26,6 +26,7 @@ export const NavMain = memo(function NavMain({
   items,
   dashboardLabel,
   navigationLabel,
+  showDashboard = true,
 }: {
   items: {
     title: string
@@ -39,6 +40,7 @@ export const NavMain = memo(function NavMain({
   }[]
   dashboardLabel: string
   navigationLabel: string
+  showDashboard?: boolean
 }) {
   const pathname = usePathname()
 
@@ -56,17 +58,19 @@ export const NavMain = memo(function NavMain({
     <SidebarGroup>
       <SidebarGroupLabel>{navigationLabel}</SidebarGroupLabel>
       <SidebarMenu>
-        <SidebarMenuButton
-          asChild
-          className={clsx({
-            'text-lime-300': isDashboardActive,
-          })}
-        >
-          <Link href="/">
-            <Home />
-            <span>{dashboardLabel}</span>
-          </Link>
-        </SidebarMenuButton>
+        {showDashboard && (
+          <SidebarMenuButton
+            asChild
+            className={clsx({
+              'text-lime-300': isDashboardActive,
+            })}
+          >
+            <Link href="/">
+              <Home />
+              <span>{dashboardLabel}</span>
+            </Link>
+          </SidebarMenuButton>
+        )}
         {items.map((item) => (
           <Collapsible
             key={item.title}

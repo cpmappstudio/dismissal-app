@@ -27,14 +27,19 @@ import { ModeToggle } from "./mode-toggle"
 import { LangToggle } from "./lang-toggle"
 import { UserButtonWrapper } from "./user-button-wrapper"
 import type { UserRole } from "@/convex/types"
+import type { DismissalRole } from "@/lib/role-utils"
+import { extractRoleFromMetadata } from "@/lib/role-utils"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar()
   const { user } = useUser()
   const t = useTranslations('navigation')
 
-  // Get user role from Clerk metadata
-  const userRole = user?.publicMetadata?.role as UserRole | undefined
+  // Get user role from Clerk metadata using centralized extraction
+  const userRole = user ? extractRoleFromMetadata(user.publicMetadata) : undefined
+
+  // Determinar si mostrar el dashboard (Students) basado en el rol
+  const showDashboard = userRole === 'admin' || userRole === 'superadmin'
 
   // Configuración de íconos para cada tipo de menú
   const iconMap = {
@@ -57,70 +62,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     const items = []
 
-    // Eliminar "Mi Cuenta" para todos los roles
-    // Menús específicos por rol
-    if (userRole === 'student') {
-      // Mi Estudio
-      if (menuConfig.student) {
-        items.push({
-          title: menuConfig.student.title,
-          url: menuConfig.student.url,
-          icon: iconMap.student,
-          isActive: true, // Dashboard activo por defecto
-          items: menuConfig.student.items.map(item => ({
-            title: item.title,
-            url: item.url,
-          })),
-        })
-      }
-
-      // Documentación para estudiantes
-      if (menuConfig.studentDocs) {
-        items.push({
-          title: menuConfig.studentDocs.title,
-          url: menuConfig.studentDocs.url,
-          icon: iconMap.studentDocs,
-          isActive: false,
-          items: menuConfig.studentDocs.items.map(item => ({
-            title: item.title,
-            url: item.url,
-          })),
-        })
-      }
-    }
-
-    if (userRole === 'professor') {
-      // Mis Clases
-      if (menuConfig.professor) {
-        items.push({
-          title: menuConfig.professor.title,
-          url: menuConfig.professor.url,
-          icon: iconMap.professor,
-          isActive: true,
-          items: menuConfig.professor.items.map(item => ({
-            title: item.title,
-            url: item.url,
-          })),
-        })
-      }
-
-      // Documentación para profesores
-      if (menuConfig.professorDocs) {
-        items.push({
-          title: menuConfig.professorDocs.title,
-          url: menuConfig.professorDocs.url,
-          icon: iconMap.professorDocs,
-          isActive: false,
-          items: menuConfig.professorDocs.items.map(item => ({
-            title: item.title,
-            url: item.url,
-          })),
-        })
-      }
-    }
-
-    if ((userRole === 'admin' || userRole === 'superadmin')) {
-      // Operadores
+    // Admin y SuperAdmin ven todos los enlaces
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      // Operadores con todos los sub-elementos
       if (menuConfig.operators) {
         items.push({
           title: menuConfig.operators.title,
@@ -148,6 +92,72 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         })
       }
     }
+    // Operator ve todos los sub-elementos dentro de operators
+    else if (userRole === 'operator') {
+      if (menuConfig.operators) {
+        items.push({
+          title: menuConfig.operators.title,
+          url: menuConfig.operators.url,
+          icon: iconMap.operators,
+          isActive: true,
+          items: menuConfig.operators.items.map(item => ({
+            title: item.title,
+            url: item.url,
+          })),
+        })
+      }
+    }
+    // Allocator solo ve su enlace específico
+    else if (userRole === 'allocator') {
+      if (menuConfig.operators) {
+        items.push({
+          title: menuConfig.operators.title,
+          url: menuConfig.operators.url,
+          icon: iconMap.operators,
+          isActive: true,
+          items: menuConfig.operators.items
+            .filter(item => item.url === '/operators/allocator')
+            .map(item => ({
+              title: item.title,
+              url: item.url,
+            })),
+        })
+      }
+    }
+    // Dispatcher solo ve su enlace específico
+    else if (userRole === 'dispatcher') {
+      if (menuConfig.operators) {
+        items.push({
+          title: menuConfig.operators.title,
+          url: menuConfig.operators.url,
+          icon: iconMap.operators,
+          isActive: true,
+          items: menuConfig.operators.items
+            .filter(item => item.url === '/operators/dispatcher')
+            .map(item => ({
+              title: item.title,
+              url: item.url,
+            })),
+        })
+      }
+    }
+    // Viewer solo ve su enlace específico
+    else if (userRole === 'viewer') {
+      if (menuConfig.operators) {
+        items.push({
+          title: menuConfig.operators.title,
+          url: menuConfig.operators.url,
+          icon: iconMap.operators,
+          isActive: true,
+          items: menuConfig.operators.items
+            .filter(item => item.url === '/operators/viewer')
+            .map(item => ({
+              title: item.title,
+              url: item.url,
+            })),
+        })
+      }
+    }
 
     return items
   }, [t, userRole])
@@ -165,6 +175,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items={navItems}
           dashboardLabel={t('dashboard')}
           navigationLabel={t('navigation')}
+          showDashboard={showDashboard}
         />
       </SidebarContent>
       <SidebarFooter>

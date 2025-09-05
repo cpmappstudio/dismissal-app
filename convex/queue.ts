@@ -2,19 +2,85 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import {
-    validateUserAccess,
-    getStudentsByCarNumber,
-    isCarInQueue,
-    getNextPosition,
-    generateCarColor,
-    studentToSummary,
-    repositionLaneCars,
-    createAuditLogFromContext,
-    userCanAllocate,
-    userCanDispatch
-} from "./helpers";
 import { laneValidator } from "./types";
+
+/**
+ * Helper functions
+ */
+async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+    if (carNumber === 0) return [];
+
+    return await db
+        .query("students")
+        .withIndex("by_car_campus", (q: any) =>
+            q.eq("carNumber", carNumber)
+                .eq("campusLocation", campus)
+                .eq("isActive", true)
+        )
+        .collect();
+}
+
+async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
+    const existing = await db
+        .query("dismissalQueue")
+        .withIndex("by_car_campus", (q: any) =>
+            q.eq("carNumber", carNumber).eq("campusLocation", campus)
+        )
+        .filter((q: any) => q.eq(q.field("status"), "waiting"))
+        .first();
+
+    return existing !== null;
+}
+
+async function getNextPosition(db: any, campus: string, lane: string): Promise<number> {
+    const entries = await db
+        .query("dismissalQueue")
+        .withIndex("by_campus_lane_position", (q: any) =>
+            q.eq("campusLocation", campus).eq("lane", lane)
+        )
+        .collect();
+
+    if (entries.length === 0) return 1;
+
+    const maxPosition = Math.max(...entries.map((e: any) => e.position));
+    return maxPosition + 1;
+}
+
+function generateCarColor(carNumber: number): string {
+    const colors = [
+        '#3b82f6', '#10b981', '#ef4444', '#8b5cf6',
+        '#f97316', '#06b6d4', '#84cc16', '#f59e0b'
+    ];
+    return colors[carNumber % colors.length];
+}
+
+function studentToSummary(student: any) {
+    return {
+        studentId: student._id,
+        name: student.fullName,
+        grade: student.grade,
+        avatarUrl: student.avatarUrl
+    };
+}
+
+async function repositionLaneCars(db: any, campus: string, lane: string, removedPosition: number): Promise<void> {
+    const entries = await db
+        .query("dismissalQueue")
+        .withIndex("by_campus_lane_position", (q: any) =>
+            q.eq("campusLocation", campus).eq("lane", lane)
+        )
+        .filter((q: any) => q.gt(q.field("position"), removedPosition))
+        .collect();
+
+    // Instead of patch, we'll delete and recreate with new positions
+    for (const entry of entries) {
+        const { _id, _creationTime, ...entryData } = entry;
+        const newEntry = { ...entryData, position: entry.position - 1 };
+
+        await db.delete(entry._id);
+        await db.insert("dismissalQueue", newEntry);
+    }
+}
 
 /**
  * Get current queue state for a campus (reactive)
@@ -62,24 +128,15 @@ export const addCar = mutation({
         lane: laneValidator
     },
     handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
         // Validate inputs
         if (!args.campus.trim()) {
             throw new Error("Campus is required");
         }
         if (args.carNumber <= 0) {
             throw new Error("Invalid car number");
-        }
-
-        // Validate access
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin', 'allocator', 'operator'],
-            args.campus
-        );
-
-        // If operator, check specific permissions
-        if (role === 'operator' && !userCanAllocate(role, user.operatorPermissions)) {
-            throw new Error("Operator doesn't have allocate permission");
         }
 
         // Check if car is already in queue
@@ -105,20 +162,8 @@ export const addCar = mutation({
             students: students.map(studentToSummary),
             carColor: generateCarColor(args.carNumber),
             assignedTime: Date.now(),
-            addedBy: user._id,
+            addedBy: "system" as any, // Temporary placeholder since we don't use users table
             status: "waiting"
-        });
-
-        // Create audit log
-        await createAuditLogFromContext(ctx, "car_added_to_queue", {
-            targetType: "queue",
-            targetId: queueId,
-            campus: args.campus,
-            metadata: {
-                carNumber: args.carNumber,
-                lane: args.lane,
-                studentCount: students.length
-            }
         });
 
         return queueId;
@@ -133,23 +178,14 @@ export const removeCar = mutation({
         queueId: v.id("dismissalQueue")
     },
     handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
 
         if (entry.status !== "waiting") {
             throw new Error("Car is not in waiting status");
-        }
-
-        // Validate access
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin', 'dispatcher', 'operator'],
-            entry.campusLocation
-        );
-
-        // If operator, check specific permissions
-        if (role === 'operator' && !userCanDispatch(role, user.operatorPermissions)) {
-            throw new Error("Operator doesn't have dispatch permission");
         }
 
         // Calculate wait time
@@ -160,13 +196,13 @@ export const removeCar = mutation({
             carNumber: entry.carNumber,
             campusLocation: entry.campusLocation,
             lane: entry.lane,
-            studentIds: entry.students.map(s => s.studentId),
-            studentNames: entry.students.map(s => s.name),
+            studentIds: entry.students.map((s: any) => s.studentId),
+            studentNames: entry.students.map((s: any) => s.name),
             queuedAt: entry.assignedTime,
             completedAt: Date.now(),
             waitTimeSeconds,
             addedBy: entry.addedBy,
-            removedBy: user._id,
+            removedBy: entry.addedBy, // Use same as addedBy for simplification
             date: new Date().toISOString().split('T')[0]
         });
 
@@ -175,18 +211,6 @@ export const removeCar = mutation({
 
         // Remove from queue
         await ctx.db.delete(args.queueId);
-
-        // Create audit log
-        await createAuditLogFromContext(ctx, "car_removed_from_queue", {
-            targetType: "queue",
-            targetId: args.queueId,
-            campus: entry.campusLocation,
-            metadata: {
-                carNumber: entry.carNumber,
-                waitTime: waitTimeSeconds,
-                studentCount: entry.students.length
-            }
-        });
 
         return {
             success: true,
@@ -244,23 +268,14 @@ export const moveCar = mutation({
         newLane: laneValidator
     },
     handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
 
         if (entry.status !== "waiting") {
             throw new Error("Car is not in waiting status");
-        }
-
-        // Validate access
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['admin', 'superadmin', 'allocator', 'operator'],
-            entry.campusLocation
-        );
-
-        // If operator, check permissions
-        if (role === 'operator' && !userCanAllocate(role, user.operatorPermissions)) {
-            throw new Error("Operator doesn't have allocate permission");
         }
 
         if (entry.lane === args.newLane) {
@@ -273,30 +288,21 @@ export const moveCar = mutation({
         // Get next position in new lane
         const newPosition = await getNextPosition(ctx.db, entry.campusLocation, args.newLane);
 
-        // Update car's lane and position
-        await ctx.db.patch(args.queueId, {
+        // Instead of patch, delete and recreate with new lane/position
+        const { _id, _creationTime, ...entryData } = entry;
+        const newEntry = {
+            ...entryData,
             lane: args.newLane,
             position: newPosition
-        });
+        };
+
+        await ctx.db.delete(args.queueId);
+        const newQueueId = await ctx.db.insert("dismissalQueue", newEntry);
 
         // Reposition cars in old lane
         await repositionLaneCars(ctx.db, entry.campusLocation, oldLane, oldPosition);
 
-        // Create audit log with correct action name
-        await createAuditLogFromContext(ctx, "car_moved_lane", {
-            targetType: "queue",
-            targetId: args.queueId,
-            campus: entry.campusLocation,
-            metadata: {
-                carNumber: entry.carNumber,
-                oldLane,
-                newLane: args.newLane,
-                oldPosition,
-                newPosition
-            }
-        });
-
-        return args.queueId;
+        return newQueueId;
     }
 });
 

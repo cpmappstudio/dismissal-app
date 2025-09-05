@@ -9,7 +9,8 @@ export default defineSchema({
    */
   users: defineTable({
     clerkId: v.string(),
-    email: v.string(),
+    username: v.string(),
+    email: v.optional(v.string()), // Optional for backwards compatibility
 
     // Display info (sync from Clerk)
     firstName: v.optional(v.string()),
@@ -29,6 +30,7 @@ export default defineSchema({
     lastLoginAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
+    .index("by_username", ["username"])
     .index("by_email", ["email"])
     .index("by_active", ["isActive"]),
 

@@ -19,8 +19,6 @@ const PUBLIC_ROUTES = createRouteMatcher([
   '/sign-up(.*)',
   '/:locale/pending-role',
   '/pending-role',
-  '/:locale',
-  '/',
 ])
 
 const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([
@@ -32,15 +30,15 @@ const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([
 
 // Rutas por defecto para cada rol (donde redirigir cuando acceden a rutas no permitidas)
 const DEFAULT_REDIRECTS: Record<DismissalRole, string> = {
-  superadmin: '/dashboard',
-  admin: '/dashboard',
-  operator: '/operators',
+  superadmin: '/',
+  admin: '/',
+  operator: '/operators/allocator',
   allocator: '/operators/allocator',
   dispatcher: '/operators/dispatcher',
   viewer: '/operators/viewer',
 }
 
-// Definición de permisos por rol - más restrictivo y granular
+// Definición de permisos por rol - más restrictivo
 const ROLE_PERMISSIONS: Record<DismissalRole, {
   allowed: string[]
   canAccessAll?: boolean
@@ -55,30 +53,19 @@ const ROLE_PERMISSIONS: Record<DismissalRole, {
   },
   operator: {
     allowed: [
-      '/dashboard',
-      '/operators',
       '/operators/allocator',
       '/operators/dispatcher',
       '/operators/viewer'
     ]
   },
   allocator: {
-    allowed: [
-      '/dashboard',
-      '/operators/allocator'
-    ]
+    allowed: ['/operators/allocator']
   },
   dispatcher: {
-    allowed: [
-      '/dashboard',
-      '/operators/dispatcher'
-    ]
+    allowed: ['/operators/dispatcher']
   },
   viewer: {
-    allowed: [
-      '/dashboard',
-      '/operators/viewer'
-    ]
+    allowed: ['/operators/viewer']
   }
 }
 
@@ -135,12 +122,17 @@ const getRedirectUrl = (
   locale: string,
   baseUrl: string
 ): URL | null => {
-  // REGLA 1: Ruta raíz redirige a dashboard por defecto
+  // REGLA 1: Admin y SuperAdmin pueden acceder a la ruta raíz
+  if (pathWithoutLocale === '/' && (userRole === 'admin' || userRole === 'superadmin')) {
+    return null // No redirigir, permitir acceso
+  }
+
+  // REGLA 2: Otros roles en ruta raíz son redirigidos a su ruta específica
   if (pathWithoutLocale === '/') {
     return new URL(`/${locale}${DEFAULT_REDIRECTS[userRole]}`, baseUrl)
   }
 
-  // REGLA 2: Verificar si puede acceder a la ruta actual
+  // REGLA 3: Verificar si puede acceder a la ruta actual
   if (!canAccessRoute(userRole, pathWithoutLocale)) {
     return new URL(`/${locale}${DEFAULT_REDIRECTS[userRole]}`, baseUrl)
   }
