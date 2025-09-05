@@ -36,62 +36,81 @@ export const list = query({
     handler: async (ctx, args) => {
         // Check authentication first
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        let students: any[];
-
-        // Optimize query - use indexes when possible
-        if (args.campus) {
-            students = await ctx.db
-                .query("students")
-                .withIndex("by_campus_active", (q: any) =>
-                    q.eq("campusLocation", args.campus!).eq("isActive", true)
-                )
-                .collect();
-        } else {
-            students = await ctx.db
-                .query("students")
-                .filter((q: any) => q.eq(q.field("isActive"), true))
-                .collect();
+        if (!identity) {
+            // Return empty results when not authenticated
+            return {
+                students: [],
+                total: 0,
+                hasMore: false,
+                authState: "unauthenticated"
+            };
         }
 
-        // Additional filtering in memory
-        if (args.grade) {
-            students = students.filter((s: any) => s.grade === args.grade);
+        try {
+            let students: any[];
+
+            // Optimize query - use indexes when possible
+            if (args.campus) {
+                students = await ctx.db
+                    .query("students")
+                    .withIndex("by_campus_active", (q: any) =>
+                        q.eq("campusLocation", args.campus!).eq("isActive", true)
+                    )
+                    .collect();
+            } else {
+                students = await ctx.db
+                    .query("students")
+                    .filter((q: any) => q.eq(q.field("isActive"), true))
+                    .collect();
+            }
+
+            // Additional filtering in memory
+            if (args.grade) {
+                students = students.filter((s: any) => s.grade === args.grade);
+            }
+
+            if (args.carNumber !== undefined) {
+                students = students.filter((s: any) => s.carNumber === args.carNumber);
+            }
+
+            if (args.hasCarAssigned !== undefined) {
+                students = students.filter((s: any) =>
+                    args.hasCarAssigned ? s.carNumber > 0 : s.carNumber === 0
+                );
+            }
+
+            if (args.search) {
+                const searchLower = args.search.toLowerCase();
+                students = students.filter((s: any) =>
+                    s.fullName.toLowerCase().includes(searchLower) ||
+                    s.firstName.toLowerCase().includes(searchLower) ||
+                    s.lastName.toLowerCase().includes(searchLower)
+                );
+            }
+
+            // Sort by full name for consistent ordering
+            students.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+
+            // Pagination
+            const offset = args.offset || 0;
+            const limit = args.limit || 50;
+            const paginatedStudents = students.slice(offset, offset + limit);
+
+            return {
+                students: paginatedStudents,
+                total: students.length,
+                hasMore: offset + limit < students.length,
+                authState: "authenticated"
+            };
+        } catch (error) {
+            console.error("Error fetching students:", error);
+            return {
+                students: [],
+                total: 0,
+                hasMore: false,
+                authState: "error"
+            };
         }
-
-        if (args.carNumber !== undefined) {
-            students = students.filter((s: any) => s.carNumber === args.carNumber);
-        }
-
-        if (args.hasCarAssigned !== undefined) {
-            students = students.filter((s: any) =>
-                args.hasCarAssigned ? s.carNumber > 0 : s.carNumber === 0
-            );
-        }
-
-        if (args.search) {
-            const searchLower = args.search.toLowerCase();
-            students = students.filter((s: any) =>
-                s.fullName.toLowerCase().includes(searchLower) ||
-                s.firstName.toLowerCase().includes(searchLower) ||
-                s.lastName.toLowerCase().includes(searchLower)
-            );
-        }
-
-        // Sort by full name for consistent ordering
-        students.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
-
-        // Pagination
-        const offset = args.offset || 0;
-        const limit = args.limit || 50;
-        const paginatedStudents = students.slice(offset, offset + limit);
-
-        return {
-            students: paginatedStudents,
-            total: students.length,
-            hasMore: offset + limit < students.length
-        };
     }
 });
 

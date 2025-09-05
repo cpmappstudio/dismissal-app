@@ -91,30 +91,55 @@ export const getCurrentQueue = query({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        if (!identity) {
+            // Return empty state instead of throwing error
+            // This allows the UI to handle auth transitions gracefully
+            return {
+                campus: args.campus,
+                leftLane: [],
+                rightLane: [],
+                totalCars: 0,
+                lastUpdated: Date.now(),
+                authState: "unauthenticated"
+            };
+        }
 
-        const entries = await ctx.db
-            .query("dismissalQueue")
-            .withIndex("by_campus_status", q =>
-                q.eq("campusLocation", args.campus).eq("status", "waiting")
-            )
-            .collect();
+        try {
+            const entries = await ctx.db
+                .query("dismissalQueue")
+                .withIndex("by_campus_status", q =>
+                    q.eq("campusLocation", args.campus).eq("status", "waiting")
+                )
+                .collect();
 
-        const leftLane = entries
-            .filter(e => e.lane === "left")
-            .sort((a, b) => a.position - b.position);
+            const leftLane = entries
+                .filter(e => e.lane === "left")
+                .sort((a, b) => a.position - b.position);
 
-        const rightLane = entries
-            .filter(e => e.lane === "right")
-            .sort((a, b) => a.position - b.position);
+            const rightLane = entries
+                .filter(e => e.lane === "right")
+                .sort((a, b) => a.position - b.position);
 
-        return {
-            campus: args.campus,
-            leftLane,
-            rightLane,
-            totalCars: entries.length,
-            lastUpdated: Date.now()
-        };
+            return {
+                campus: args.campus,
+                leftLane,
+                rightLane,
+                totalCars: entries.length,
+                lastUpdated: Date.now(),
+                authState: "authenticated"
+            };
+        } catch (error) {
+            console.error("Error fetching queue data:", error);
+            // Return empty state on database errors too
+            return {
+                campus: args.campus,
+                leftLane: [],
+                rightLane: [],
+                totalCars: 0,
+                lastUpdated: Date.now(),
+                authState: "error"
+            };
+        }
     }
 });
 
@@ -299,32 +324,41 @@ export const checkCarInQueue = query({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const inQueue = await isCarInQueue(ctx.db, args.carNumber, args.campus);
-
-        if (inQueue) {
-            const entry = await ctx.db
-                .query("dismissalQueue")
-                .withIndex("by_car_campus", q =>
-                    q.eq("carNumber", args.carNumber).eq("campusLocation", args.campus)
-                )
-                .filter(q => q.eq(q.field("status"), "waiting"))
-                .first();
-
-            return {
-                inQueue: true,
-                entry: entry ? {
-                    id: entry._id,
-                    lane: entry.lane,
-                    position: entry.position,
-                    assignedTime: entry.assignedTime,
-                    students: entry.students
-                } : null
-            };
+        if (!identity) {
+            // Return default state when not authenticated
+            return { inQueue: false, entry: null, authState: "unauthenticated" };
         }
 
-        return { inQueue: false, entry: null };
+        try {
+            const inQueue = await isCarInQueue(ctx.db, args.carNumber, args.campus);
+
+            if (inQueue) {
+                const entry = await ctx.db
+                    .query("dismissalQueue")
+                    .withIndex("by_car_campus", q =>
+                        q.eq("carNumber", args.carNumber).eq("campusLocation", args.campus)
+                    )
+                    .filter(q => q.eq(q.field("status"), "waiting"))
+                    .first();
+
+                return {
+                    inQueue: true,
+                    entry: entry ? {
+                        id: entry._id,
+                        lane: entry.lane,
+                        position: entry.position,
+                        assignedTime: entry.assignedTime,
+                        students: entry.students
+                    } : null,
+                    authState: "authenticated"
+                };
+            }
+
+            return { inQueue: false, entry: null, authState: "authenticated" };
+        } catch (error) {
+            console.error("Error checking car in queue:", error);
+            return { inQueue: false, entry: null, authState: "error" };
+        }
     }
 });
 
@@ -384,41 +418,68 @@ export const getQueueMetrics = query({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        if (!identity) {
+            // Return empty metrics when not authenticated
+            return {
+                campus: args.campus,
+                currentCars: 0,
+                leftLaneCars: 0,
+                rightLaneCars: 0,
+                averageWaitTime: 0,
+                todayTotal: 0,
+                todayStudents: 0,
+                authState: "unauthenticated"
+            };
+        }
 
-        // Current queue
-        const currentQueue = await ctx.db
-            .query("dismissalQueue")
-            .withIndex("by_campus_status", q =>
-                q.eq("campusLocation", args.campus).eq("status", "waiting")
-            )
-            .collect();
+        try {
+            // Current queue
+            const currentQueue = await ctx.db
+                .query("dismissalQueue")
+                .withIndex("by_campus_status", q =>
+                    q.eq("campusLocation", args.campus).eq("status", "waiting")
+                )
+                .collect();
 
-        const leftLaneCars = currentQueue.filter(e => e.lane === "left").length;
-        const rightLaneCars = currentQueue.filter(e => e.lane === "right").length;
+            const leftLaneCars = currentQueue.filter(e => e.lane === "left").length;
+            const rightLaneCars = currentQueue.filter(e => e.lane === "right").length;
 
-        // Today's completed pickups
-        const today = new Date().toISOString().split('T')[0];
-        const todayHistory = await ctx.db
-            .query("dismissalHistory")
-            .withIndex("by_campus_date", q =>
-                q.eq("campusLocation", args.campus).eq("date", today)
-            )
-            .collect();
+            // Today's completed pickups
+            const today = new Date().toISOString().split('T')[0];
+            const todayHistory = await ctx.db
+                .query("dismissalHistory")
+                .withIndex("by_campus_date", q =>
+                    q.eq("campusLocation", args.campus).eq("date", today)
+                )
+                .collect();
 
-        const averageWaitTime = todayHistory.length > 0
-            ? todayHistory.reduce((sum, h) => sum + h.waitTimeSeconds, 0) / todayHistory.length
-            : 0;
+            const averageWaitTime = todayHistory.length > 0
+                ? todayHistory.reduce((sum, h) => sum + h.waitTimeSeconds, 0) / todayHistory.length
+                : 0;
 
-        return {
-            campus: args.campus,
-            currentCars: currentQueue.length,
-            leftLaneCars,
-            rightLaneCars,
-            averageWaitTime: Math.round(averageWaitTime),
-            todayTotal: todayHistory.length,
-            todayStudents: todayHistory.reduce((sum, h) => sum + h.studentIds.length, 0)
-        };
+            return {
+                campus: args.campus,
+                currentCars: currentQueue.length,
+                leftLaneCars,
+                rightLaneCars,
+                averageWaitTime: Math.round(averageWaitTime),
+                todayTotal: todayHistory.length,
+                todayStudents: todayHistory.reduce((sum, h) => sum + h.studentIds.length, 0),
+                authState: "authenticated"
+            };
+        } catch (error) {
+            console.error("Error fetching queue metrics:", error);
+            return {
+                campus: args.campus,
+                currentCars: 0,
+                leftLaneCars: 0,
+                rightLaneCars: 0,
+                averageWaitTime: 0,
+                todayTotal: 0,
+                todayStudents: 0,
+                authState: "error"
+            };
+        }
     }
 });
 
@@ -432,24 +493,32 @@ export const getRecentActivity = query({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        if (!identity) {
+            // Return empty array when not authenticated
+            return [];
+        }
 
-        const limit = args.limit || 10;
+        try {
+            const limit = args.limit || 10;
 
-        // Get recent completed pickups
-        const recentHistory = await ctx.db
-            .query("dismissalHistory")
-            .withIndex("by_campus_completed", q => q.eq("campusLocation", args.campus))
-            .order("desc")
-            .take(limit);
+            // Get recent completed pickups
+            const recentHistory = await ctx.db
+                .query("dismissalHistory")
+                .withIndex("by_campus_completed", q => q.eq("campusLocation", args.campus))
+                .order("desc")
+                .take(limit);
 
-        return recentHistory.map(h => ({
-            id: h._id,
-            carNumber: h.carNumber,
-            studentNames: h.studentNames,
-            completedAt: h.completedAt,
-            waitTimeSeconds: h.waitTimeSeconds,
-            lane: h.lane
-        }));
+            return recentHistory.map(h => ({
+                id: h._id,
+                carNumber: h.carNumber,
+                studentNames: h.studentNames,
+                completedAt: h.completedAt,
+                waitTimeSeconds: h.waitTimeSeconds,
+                lane: h.lane
+            }));
+        } catch (error) {
+            console.error("Error fetching recent activity:", error);
+            return [];
+        }
     }
 });

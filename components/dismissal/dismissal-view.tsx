@@ -75,9 +75,22 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     }, [])
 
     // Transform Convex queue data to CarData format
-    const { leftLaneCars, rightLaneCars, totalCars } = React.useMemo(() => {
-        if (!queueData || !queueData.leftLane || !queueData.rightLane) {
-            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0 }
+    const { leftLaneCars, rightLaneCars, totalCars, isLoading, authError } = React.useMemo(() => {
+        if (!queueData) {
+            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: true, authError: false }
+        }
+
+        // Handle authentication states
+        if (queueData.authState === "unauthenticated") {
+            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: true, authError: false }
+        }
+
+        if (queueData.authState === "error") {
+            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: false, authError: true }
+        }
+
+        if (!queueData.leftLane || !queueData.rightLane) {
+            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: false, authError: false }
         }
 
         const transformQueueEntry = (entry: any): CarData => ({
@@ -102,7 +115,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         return {
             leftLaneCars: leftCars,
             rightLaneCars: rightCars,
-            totalCars: leftCars.length + rightCars.length
+            totalCars: leftCars.length + rightCars.length,
+            isLoading: false,
+            authError: false
         }
     }, [queueData])
 
@@ -195,7 +210,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         <div className={cn("w-full h-full flex flex-col", className)}>
             {/* Campus Selection and Lane Balance */}
             <div className="flex flex-col gap-4  md:flex-row md:items-center md:gap-6 flex-shrink-0">
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 relative">
                     <FilterDropdown<CampusLocation>
                         value={selectedCampus as CampusLocation}
                         onChange={(value) => setSelectedCampus(value)}
@@ -206,6 +221,15 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         className="w-full md:w-64"
                         showAllOption={false}
                     />
+                    {/* Auth State Indicator */}
+                    {isLoading && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"
+                            title="Loading authentication..." />
+                    )}
+                    {authError && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full"
+                            title="Authentication error" />
+                    )}
                 </div>
 
                 {/* Lane Balance Bar */}
