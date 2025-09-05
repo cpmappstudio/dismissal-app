@@ -1,388 +1,405 @@
-// ################################################################################
-// # File: students.ts                                                           # 
-// # Authors: Juan Camilo Narváez Tascón (github.com/ulvenforst)                  #
-// # Creation date: 08/23/2025                                                    #
-// # License: Apache License 2.0                                                  #
-// ################################################################################
+// convex/students.ts
 
-/**
- * Student-specific queries and mutations
- * Handles student academic data, progress tracking, and personal information
- */
-
-import { query, mutation } from "./_generated/server";
-import { v, ConvexError } from "convex/values";
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 import {
-    getUserByClerkId,
-    getCurrentPeriod,
-    calculateAcademicProgress,
-    getAcademicHistory,
-    getProgramCourses,
-    calculateGPA
+    validateUserAccess,
+    getStudentsByCarNumber,
+    createAuditLogFromContext
 } from "./helpers";
+import { gradeValidator } from "./types";
 
 /**
- * Get student's current enrollments for the active period
+ * List students with filtering options
+ * Only admin/superadmin can access
  */
-export const getMyEnrollments = query({
+export const list = query({
     args: {
-        periodId: v.optional(v.id("periods")),
+        campus: v.optional(v.string()),
+        grade: v.optional(v.string()),
+        search: v.optional(v.string()),
+        carNumber: v.optional(v.number()),
+        hasCarAssigned: v.optional(v.boolean()),
+        limit: v.optional(v.number()),
+        offset: v.optional(v.number())
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
-        }
-
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student") {
-            throw new ConvexError("Student access required");
-        }
-
-        // Get target period (current or specified)
-        const targetPeriod = args.periodId
-            ? await ctx.db.get(args.periodId)
-            : await getCurrentPeriod(ctx.db);
-
-        if (!targetPeriod) {
-            throw new ConvexError("Period not found");
-        }
-
-        // Get enrollments for the period
-        const enrollments = await ctx.db
-            .query("enrollments")
-            .withIndex("by_student_period", q =>
-                q.eq("studentId", user._id).eq("periodId", targetPeriod._id))
-            .collect();
-
-        // Get detailed information for each enrollment
-        const enrollmentDetails = await Promise.all(
-            enrollments.map(async (enrollment) => {
-                const [section, course, professor] = await Promise.all([
-                    ctx.db.get(enrollment.sectionId),
-                    ctx.db.get(enrollment.courseId),
-                    ctx.db.get(enrollment.professorId),
-                ]);
-
-                return {
-                    enrollment,
-                    section,
-                    course,
-                    professor,
-                };
-            })
+        // Use validateUserAccess helper for consistency
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
         );
 
+        let students: any[];
+
+        // Optimize query - use indexes when possible
+        if (args.campus) {
+            students = await ctx.db
+                .query("students")
+                .withIndex("by_campus_active", q =>
+                    q.eq("campusLocation", args.campus!).eq("isActive", true)
+                )
+                .collect();
+        } else {
+            students = await ctx.db
+                .query("students")
+                .filter(q => q.eq(q.field("isActive"), true))
+                .collect();
+        }
+
+        // Additional filtering in memory (can't be optimized with current indexes)
+        if (args.grade) {
+            students = students.filter(s => s.grade === args.grade);
+        }
+
+        if (args.carNumber !== undefined) {
+            students = students.filter(s => s.carNumber === args.carNumber);
+        }
+
+        if (args.hasCarAssigned !== undefined) {
+            students = students.filter(s =>
+                args.hasCarAssigned ? s.carNumber > 0 : s.carNumber === 0
+            );
+        }
+
+        if (args.search) {
+            const searchLower = args.search.toLowerCase();
+            students = students.filter(s =>
+                s.fullName.toLowerCase().includes(searchLower) ||
+                s.firstName.toLowerCase().includes(searchLower) ||
+                s.lastName.toLowerCase().includes(searchLower)
+            );
+        }
+
+        // Sort by full name for consistent ordering
+        students.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+        // Pagination
+        const offset = args.offset || 0;
+        const limit = args.limit || 50;
+        const paginatedStudents = students.slice(offset, offset + limit);
+
         return {
-            period: targetPeriod,
-            enrollments: enrollmentDetails,
+            students: paginatedStudents,
+            total: students.length,
+            hasMore: offset + limit < students.length
         };
-    },
+    }
 });
 
 /**
- * Get student's academic progress
+ * Get a single student by ID
  */
-export const getMyProgress = query({
-    args: {},
-    handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
-        }
-
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student" || !user.studentProfile) {
-            throw new ConvexError("Student access required");
-        }
-
-        // Calculate academic progress
-        const progress = await calculateAcademicProgress(ctx.db, user._id);
-        if (!progress) {
-            throw new ConvexError("Unable to calculate academic progress");
-        }
-
-        // Get program courses for curriculum visualization
-        const programCourses = await getProgramCourses(ctx.db, user.studentProfile.programId);
-
-        // Get completed courses
-        const completedEnrollments = await ctx.db
-            .query("enrollments")
-            .withIndex("by_student_period", q => q.eq("studentId", user._id))
-            .filter(q => q.eq(q.field("status"), "completed"))
-            .collect();
-
-        const completedCourseIds = completedEnrollments.map(e => e.courseId);
-
-        // Organize courses by category with completion status
-        const coursesByCategory = {
-            humanities: [] as any[],
-            core: [] as any[],
-            elective: [] as any[],
-            general: [] as any[],
-        };
-
-        for (const { course, isRequired, category } of programCourses) {
-            const isCompleted = completedCourseIds.includes(course._id);
-            const enrollment = completedEnrollments.find(e => e.courseId === course._id);
-
-            coursesByCategory[category].push({
-                course,
-                isRequired,
-                isCompleted,
-                grade: enrollment ? {
-                    percentageGrade: enrollment.percentageGrade,
-                    letterGrade: enrollment.letterGrade,
-                    gradePoints: enrollment.gradePoints,
-                } : null,
-            });
-        }
-
-        return {
-            progress,
-            curriculum: coursesByCategory,
-            summary: {
-                totalCreditsRequired: progress.totalCreditsRequired,
-                totalCreditsEarned: progress.creditsCompleted,
-                progressPercentage: progress.completionPercentage,
-                gpa: progress.gpa,
-            },
-        };
-    },
-});
-
-/**
- * Get student's class schedule
- */
-export const getMySchedule = query({
-    args: {
-        periodId: v.optional(v.id("periods")),
-    },
+export const get = query({
+    args: { id: v.id("students") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
-        }
-
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student") {
-            throw new ConvexError("Student access required");
-        }
-
-        // Get target period
-        const targetPeriod = args.periodId
-            ? await ctx.db.get(args.periodId)
-            : await getCurrentPeriod(ctx.db);
-
-        if (!targetPeriod) {
-            throw new ConvexError("Period not found");
-        }
-
-        // Get current enrollments
-        const enrollments = await ctx.db
-            .query("enrollments")
-            .withIndex("by_student_period", q =>
-                q.eq("studentId", user._id).eq("periodId", targetPeriod._id))
-            .filter(q => q.eq(q.field("status"), "enrolled"))
-            .collect();
-
-        // Get schedule details
-        const scheduleItems = await Promise.all(
-            enrollments.map(async (enrollment) => {
-                const [section, course, professor] = await Promise.all([
-                    ctx.db.get(enrollment.sectionId),
-                    ctx.db.get(enrollment.courseId),
-                    ctx.db.get(enrollment.professorId),
-                ]);
-
-                return {
-                    enrollment,
-                    section,
-                    course,
-                    professor,
-                    schedule: section?.schedule,
-                };
-            })
+        // Use validateUserAccess helper for consistency
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
         );
 
+        const student = await ctx.db.get(args.id);
+        if (!student || !student.isActive) {
+            return null;
+        }
+
+        // Get siblings (other students with same car number)
+        const siblings = student.carNumber > 0 ?
+            await getStudentsByCarNumber(ctx.db, student.carNumber, student.campusLocation)
+                .then(students => students.filter(s => s._id !== student._id)) :
+            [];
+
         return {
-            period: targetPeriod,
-            schedule: scheduleItems,
+            student,
+            siblings
         };
-    },
+    }
 });
 
 /**
- * Get student's complete academic history
+ * Create a new student
  */
-export const getMyAcademicHistory = query({
-    args: {},
-    handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
-        }
-
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student") {
-            throw new ConvexError("Student access required");
-        }
-
-        // Get complete academic history
-        const history = await getAcademicHistory(ctx.db, user._id);
-
-        // Calculate overall GPA
-        const allEnrollments = await ctx.db
-            .query("enrollments")
-            .withIndex("by_student_period", q => q.eq("studentId", user._id))
-            .filter(q => q.eq(q.field("countsForGPA"), true))
-            .collect();
-
-        const overallGPA = await calculateGPA(ctx.db, allEnrollments);
-
-        return {
-            history,
-            overallGPA,
-            summary: {
-                totalPeriodsCompleted: history.length,
-                totalCreditsAttempted: allEnrollments.reduce((sum, e) => {
-                    // Get course credits (we'll need to fetch the course)
-                    return sum; // Simplified for now
-                }, 0),
-                totalCreditsEarned: allEnrollments
-                    .filter(e => e.status === "completed")
-                    .reduce((sum, e) => {
-                        return sum; // Simplified for now
-                    }, 0),
-            },
-        };
-    },
-});
-
-/**
- * Get grades for a specific period
- */
-export const getMyGrades = query({
+export const create = mutation({
     args: {
-        periodId: v.id("periods"),
+        firstName: v.string(),
+        lastName: v.string(),
+        birthday: v.string(),
+        grade: v.string(), // Could use gradeValidator for stricter validation
+        campusLocation: v.string(),
+        carNumber: v.optional(v.number()),
+        avatarUrl: v.optional(v.string())
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
-        }
-
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student") {
-            throw new ConvexError("Student access required");
-        }
-
-        const period = await ctx.db.get(args.periodId);
-        if (!period) {
-            throw new ConvexError("Period not found");
-        }
-
-        // Get enrollments with grades
-        const enrollments = await ctx.db
-            .query("enrollments")
-            .withIndex("by_student_period", q =>
-                q.eq("studentId", user._id).eq("periodId", args.periodId))
-            .collect();
-
-        // Get grade details
-        const gradeDetails = await Promise.all(
-            enrollments.map(async (enrollment) => {
-                const [course, section, professor] = await Promise.all([
-                    ctx.db.get(enrollment.courseId),
-                    ctx.db.get(enrollment.sectionId),
-                    ctx.db.get(enrollment.professorId),
-                ]);
-
-                return {
-                    enrollment,
-                    course,
-                    section,
-                    professor,
-                    grade: {
-                        percentageGrade: enrollment.percentageGrade,
-                        letterGrade: enrollment.letterGrade,
-                        gradePoints: enrollment.gradePoints,
-                        qualityPoints: enrollment.qualityPoints,
-                        isRetake: enrollment.isRetake,
-                        countsForGPA: enrollment.countsForGPA,
-                        gradedAt: enrollment.gradedAt,
-                    },
-                };
-            })
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
         );
 
-        // Calculate period GPA
-        const periodGPA = await calculateGPA(ctx.db, enrollments);
-
-        return {
-            period,
-            grades: gradeDetails,
-            periodGPA,
-            statistics: {
-                totalCourses: enrollments.length,
-                gradedCourses: enrollments.filter(e => e.percentageGrade !== undefined).length,
-                passedCourses: enrollments.filter(e => e.status === "completed").length,
-                totalCredits: gradeDetails.reduce((sum, g) => sum + (g.course?.credits || 0), 0),
-            },
-        };
-    },
-});
-
-/**
- * Request academic document (transcript, certificate, etc.)
- */
-export const requestDocument = mutation({
-    args: {
-        documentType: v.union(
-            v.literal("transcript"),
-            v.literal("enrollment_certificate"),
-            v.literal("grade_report"),
-            v.literal("completion_certificate"),
-            v.literal("degree"),
-            v.literal("schedule")
-        ),
-        scope: v.optional(v.object({
-            periodId: v.optional(v.id("periods")),
-            fromDate: v.optional(v.number()),
-            toDate: v.optional(v.number()),
-            includeInProgress: v.optional(v.boolean()),
-        })),
-        language: v.union(v.literal("es"), v.literal("en")),
-        format: v.union(v.literal("pdf"), v.literal("html")),
-    },
-    handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Not authenticated");
+        // Validate required fields are not empty
+        if (!args.firstName.trim()) {
+            throw new Error("First name is required");
+        }
+        if (!args.lastName.trim()) {
+            throw new Error("Last name is required");
+        }
+        if (!args.campusLocation.trim()) {
+            throw new Error("Campus location is required");
         }
 
-        const user = await getUserByClerkId(ctx.db, identity.subject);
-        if (!user || user.role !== "student") {
-            throw new ConvexError("Student access required");
+        // Validate campus access
+        if (role !== 'superadmin' && !user.assignedCampuses.includes(args.campusLocation)) {
+            throw new Error(`No access to campus: ${args.campusLocation}`);
         }
 
-        // Create document request log
-        const documentLogId = await ctx.db.insert("document_logs", {
-            requestedBy: user._id,
-            requestedFor: user._id,
-            documentType: args.documentType,
-            scope: args.scope,
-            format: args.format,
-            language: args.language,
-            status: "pending",
-            generatedAt: Date.now(),
-            // IP and user agent would be added from the action layer
+        // Validate car number
+        const carNumber = args.carNumber || 0;
+        if (carNumber < 0) {
+            throw new Error("Car number cannot be negative");
+        }
+
+        // Create full name
+        const fullName = `${args.firstName.trim()} ${args.lastName.trim()}`;
+
+        // Insert student
+        const studentId = await ctx.db.insert("students", {
+            firstName: args.firstName.trim(),
+            lastName: args.lastName.trim(),
+            fullName,
+            birthday: args.birthday,
+            grade: args.grade,
+            campusLocation: args.campusLocation,
+            carNumber,
+            avatarUrl: args.avatarUrl,
+            isActive: true,
+            createdBy: user._id,
+            createdAt: Date.now()
         });
 
-        return {
-            documentLogId,
-            status: "Document request submitted successfully",
-            estimatedTime: "5-10 minutes",
-        };
+        // Create audit log
+        await createAuditLogFromContext(ctx, "student_created", {
+            targetType: "student",
+            targetId: studentId,
+            campus: args.campusLocation,
+            metadata: { fullName, carNumber }
+        });
+
+        return studentId;
+    }
+});
+
+/**
+ * Update an existing student
+ */
+export const update = mutation({
+    args: {
+        id: v.id("students"),
+        firstName: v.optional(v.string()),
+        lastName: v.optional(v.string()),
+        birthday: v.optional(v.string()),
+        grade: v.optional(v.string()),
+        campusLocation: v.optional(v.string()),
+        carNumber: v.optional(v.number()),
+        avatarUrl: v.optional(v.string())
     },
+    handler: async (ctx, args) => {
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
+        );
+
+        const student = await ctx.db.get(args.id);
+        if (!student || !student.isActive) {
+            throw new Error("Student not found");
+        }
+
+        // Validate campus access
+        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
+            throw new Error(`No access to student's campus`);
+        }
+
+        // Build update object - remove updatedAt as it doesn't exist in schema
+        const updates: any = {};
+
+        // Update individual fields
+        if (args.firstName !== undefined) updates.firstName = args.firstName.trim();
+        if (args.lastName !== undefined) updates.lastName = args.lastName.trim();
+        if (args.birthday !== undefined) updates.birthday = args.birthday;
+        if (args.grade !== undefined) updates.grade = args.grade;
+        if (args.campusLocation !== undefined) updates.campusLocation = args.campusLocation;
+        if (args.carNumber !== undefined) {
+            if (args.carNumber < 0) throw new Error("Car number cannot be negative");
+            updates.carNumber = args.carNumber;
+        }
+        if (args.avatarUrl !== undefined) updates.avatarUrl = args.avatarUrl;
+
+        // Update full name if first or last name changed
+        if (args.firstName !== undefined || args.lastName !== undefined) {
+            const firstName = args.firstName || student.firstName;
+            const lastName = args.lastName || student.lastName;
+            updates.fullName = `${firstName.trim()} ${lastName.trim()}`;
+        }
+
+        // Apply updates
+        await ctx.db.patch(args.id, updates);
+
+        // Create audit log
+        await createAuditLogFromContext(ctx, "student_updated", {
+            targetType: "student",
+            targetId: args.id,
+            campus: student.campusLocation,
+            before: student,
+            after: updates
+        });
+
+        return args.id;
+    }
+});
+
+/**
+ * Soft delete a student
+ */
+export const deleteStudent = mutation({
+    args: { id: v.id("students") },
+    handler: async (ctx, args) => {
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
+        );
+
+        const student = await ctx.db.get(args.id);
+        if (!student) {
+            throw new Error("Student not found");
+        }
+
+        // Validate campus access
+        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
+            throw new Error(`No access to student's campus`);
+        }
+
+        // Soft delete - remove updatedAt as it doesn't exist in schema
+        await ctx.db.patch(args.id, {
+            isActive: false
+        });
+
+        // Create audit log
+        await createAuditLogFromContext(ctx, "student_deleted", {
+            targetType: "student",
+            targetId: args.id,
+            campus: student.campusLocation,
+            metadata: { fullName: student.fullName }
+        });
+
+        return args.id;
+    }
+});
+
+/**
+ * Assign car number to a student
+ */
+export const assignCarNumber = mutation({
+    args: {
+        studentId: v.id("students"),
+        carNumber: v.number()
+    },
+    handler: async (ctx, args) => {
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
+        );
+
+        const student = await ctx.db.get(args.studentId);
+        if (!student || !student.isActive) {
+            throw new Error("Student not found");
+        }
+
+        // Validate campus access
+        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
+            throw new Error(`No access to student's campus`);
+        }
+
+        if (args.carNumber < 0) {
+            throw new Error("Car number cannot be negative");
+        }
+
+        const oldCarNumber = student.carNumber;
+
+        // Update car number - remove updatedAt as it doesn't exist in schema
+        await ctx.db.patch(args.studentId, {
+            carNumber: args.carNumber
+        });
+
+        // Create audit log
+        await createAuditLogFromContext(ctx, "car_assigned", {
+            targetType: "student",
+            targetId: args.studentId,
+            campus: student.campusLocation,
+            metadata: {
+                studentName: student.fullName,
+                oldCarNumber,
+                newCarNumber: args.carNumber
+            }
+        });
+
+        return args.studentId;
+    }
+});
+
+/**
+ * Remove car assignment from a student
+ */
+export const removeCarNumber = mutation({
+    args: { studentId: v.id("students") },
+    handler: async (ctx, args) => {
+        const { user, role } = await validateUserAccess(
+            ctx,
+            ['admin', 'superadmin']
+        );
+
+        const student = await ctx.db.get(args.studentId);
+        if (!student || !student.isActive) {
+            throw new Error("Student not found");
+        }
+
+        // Validate campus access
+        if (role !== 'superadmin' && !user.assignedCampuses.includes(student.campusLocation)) {
+            throw new Error(`No access to student's campus`);
+        }
+
+        const oldCarNumber = student.carNumber;
+
+        // Remove car assignment - remove updatedAt as it doesn't exist in schema
+        await ctx.db.patch(args.studentId, {
+            carNumber: 0
+        });
+
+        // Create audit log
+        await createAuditLogFromContext(ctx, "car_removed", {
+            targetType: "student",
+            targetId: args.studentId,
+            campus: student.campusLocation,
+            metadata: {
+                studentName: student.fullName,
+                removedCarNumber: oldCarNumber
+            }
+        });
+
+        return args.studentId;
+    }
+});
+
+/**
+ * Get students by car number for a specific campus
+ */
+export const getByCarNumber = query({
+    args: {
+        carNumber: v.number(),
+        campus: v.string()
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
+    }
 });

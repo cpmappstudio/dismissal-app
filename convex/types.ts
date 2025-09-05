@@ -1,26 +1,4 @@
-// ################################################################################
-// # File: types.ts                                                              # 
-// # Authors: Juan Camilo Narváez Tascón (github.com/ulvenforst)                  #
-// # Creation date: 08/17/2025                                                    #
-// # License: Apache License 2.0                                                  #
-// ################################################################################
-
-/**
- * ALEF UNIVERSITY: Shared Types and Validators
- * 
- * This file contains:
- * 1. Reusable validators for common patterns
- * 2. Type utilities for frontend and backend
- * 3. View-specific types for different user roles
- * 4. Form types for data input
- * 5. Response types for API calls
- * 
- * Following Convex best practices:
- * - Use Infer<> to derive types from validators
- * - Export types for frontend consumption
- * - Leverage Doc<> and Id<> from generated types
- * - Use WithoutSystemFields<> for creation types
- */
+// convex/types.ts
 
 import { v, Infer } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -31,383 +9,370 @@ import type { WithoutSystemFields } from "convex/server";
 // ============================================================================
 
 /**
- * User role validator
+ * User role validator - estos roles vienen de Clerk, no de Convex
+ * Solo los usamos para tipos, no están en la DB
  */
 export const roleValidator = v.union(
-    v.literal("student"),
-    v.literal("professor"),
+    v.literal("superadmin"),
     v.literal("admin"),
-    v.literal("superadmin")
+    v.literal("allocator"),
+    v.literal("dispatcher"),
+    v.literal("viewer"),
+    v.literal("operator")
 );
 export type UserRole = Infer<typeof roleValidator>;
+export type DismissalRole = UserRole; // Alias para compatibilidad
 
 /**
- * Academic program type validator
+ * Lane validator
  */
-export const programTypeValidator = v.union(
-    v.literal("diploma"),
-    v.literal("bachelor"),
-    v.literal("master"),
-    v.literal("doctorate")
+export const laneValidator = v.union(
+    v.literal("left"),
+    v.literal("right")
 );
-export type ProgramType = Infer<typeof programTypeValidator>;
+export type Lane = Infer<typeof laneValidator>;
 
 /**
- * Language validator
+ * Queue status validator
  */
-export const languageValidator = v.union(
-    v.literal("es"),
-    v.literal("en"),
-    v.literal("both")
-);
-export type Language = Infer<typeof languageValidator>;
-
-/**
- * Course category validator
- */
-export const courseCategoryValidator = v.union(
-    v.literal("humanities"),
-    v.literal("core"),
-    v.literal("elective"),
-    v.literal("general")
-);
-export type CourseCategory = Infer<typeof courseCategoryValidator>;
-
-/**
- * Enrollment status validator
- */
-export const enrollmentStatusValidator = v.union(
-    v.literal("enrolled"),
-    v.literal("withdrawn"),
-    v.literal("dropped"),
-    v.literal("completed"),
-    v.literal("failed"),
-    v.literal("incomplete"),
-    v.literal("in_progress")
-);
-export type EnrollmentStatus = Infer<typeof enrollmentStatusValidator>;
-
-/**
- * Period status validator
- */
-export const periodStatusValidator = v.union(
-    v.literal("planning"),
-    v.literal("enrollment"),
-    v.literal("active"),
-    v.literal("grading"),
-    v.literal("closed")
-);
-export type PeriodStatus = Infer<typeof periodStatusValidator>;
-
-/**
- * Section status validator
- */
-export const sectionStatusValidator = v.union(
-    v.literal("draft"),
-    v.literal("open"),
-    v.literal("closed"),
-    v.literal("active"),
-    v.literal("grading"),
+export const queueStatusValidator = v.union(
+    v.literal("waiting"),
     v.literal("completed")
 );
-export type SectionStatus = Infer<typeof sectionStatusValidator>;
+export type QueueStatus = Infer<typeof queueStatusValidator>;
 
 /**
- * Student academic standing validator
+ * Audit action validator
  */
-export const academicStandingValidator = v.union(
-    v.literal("good_standing"),
-    v.literal("probation"),
-    v.literal("suspension")
+export const auditActionValidator = v.union(
+    v.literal("student_created"),
+    v.literal("student_updated"),
+    v.literal("student_deleted"),
+    v.literal("car_assigned"),
+    v.literal("car_removed"),
+    v.literal("car_added_to_queue"),
+    v.literal("car_removed_from_queue"),
+    v.literal("car_moved_lane"),
+    v.literal("user_campus_updated"),
+    v.literal("user_permissions_updated"),
+    v.literal("user_status_updated"),
+    v.literal("login"),
+    v.literal("logout")
 );
-export type AcademicStanding = Infer<typeof academicStandingValidator>;
+export type AuditAction = Infer<typeof auditActionValidator>;
 
 /**
- * Document type validator
+ * Grade validator - American K-12 system
  */
-export const documentTypeValidator = v.union(
-    v.literal("transcript"),
-    v.literal("enrollment_certificate"),
-    v.literal("grade_report"),
-    v.literal("completion_certificate"),
-    v.literal("degree"),
-    v.literal("schedule"),
-    v.literal("other")
+export const gradeValidator = v.union(
+    v.literal("PreK"),
+    v.literal("K"),
+    v.literal("1st"),
+    v.literal("2nd"),
+    v.literal("3rd"),
+    v.literal("4th"),
+    v.literal("5th"),
+    v.literal("6th"),
+    v.literal("7th"),
+    v.literal("8th"),
+    v.literal("9th"),
+    v.literal("10th"),
+    v.literal("11th"),
+    v.literal("12th")
 );
-export type DocumentType = Infer<typeof documentTypeValidator>;
+export type Grade = Infer<typeof gradeValidator>;
 
 /**
- * Delivery method validator
+ * Operator permissions validator
  */
-export const deliveryMethodValidator = v.union(
-    v.literal("online_sync"),
-    v.literal("online_async"),
-    v.literal("hybrid"),
-    v.literal("in_person")
-);
-export type DeliveryMethod = Infer<typeof deliveryMethodValidator>;
-
-/**
- * Address validator (for reuse in user profile)
- */
-export const addressValidator = v.object({
-    street: v.optional(v.string()),
-    city: v.optional(v.string()),
-    state: v.optional(v.string()),
-    zipCode: v.optional(v.string()),
-    country: v.optional(v.string()),
+export const operatorPermissionsValidator = v.object({
+    canAllocate: v.boolean(),
+    canDispatch: v.boolean(),
+    canView: v.boolean(),
 });
-export type Address = Infer<typeof addressValidator>;
-
-/**
- * Schedule session validator
- */
-export const scheduleSessionValidator = v.object({
-    day: v.union(
-        v.literal("monday"),
-        v.literal("tuesday"),
-        v.literal("wednesday"),
-        v.literal("thursday"),
-        v.literal("friday"),
-        v.literal("saturday"),
-        v.literal("sunday")
-    ),
-    startTime: v.string(),
-    endTime: v.string(),
-    roomUrl: v.optional(v.string()),
-});
-export type ScheduleSession = Infer<typeof scheduleSessionValidator>;
-
-// ============================================================================
-// GRADE TYPES AND INTERFACES
-// ============================================================================
-
-/**
- * Grade information with all calculated fields
- */
-export interface GradeInfo {
-    percentageGrade: number;
-    letterGrade: string;
-    gradePoints: number;
-    qualityPoints: number;
-    isPassing: boolean;
-}
-
-/**
- * Grade summary for a period or overall
- */
-export interface GradeSummary {
-    totalCredits: number;
-    attemptedCredits: number;
-    earnedCredits: number;
-    gradePoints: number;
-    gpa: number;
-    cgpa?: number; // Cumulative GPA
-}
-
-/**
- * Letter grade scale configuration
- */
-export const GRADE_SCALE = {
-    "A+": { min: 97, max: 100, points: 4.0 },
-    "A": { min: 93, max: 96.99, points: 4.0 },
-    "A-": { min: 90, max: 92.99, points: 3.7 },
-    "B+": { min: 87, max: 89.99, points: 3.3 },
-    "B": { min: 83, max: 86.99, points: 3.0 },
-    "B-": { min: 80, max: 82.99, points: 2.7 },
-    "C+": { min: 77, max: 79.99, points: 2.3 },
-    "C": { min: 73, max: 76.99, points: 2.0 },
-    "C-": { min: 70, max: 72.99, points: 1.7 },
-    "D+": { min: 67, max: 69.99, points: 1.3 },
-    "D": { min: 65, max: 66.99, points: 1.0 },
-    "F": { min: 0, max: 64.99, points: 0.0 },
-} as const;
-
-export type LetterGrade = keyof typeof GRADE_SCALE;
+export type OperatorPermissions = Infer<typeof operatorPermissionsValidator>;
 
 // ============================================================================
 // USER PROFILE TYPES
 // ============================================================================
 
 /**
- * Complete user profile with role-specific data
+ * User profile from database (sin rol)
  */
 export type UserProfile = Doc<"users">;
+
+/**
+ * User profile con rol desde Clerk
+ */
+export interface UserWithRole extends UserProfile {
+    role: UserRole;
+}
 
 /**
  * Public user information (safe to share)
  */
 export type PublicUserInfo = Pick<Doc<"users">,
-    "_id" | "firstName" | "lastName" | "email" | "role"
+    "_id" | "email" | "firstName" | "lastName" | "imageUrl"
 >;
 
 /**
- * Student-specific view with enrollment data
+ * User with campus access info and role
  */
-export interface StudentView {
+export interface UserWithAccess {
     user: UserProfile;
-    program: Doc<"programs">;
-    currentEnrollments: Array<EnrollmentWithDetails>;
-    academicProgress: AcademicProgress;
-    currentPeriod: Doc<"periods"> | null;
+    role: UserRole;
+    assignedCampuses: string[];
+    permissions: OperatorPermissions | null;
+}
+
+// ============================================================================
+// STUDENT TYPES
+// ============================================================================
+
+/**
+ * Student document type
+ */
+export type Student = Doc<"students">;
+
+/**
+ * Student with car assignment info
+ */
+export interface StudentWithCar {
+    student: Student;
+    carNumber: number;
+    hasCarAssigned: boolean;
+    siblings: Student[]; // Other students with same car number
 }
 
 /**
- * Professor-specific view with teaching data
+ * Student summary for queue display
  */
-export interface ProfessorView {
-    user: UserProfile;
-    currentSections: Array<SectionWithCourse>;
-    totalStudents: number;
-    gradingDeadlines: Array<{
-        section: Doc<"sections">;
-        deadline: number;
-    }>;
-    currentPeriod: Doc<"periods"> | null;
+export interface StudentSummary {
+    studentId: Id<"students">;
+    name: string;
+    grade: string;
+    avatarUrl?: string;
 }
+
+// ============================================================================
+// DISMISSAL QUEUE TYPES
+// ============================================================================
+
+/**
+ * Queue entry type
+ */
+export type QueueEntry = Doc<"dismissalQueue">;
+
+/**
+ * Car data for display (matches frontend CarData type)
+ */
+export interface CarData {
+    id: string;
+    carNumber: number;
+    lane: Lane;
+    position: number;
+    assignedTime: Date;
+    students: StudentData[];
+    campus: string;
+    imageColor: string;
+}
+
+/**
+ * Student data for car display
+ */
+export interface StudentData {
+    id: string;
+    name: string;
+    grade?: string;
+    imageUrl?: string;
+}
+
+/**
+ * Queue state for a campus
+ */
+export interface QueueState {
+    campus: string;
+    leftLane: QueueEntry[];
+    rightLane: QueueEntry[];
+    totalCars: number;
+    averageWaitTime?: number;
+}
+
+/**
+ * Queue metrics
+ */
+export interface QueueMetrics {
+    campus: string;
+    currentCars: number;
+    leftLaneCars: number;
+    rightLaneCars: number;
+    averageWaitTime: number;
+    todayTotal: number;
+}
+
+// ============================================================================
+// CAMPUS TYPES
+// ============================================================================
+
+/**
+ * Campus settings type
+ */
+export type CampusSettings = Doc<"campusSettings">;
+
+/**
+ * Campus with current state
+ */
+export interface CampusState {
+    settings: CampusSettings;
+    activeStudents: number;
+    currentQueue: QueueState;
+    availableGrades: string[];
+}
+
+/**
+ * Campus list item for dropdowns
+ */
+export interface CampusOption {
+    value: string;
+    label: string;
+    isActive: boolean;
+}
+
+// ============================================================================
+// HISTORY AND ANALYTICS TYPES
+// ============================================================================
+
+/**
+ * Dismissal history entry
+ */
+export type DismissalHistoryEntry = Doc<"dismissalHistory">;
+
+/**
+ * Daily dismissal summary
+ */
+export interface DailyDismissalSummary {
+    date: string;
+    campus: string;
+    totalCars: number;
+    totalStudents: number;
+    averageWaitTime: number;
+    peakHour: string;
+    laneDistribution: {
+        left: number;
+        right: number;
+    };
+}
+
+/**
+ * Car pickup history
+ */
+export interface CarPickupHistory {
+    carNumber: number;
+    pickupTimes: Array<{
+        date: string;
+        time: number;
+        students: string[];
+        waitTime: number;
+    }>;
+    averageWaitTime: number;
+    preferredLane?: Lane;
+}
+
+// ============================================================================
+// FORM INPUT TYPES
+// ============================================================================
+
+/**
+ * Student creation/update form
+ */
+export interface StudentFormData {
+    firstName: string;
+    lastName: string;
+    birthday: string;
+    grade: Grade | string; // Allow custom grades
+    campusLocation: string;
+    carNumber: number;
+    avatarUrl?: string;
+}
+
+/**
+ * User creation form (para sincronización con Clerk)
+ */
+export interface UserFormData {
+    clerkId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    imageUrl?: string;
+    assignedCampuses: string[];
+    operatorPermissions?: OperatorPermissions;
+}
+
+/**
+ * Campus creation form
+ */
+export interface CampusFormData {
+    campusName: string;
+    displayName: string;
+    timezone: string;
+    dismissalStartTime?: string;
+    dismissalEndTime?: string;
+    allowMultipleStudentsPerCar: boolean;
+    requireCarNumber: boolean;
+}
+
+/**
+ * Queue entry input
+ */
+export interface QueueEntryInput {
+    carNumber: number;
+    campus: string;
+    lane: Lane;
+}
+
+// ============================================================================
+// VIEW-SPECIFIC TYPES (for different user roles)
+// ============================================================================
 
 /**
  * Admin dashboard view
  */
 export interface AdminDashboard {
-    activeStudents: number;
-    activeProfessors: number;
-    activePrograms: number;
-    activeCourses: number;
-    currentPeriod: Doc<"periods"> | null;
-    upcomingDeadlines: Array<{
-        type: string;
-        description: string;
-        date: number;
-    }>;
-}
-
-// ============================================================================
-// ENROLLMENT AND SECTION TYPES
-// ============================================================================
-
-/**
- * Enrollment with full details for display
- */
-export interface EnrollmentWithDetails {
-    enrollment: Doc<"enrollments">;
-    section: Doc<"sections">;
-    course: Doc<"courses">;
-    professor: PublicUserInfo;
-    period: Doc<"periods">;
+    totalStudents: number;
+    totalCampuses: number;
+    activeUsers: number;
+    campusStates: CampusState[];
+    recentActivity: AuditLogEntry[];
 }
 
 /**
- * Section with course details
+ * Allocator view
  */
-export interface SectionWithCourse {
-    section: Doc<"sections">;
-    course: Doc<"courses">;
-    enrollmentCount: number;
-    availableSeats: number;
+export interface AllocatorView {
+    campus: string;
+    queueState: QueueState;
+    recentCars: number[]; // Recently added car numbers
+    availableStudents: StudentWithCar[]; // Students not in queue
 }
 
 /**
- * Section with full enrollment list (for professors)
+ * Dispatcher view
  */
-export interface SectionWithEnrollments {
-    section: Doc<"sections">;
-    course: Doc<"courses">;
-    enrollments: Array<{
-        enrollment: Doc<"enrollments">;
-        student: PublicUserInfo;
-    }>;
-}
-
-// ============================================================================
-// ACADEMIC PROGRESS TYPES
-// ============================================================================
-
-/**
- * Student's academic progress
- */
-export interface AcademicProgress {
-    programId: Id<"programs">;
-    totalCreditsRequired: number;
-    creditsCompleted: number;
-    creditsByCategory: {
-        humanities: { required: number; completed: number };
-        core: { required: number; completed: number };
-        elective: { required: number; completed: number };
-        general: { required: number; completed: number };
-    };
-    gpa: number;
-    cgpa: number;
-    academicStanding: AcademicStanding;
-    completionPercentage: number;
-    estimatedGraduationDate?: number;
+export interface DispatcherView {
+    campus: string;
+    queueState: QueueState;
+    nextCars: QueueEntry[]; // Next 5 cars to be picked up
+    recentlyCompleted: DismissalHistoryEntry[];
 }
 
 /**
- * Period academic summary (for transcripts)
+ * Viewer display
  */
-export interface PeriodSummary {
-    period: Doc<"periods">;
-    enrollments: Array<EnrollmentWithDetails>;
-    summary: GradeSummary;
-}
-
-// ============================================================================
-// FORM INPUT TYPES (for frontend forms)
-// ============================================================================
-
-/**
- * User creation form
- */
-export type UserCreateInput = WithoutSystemFields<Doc<"users">>;
-
-/**
- * User update form (partial update)
- */
-export type UserUpdateInput = Partial<Omit<UserCreateInput, "clerkId" | "email" | "role">>;
-
-/**
- * Section creation form
- */
-export interface SectionCreateInput {
-    courseId: Id<"courses">;
-    periodId: Id<"periods">;
-    groupNumber: string;
-    professorId: Id<"users">;
-    capacity: number;
-    deliveryMethod: DeliveryMethod;
-    schedule?: {
-        sessions: ScheduleSession[];
-        timezone: string;
-        notes?: string;
-    };
-}
-
-/**
- * Grade submission form (for professors)
- */
-export interface GradeSubmissionInput {
-    enrollmentId: Id<"enrollments">;
-    percentageGrade: number;
-    gradeNotes?: string;
-}
-
-/**
- * Bulk grade submission
- */
-export interface BulkGradeSubmission {
-    sectionId: Id<"sections">;
-    grades: GradeSubmissionInput[];
-}
-
-/**
- * Enrollment creation form
- */
-export interface EnrollmentCreateInput {
-    studentId: Id<"users">;
-    sectionId: Id<"sections">;
-    isRetake?: boolean;
-    isAuditing?: boolean;
+export interface ViewerDisplay {
+    campus: string;
+    leftLane: CarData[];
+    rightLane: CarData[];
+    isFullscreen: boolean;
 }
 
 // ============================================================================
@@ -415,139 +380,82 @@ export interface EnrollmentCreateInput {
 // ============================================================================
 
 /**
- * Course search filters
+ * Student search filters
  */
-export interface CourseSearchFilters {
-    programId?: Id<"programs">;
-    category?: CourseCategory;
-    language?: Language;
-    level?: string;
-    credits?: number;
+export interface StudentSearchFilters {
     searchTerm?: string;
-    includeInactive?: boolean;
-}
-
-/**
- * Section search filters
- */
-export interface SectionSearchFilters {
-    periodId?: Id<"periods">;
-    courseId?: Id<"courses">;
-    professorId?: Id<"users">;
-    status?: SectionStatus;
-    hasAvailableSeats?: boolean;
-    deliveryMethod?: DeliveryMethod;
-}
-
-/**
- * User search filters
- */
-export interface UserSearchFilters {
-    role?: UserRole;
+    campus?: string;
+    grade?: string;
+    carNumber?: number;
+    hasCarAssigned?: boolean;
     isActive?: boolean;
-    searchTerm?: string; // Searches name, email, code
-    programId?: Id<"programs">; // For students
 }
 
 /**
- * Enrollment search filters
+ * Queue search filters
  */
-export interface EnrollmentSearchFilters {
-    studentId?: Id<"users">;
-    periodId?: Id<"periods">;
-    courseId?: Id<"courses">;
-    sectionId?: Id<"sections">;
-    status?: EnrollmentStatus;
-    includeRetakes?: boolean;
-}
-
-// ============================================================================
-// REPORT AND ANALYTICS TYPES
-// ============================================================================
-
-/**
- * Grade distribution for analytics
- */
-export interface GradeDistribution {
-    letterGrade: LetterGrade;
-    count: number;
-    percentage: number;
+export interface QueueFilters {
+    campus: string;
+    lane?: Lane;
+    status?: QueueStatus;
+    carNumber?: number;
 }
 
 /**
- * Course statistics
+ * History search filters
  */
-export interface CourseStatistics {
-    courseId: Id<"courses">;
-    courseName: string;
-    totalEnrollments: number;
-    averageGrade: number;
-    passRate: number;
-    gradeDistribution: GradeDistribution[];
-    withdrawalRate: number;
-}
-
-/**
- * Program statistics
- */
-export interface ProgramStatistics {
-    programId: Id<"programs">;
-    programName: string;
-    activeStudents: number;
-    totalGraduates: number;
-    averageGPA: number;
-    averageTimeToGraduation: number; // In bimesters
-    retentionRate: number;
-}
-
-/**
- * Professor performance metrics
- */
-export interface ProfessorMetrics {
-    professorId: Id<"users">;
-    totalSections: number;
-    totalStudents: number;
-    averageClassSize: number;
-    averageGrade: number;
-    gradeSubmissionTimeliness: number; // Percentage on time
+export interface HistoryFilters {
+    campus?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    carNumber?: number;
+    minWaitTime?: number;
+    maxWaitTime?: number;
 }
 
 // ============================================================================
-// VALIDATION RESULT TYPES
+// AUDIT LOG TYPES
 // ============================================================================
 
 /**
- * Prerequisites validation result
+ * Audit log entry
  */
-export interface PrerequisiteValidation {
-    isValid: boolean;
-    missingPrerequisites: string[]; // Course codes
-    completedPrerequisites: string[];
+export type AuditLogEntry = Doc<"auditLogs">;
+
+/**
+ * Audit log with user info
+ */
+export interface AuditLogWithUser {
+    log: AuditLogEntry;
+    user: PublicUserInfo;
+    targetDetails?: any;
+}
+
+// ============================================================================
+// REAL-TIME UPDATE TYPES
+// ============================================================================
+
+/**
+ * Queue update event
+ */
+export interface QueueUpdateEvent {
+    type: "car_added" | "car_removed" | "position_changed";
+    campus: string;
+    lane: Lane;
+    carNumber: number;
+    position?: number;
+    timestamp: number;
 }
 
 /**
- * Enrollment validation result
+ * System notification
  */
-export interface EnrollmentValidation {
-    canEnroll: boolean;
-    reasons: string[]; // Human-readable reasons if cannot enroll
-    warnings: string[]; // Non-blocking warnings
-}
-
-/**
- * Graduation requirements validation
- */
-export interface GraduationValidation {
-    isEligible: boolean;
-    totalCredits: { required: number; completed: number };
-    categoryRequirements: Array<{
-        category: CourseCategory;
-        required: number;
-        completed: number;
-        remaining: number;
-    }>;
-    gpaRequirement: { minimum: number; current: number };
-    missingCourses: string[]; // Required course codes not completed
+export interface SystemNotification {
+    id: string;
+    type: "info" | "warning" | "error" | "success";
+    message: string;
+    campus?: string;
+    timestamp: number;
 }
 
 // ============================================================================
@@ -555,7 +463,7 @@ export interface GraduationValidation {
 // ============================================================================
 
 /**
- * Pagination request parameters
+ * Pagination parameters
  */
 export interface PaginationParams {
     page: number;
@@ -565,7 +473,7 @@ export interface PaginationParams {
 }
 
 /**
- * Paginated response wrapper
+ * Paginated response
  */
 export interface PaginatedResponse<T> {
     items: T[];
@@ -578,73 +486,111 @@ export interface PaginatedResponse<T> {
 }
 
 // ============================================================================
-// NOTIFICATION TYPES
+// UTILITY FUNCTIONS AND TYPE GUARDS
 // ============================================================================
 
 /**
- * Announcement creation input
+ * Type guard to check if user is admin (necesita rol de Clerk)
  */
-export interface AnnouncementInput {
-    sectionId: Id<"sections">;
-    title: string;
-    content: string;
-    type: "general" | "assignment" | "exam" | "schedule" | "urgent";
-    expiresAt?: number;
+export function isAdmin(role: UserRole | null): boolean {
+    return role === "admin" || role === "superadmin";
 }
 
 /**
- * System notification (for future implementation)
+ * Type guard to check if user can allocate cars (necesita rol de Clerk)
  */
-export interface SystemNotification {
-    id: string;
-    userId: Id<"users">;
-    type: "grade_posted" | "enrollment_confirmed" | "deadline_reminder" | "announcement";
-    title: string;
-    message: string;
-    relatedId?: string; // ID of related entity
-    createdAt: number;
-    readAt?: number;
+export function canAllocateWithRole(role: UserRole | null, operatorPermissions?: OperatorPermissions | null): boolean {
+    return role === "admin" ||
+        role === "superadmin" ||
+        role === "allocator" ||
+        (role === "operator" && operatorPermissions?.canAllocate === true);
+}
+
+/**
+ * Type guard to check if user can dispatch cars (necesita rol de Clerk)
+ */
+export function canDispatchWithRole(role: UserRole | null, operatorPermissions?: OperatorPermissions | null): boolean {
+    return role === "admin" ||
+        role === "superadmin" ||
+        role === "dispatcher" ||
+        (role === "operator" && operatorPermissions?.canDispatch === true);
+}
+
+/**
+ * Check if user has access to a campus
+ */
+export function hasAccessToCampus(user: UserProfile, campus: string, role: UserRole): boolean {
+    if (role === "admin" || role === "superadmin") {
+        return true; // Admins have access to all campuses
+    }
+    return user.assignedCampuses.includes(campus);
+}
+
+/**
+ * Convert queue entry to car data for frontend
+ */
+export function queueEntryToCarData(entry: QueueEntry): CarData {
+    return {
+        id: entry._id,
+        carNumber: entry.carNumber,
+        lane: entry.lane,
+        position: entry.position,
+        assignedTime: new Date(entry.assignedTime),
+        students: entry.students.map(s => ({
+            id: s.studentId,
+            name: s.name,
+            grade: s.grade,
+            imageUrl: s.avatarUrl
+        })),
+        campus: entry.campusLocation,
+        imageColor: entry.carColor
+    };
 }
 
 // ============================================================================
-// EXPORT UTILITY TYPES FOR FRONTEND
+// CONSTANTS
 // ============================================================================
 
-// Re-export commonly used types for frontend convenience
+/**
+ * Available car colors
+ */
+export const CAR_COLORS = [
+    '#3b82f6', // blue
+    '#10b981', // green
+    '#ef4444', // red
+    '#8b5cf6', // purple
+    '#f97316', // orange
+    '#06b6d4', // cyan
+    '#84cc16', // lime
+    '#f59e0b'  // amber
+] as const;
+
+/**
+ * Default campus settings
+ */
+export const DEFAULT_CAMPUS_SETTINGS = {
+    allowMultipleStudentsPerCar: true,
+    requireCarNumber: true,
+    dismissalStartTime: "14:30",
+    dismissalEndTime: "15:30",
+    timezone: "America/New_York"
+} as const;
+
+// ============================================================================
+// EXPORT UTILITY TYPES
+// ============================================================================
+
 export type { Doc, Id } from "./_generated/dataModel";
 export type { WithoutSystemFields } from "convex/server";
 
 /**
  * Helper type to extract document type without system fields
- * Usage: CreateInput<"users"> gives you user creation type
  */
 export type CreateInput<TableName extends keyof typeof import("./schema")["default"]["tables"]> =
     WithoutSystemFields<Doc<TableName>>;
 
 /**
  * Helper type for partial updates
- * Usage: UpdateInput<"users"> gives you user update type
  */
 export type UpdateInput<TableName extends keyof typeof import("./schema")["default"]["tables"]> =
     Partial<CreateInput<TableName>>;
-
-/**
- * Type guard to check if user is a student
- */
-export function isStudent(user: UserProfile): boolean {
-    return user.role === "student" && user.studentProfile !== undefined;
-}
-
-/**
- * Type guard to check if user is a professor
- */
-export function isProfessor(user: UserProfile): boolean {
-    return user.role === "professor" && user.professorProfile !== undefined;
-}
-
-/**
- * Type guard to check if user is admin
- */
-export function isAdmin(user: UserProfile): boolean {
-    return user.role === "admin" || user.role === "superadmin";
-}
