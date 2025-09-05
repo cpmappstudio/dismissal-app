@@ -2,18 +2,19 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Car, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { Car, ChevronLeft, ChevronRight, MapPin, AlertCircle, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
-import { CAMPUS_LOCATIONS, type CampusLocation } from "@/convex/types"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
 import { Road } from "./road"
 import { CarData, ModeType, LaneType } from "./types"
-import { getCarColor, getConsistentTime } from "./utils"
-import { MOCK_CARS, INITIAL_NEXT_ID } from "./mock-cars-data"
 
 interface DismissalViewProps {
     mode: ModeType
@@ -24,76 +25,157 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
 
     const [selectedCampus, setSelectedCampus] = React.useState<string>("Poinciana Campus")
-    const [cars, setCars] = React.useState<CarData[]>(MOCK_CARS)
-    const [nextId, setNextId] = React.useState(INITIAL_NEXT_ID)
     const [isFullscreen, setIsFullscreen] = React.useState(false)
-
-    // Single input for allocator mode
     const [carInputValue, setCarInputValue] = React.useState<string>('')
+    const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+    // Alert state
+    const [alert, setAlert] = React.useState<{
+        show: boolean
+        type: 'success' | 'error'
+        title: string
+        message: string
+    }>({
+        show: false,
+        type: 'success',
+        title: '',
+        message: ''
+    })
+
+    // Convex hooks - para obtener datos en tiempo real
+    const queueData = useQuery(api.queue.getCurrentQueue,
+        selectedCampus ? { campus: selectedCampus } : "skip"
+    )
+
+    // Mutations de Convex
+    const addCarToQueue = useMutation(api.queue.addCar)
+    const removeCarFromQueue = useMutation(api.queue.removeCar)
 
     // Campus selection validation
-    const isCampusSelected = selectedCampus !== "all"
+    const isCampusSelected = selectedCampus !== "all" && selectedCampus !== ""
 
-    // Stats - filtered by selected campus - Memoized to prevent unnecessary re-renders
-    const leftLaneCars = React.useMemo(() =>
-        cars.filter(car => car.lane === 'left' && car.campus === selectedCampus),
-        [cars, selectedCampus]
-    )
+    // Function to show alerts
+    const showAlert = React.useCallback((type: 'success' | 'error', title: string, message: string) => {
+        setAlert({
+            show: true,
+            type,
+            title,
+            message
+        })
 
-    const rightLaneCars = React.useMemo(() =>
-        cars.filter(car => car.lane === 'right' && car.campus === selectedCampus),
-        [cars, selectedCampus]
-    )
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            setAlert(prev => ({ ...prev, show: false }))
+        }, 5000)
+    }, [])
 
-    const totalCars = leftLaneCars.length + rightLaneCars.length
+    // Function to hide alert manually
+    const hideAlert = React.useCallback(() => {
+        setAlert(prev => ({ ...prev, show: false }))
+    }, [])
 
-    // Add car function for allocator with new single input approach
-    const handleAddCarToLane = React.useCallback((lane: 'left' | 'right') => {
-        if (!carInputValue.trim()) return
+    // Transform Convex queue data to CarData format
+    const { leftLaneCars, rightLaneCars, totalCars } = React.useMemo(() => {
+        if (!queueData || !queueData.leftLane || !queueData.rightLane) {
+            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0 }
+        }
+
+        const transformQueueEntry = (entry: any): CarData => ({
+            id: entry._id,
+            carNumber: entry.carNumber,
+            lane: entry.lane,
+            position: entry.position,
+            assignedTime: new Date(entry.assignedTime),
+            students: entry.students.map((s: any) => ({
+                id: s.studentId,
+                name: s.name,
+                grade: s.grade,
+                imageUrl: s.avatarUrl
+            })),
+            campus: entry.campusLocation,
+            imageColor: entry.carColor
+        })
+
+        const leftCars = queueData.leftLane.map(transformQueueEntry)
+        const rightCars = queueData.rightLane.map(transformQueueEntry)
+
+        return {
+            leftLaneCars: leftCars,
+            rightLaneCars: rightCars,
+            totalCars: leftCars.length + rightCars.length
+        }
+    }, [queueData])
+
+    // Add car function using Convex mutation
+    const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
+        if (!carInputValue.trim() || isSubmitting) return
 
         const carNumber = parseInt(carInputValue.trim())
-        if (isNaN(carNumber)) return
+        if (isNaN(carNumber) || carNumber <= 0) {
+            showAlert('error', 'Invalid Car Number', 'Please enter a valid car number')
+            return
+        }
 
-        setCars(prev => {
-            // Calculate position based on current state
-            const existingCarsInLane = prev.filter(c => c.lane === lane && c.campus === selectedCampus).length
+        if (!isCampusSelected) {
+            showAlert('error', 'Campus Required', 'Please select a campus')
+            return
+        }
 
-            const newCar: CarData = {
-                id: `car-${nextId}`,
+        setIsSubmitting(true)
+        try {
+            const result = await addCarToQueue({
                 carNumber,
-                lane,
-                position: existingCarsInLane + 1,
-                assignedTime: getConsistentTime(carNumber),
-                students: [{ id: `student-${nextId}`, name: `Student ${carNumber}`, grade: 'Grado 5' }], // Mock data
                 campus: selectedCampus,
-                imageColor: getCarColor(carNumber)
+                lane
+            })
+
+            if (result.success) {
+                setCarInputValue('') // Clear input after successful add
+                showAlert('success', 'Car Added!', `Car ${carNumber} has been added to the ${lane} lane`)
+            } else {
+                // Handle different error types
+                switch (result.error) {
+                    case 'NO_STUDENTS_FOUND':
+                        showAlert('error', 'Car Not Found', `No students found with car number ${carNumber}`)
+                        break
+                    case 'CAR_ALREADY_IN_QUEUE':
+                        showAlert('error', 'Car Already in Queue', `Car ${carNumber} is already in the dismissal queue`)
+                        break
+                    case 'INVALID_CAR_NUMBER':
+                        showAlert('error', 'Invalid Car Number', 'Please enter a valid car number')
+                        break
+                    case 'INVALID_CAMPUS':
+                        showAlert('error', 'Campus Required', 'Please select a campus')
+                        break
+                    default:
+                        showAlert('error', 'Error', result.message || 'An unexpected error occurred')
+                }
             }
+        } catch (error) {
+            console.error("Error adding car to queue:", error)
+            showAlert('error', 'Error', 'Failed to add car to queue')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }, [carInputValue, selectedCampus, isCampusSelected, addCarToQueue, isSubmitting, showAlert])
 
-            return [...prev, newCar]
-        })
+    // Remove car function using Convex mutation
+    const handleRemoveCar = React.useCallback(async (carId: string) => {
+        if (isSubmitting) return
 
-        setNextId(prev => prev + 1)
-        setCarInputValue('') // Clear input after adding
-    }, [carInputValue, nextId, selectedCampus]) // Removed 'cars' dependency
-
-    // Remove car function for dispatcher
-    const handleRemoveCar = React.useCallback((carId: string) => {
-        setCars(prev => {
-            const updatedCars = prev.filter(car => car.id !== carId)
-
-            // Reorder positions for each lane within the selected campus
-            const leftCars = updatedCars.filter(car => car.lane === 'left' && car.campus === selectedCampus)
-                .map((car, index) => ({ ...car, position: index + 1 }))
-
-            const rightCars = updatedCars.filter(car => car.lane === 'right' && car.campus === selectedCampus)
-                .map((car, index) => ({ ...car, position: index + 1 }))
-
-            // Keep cars from other campuses unchanged
-            const otherCampusCars = updatedCars.filter(car => car.campus !== selectedCampus)
-
-            return [...leftCars, ...rightCars, ...otherCampusCars]
-        })
-    }, [selectedCampus])
+        setIsSubmitting(true)
+        try {
+            const result = await removeCarFromQueue({ queueId: carId as Id<"dismissalQueue"> })
+            if (result && result.carNumber) {
+                showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
+            }
+        } catch (error) {
+            console.error("Error removing car from queue:", error)
+            showAlert('error', 'Error', 'Failed to remove car from queue')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }, [removeCarFromQueue, isSubmitting, showAlert])
 
     // Handle keyboard shortcuts for the single input
     const handleKeyPress = React.useCallback((e: React.KeyboardEvent) => {
@@ -182,7 +264,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                         {/* Left Arrow Button */}
                                         <Button
                                             onClick={() => handleAddCarToLane('left')}
-                                            disabled={!carInputValue.trim()}
+                                            disabled={!carInputValue.trim() || isSubmitting}
                                             size="sm"
                                             className="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
                                         >
@@ -202,14 +284,15 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                                 setCarInputValue(value)
                                             }}
                                             onKeyDown={handleKeyPress}
-                                            className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white"
+                                            disabled={isSubmitting}
+                                            className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white disabled:opacity-50"
                                             autoFocus
                                         />
 
                                         {/* Right Arrow Button */}
                                         <Button
                                             onClick={() => handleAddCarToLane('right')}
-                                            disabled={!carInputValue.trim()}
+                                            disabled={!carInputValue.trim() || isSubmitting}
                                             size="sm"
                                             className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
                                         >
@@ -223,6 +306,28 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </>
             )}
             </div>
+
+            {/* Alert Component - Fixed at bottom right */}
+            {alert.show && (
+                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                    <Alert
+                        variant={alert.type === 'error' ? 'destructive' : 'default'}
+                        className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+                        onClick={hideAlert}
+                    >
+                        {alert.type === 'error' ? (
+                            <AlertCircle className="h-4 w-4" />
+                        ) : (
+                            <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+                        <AlertDescription className="text-sm mt-1">
+                            {alert.message}
+                            <div className="text-xs text-muted-foreground mt-1">Tap to dismiss</div>
+                        </AlertDescription>
+                    </Alert>
+                </div>
+            )}
         </div>
     )
 }

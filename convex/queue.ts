@@ -131,23 +131,64 @@ export const addCar = mutation({
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
+        // Get or create user record
+        let user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) {
+            // Create user record if it doesn't exist
+            const userId = await ctx.db.insert("users", {
+                clerkId: identity.subject,
+                username: (identity.username as string) || (identity.email as string) || "unknown",
+                email: (identity.email as string) || (identity.emailAddress as string),
+                firstName: (identity.firstName as string) || (identity.givenName as string),
+                lastName: (identity.lastName as string) || (identity.familyName as string),
+                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
+                assignedCampuses: [args.campus],
+                isActive: true,
+                createdAt: Date.now(),
+                lastLoginAt: Date.now()
+            });
+            user = await ctx.db.get(userId);
+        }
+
+        if (!user) throw new Error("Failed to create user record");
+
         // Validate inputs
         if (!args.campus.trim()) {
-            throw new Error("Campus is required");
+            return {
+                success: false,
+                error: "INVALID_CAMPUS",
+                message: "Campus is required"
+            };
         }
         if (args.carNumber <= 0) {
-            throw new Error("Invalid car number");
+            return {
+                success: false,
+                error: "INVALID_CAR_NUMBER",
+                message: "Invalid car number"
+            };
         }
 
         // Check if car is already in queue
         if (await isCarInQueue(ctx.db, args.carNumber, args.campus)) {
-            throw new Error("Car already in queue");
+            return {
+                success: false,
+                error: "CAR_ALREADY_IN_QUEUE",
+                message: `Car ${args.carNumber} is already in the queue`
+            };
         }
 
         // Get students for this car
         const students = await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
         if (students.length === 0) {
-            throw new Error("No students found with this car number");
+            return {
+                success: false,
+                error: "NO_STUDENTS_FOUND",
+                message: `No students found with car number ${args.carNumber} in ${args.campus}`
+            };
         }
 
         // Get next position in lane
@@ -162,11 +203,14 @@ export const addCar = mutation({
             students: students.map(studentToSummary),
             carColor: generateCarColor(args.carNumber),
             assignedTime: Date.now(),
-            addedBy: "system" as any, // Temporary placeholder since we don't use users table
+            addedBy: user._id,
             status: "waiting"
         });
 
-        return queueId;
+        return {
+            success: true,
+            queueId
+        };
     }
 });
 
@@ -180,6 +224,31 @@ export const removeCar = mutation({
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
+
+        // Get or create user record
+        let user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) {
+            // Create user record if it doesn't exist
+            const userId = await ctx.db.insert("users", {
+                clerkId: identity.subject,
+                username: (identity.username as string) || (identity.email as string) || "unknown",
+                email: (identity.email as string) || (identity.emailAddress as string),
+                firstName: (identity.firstName as string) || (identity.givenName as string),
+                lastName: (identity.lastName as string) || (identity.familyName as string),
+                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
+                assignedCampuses: [],
+                isActive: true,
+                createdAt: Date.now(),
+                lastLoginAt: Date.now()
+            });
+            user = await ctx.db.get(userId);
+        }
+
+        if (!user) throw new Error("Failed to create user record");
 
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
@@ -202,7 +271,7 @@ export const removeCar = mutation({
             completedAt: Date.now(),
             waitTimeSeconds,
             addedBy: entry.addedBy,
-            removedBy: entry.addedBy, // Use same as addedBy for simplification
+            removedBy: user._id,
             date: new Date().toISOString().split('T')[0]
         });
 

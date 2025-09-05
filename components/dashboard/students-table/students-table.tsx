@@ -60,8 +60,9 @@ export function StudentsTable() {
     // Dialog state
     const [editDialogOpen, setEditDialogOpen] = React.useState(false)
     const [selectedStudent, setSelectedStudent] = React.useState<Student | undefined>()
+    const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-    // Convex hooks
+    // Convex hooks - usando el patrón correcto
     const studentsData = useQuery(api.students.list, {
         search: searchFilter || undefined,
         campus: campusFilter || undefined,
@@ -69,9 +70,10 @@ export function StudentsTable() {
         limit: 100,
     })
 
-    const createStudentMutation = useMutation(api.students.create)
-    const updateStudentMutation = useMutation(api.students.update)
-    const deleteStudentMutation = useMutation(api.students.deleteStudent)
+    // Mutations de Convex
+    const createStudent = useMutation(api.students.create)
+    const updateStudent = useMutation(api.students.update)
+    const deleteStudent = useMutation(api.students.deleteStudent)
 
     // Transform Convex data to match component expectations
     const data: Student[] = React.useMemo(() => {
@@ -90,7 +92,7 @@ export function StudentsTable() {
         }))
     }, [studentsData])
 
-    // Loading state
+    // Loading state - Convex retorna undefined mientras carga
     const isLoading = studentsData === undefined
 
     // Table instance
@@ -111,7 +113,7 @@ export function StudentsTable() {
         getSortedRowModel: getSortedRowModel(),
     })
 
-    // Update filters when table filters change
+    // Update filters when table filters change - Convex optimiza esto en el backend
     React.useEffect(() => {
         const searchValue = table.getColumn("fullName")?.getFilterValue() as string
         setSearchFilter(searchValue || "")
@@ -130,21 +132,28 @@ export function StudentsTable() {
     // Get selected students
     const selectedStudents = table.getFilteredSelectedRowModel().rows.map(row => row.original)
 
-    // Handlers
+    // Handlers con mejor manejo de estado siguiendo patrón Convex
     const handleDeleteStudents = async (studentIds: string[]) => {
+        setIsSubmitting(true)
         try {
-            for (const id of studentIds) {
-                await deleteStudentMutation({ studentId: id as Id<"students"> })
-            }
+            // Convex permite múltiples mutations en paralelo
+            const deletePromises = studentIds.map(id =>
+                deleteStudent({ studentId: id as Id<"students"> })
+            )
+            await Promise.all(deletePromises)
             setRowSelection({})
         } catch (error) {
             console.error("Error deleting students:", error)
+            // Aquí podrías agregar un toast de error
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
     const handleCreateStudent = async (studentData: Omit<Student, 'id'>) => {
+        setIsSubmitting(true)
         try {
-            await createStudentMutation({
+            await createStudent({
                 firstName: studentData.firstName,
                 lastName: studentData.lastName,
                 grade: studentData.grade,
@@ -153,16 +162,21 @@ export function StudentsTable() {
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
             })
+            // No necesitamos recargar manualmente - Convex actualiza automáticamente
         } catch (error) {
             console.error("Error creating student:", error)
+            // Aquí podrías agregar un toast de error
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
     const handleUpdateStudent = async (studentData: Omit<Student, 'id'>) => {
         if (!selectedStudent) return
 
+        setIsSubmitting(true)
         try {
-            await updateStudentMutation({
+            await updateStudent({
                 studentId: selectedStudent.id as Id<"students">,
                 firstName: studentData.firstName,
                 lastName: studentData.lastName,
@@ -174,18 +188,25 @@ export function StudentsTable() {
             })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
+            // Convex actualiza automáticamente la UI
         } catch (error) {
             console.error("Error updating student:", error)
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
     const handleDeleteStudent = async (studentId: string) => {
+        setIsSubmitting(true)
         try {
-            await deleteStudentMutation({ studentId: studentId as Id<"students"> })
+            await deleteStudent({ studentId: studentId as Id<"students"> })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
+            // Convex actualiza automáticamente la UI
         } catch (error) {
             console.error("Error deleting student:", error)
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -253,7 +274,7 @@ export function StudentsTable() {
                         onChange={(value: string) =>
                             table.getColumn("grade")?.setFilterValue(value)
                         }
-                        options={GRADES}
+                        options={GRADES as readonly Grade[]}
                         icon={GraduationCap}
                         label={t('filters.grade.label')}
                         placeholder={t('filters.grade.all')}
