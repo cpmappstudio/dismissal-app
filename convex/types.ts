@@ -8,10 +8,6 @@ import type { WithoutSystemFields } from "convex/server";
 // COMMON VALIDATORS (Reusable across schema and functions)
 // ============================================================================
 
-/**
- * User role validator - estos roles vienen de Clerk, no de Convex
- * Solo los usamos para tipos, no están en la DB
- */
 export const roleValidator = v.union(
     v.literal("superadmin"),
     v.literal("admin"),

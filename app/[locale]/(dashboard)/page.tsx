@@ -19,8 +19,8 @@ export default async function DashboardPage({
   return (
     <div className="dashboard-container">
       {/* Render condicional por rol - AQUÍ van los componentes */}
-      {userRole === 'student' && <div>Student Dashboard Placeholder</div>}
-      {userRole === 'professor' && <div>Professor Dashboard Placeholder</div>}
+      {/* {userRole === 'student' && <div>Student Dashboard Placeholder</div>}
+      {userRole === 'professor' && <div>Professor Dashboard Placeholder</div>} */}
       {(userRole === 'admin') && <AdminDashboard />}
 
       {/* Fallback si no hay rol asignado */}

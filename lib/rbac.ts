@@ -3,9 +3,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { createRouteMatcher } from '@clerk/nextjs/server';
 import type { NextRequest } from 'next/server';
-
-// Tipos de roles para el sistema dismissal
-export type DismissalRole = 'superadmin' | 'admin' | 'allocator' | 'dispatcher' | 'viewer' | 'operator';
+import {
+    DismissalRole,
+    extractRoleFromMetadata,
+    extractOperatorPermissions,
+    hasRole,
+    canAccessAdmin,
+    canAccessOperators,
+    canAllocate,
+    canDispatch,
+    isViewerOnly,
+    isOperator,
+    isSuperAdmin
+} from './role-utils';
 
 // Rutas específicas por rol/función
 const roleMatchers = {
@@ -31,23 +41,10 @@ const ROLE_PERMISSIONS = {
 export async function getCurrentUserRole(): Promise<DismissalRole | null> {
     try {
         const { sessionClaims } = await auth();
-
         if (!sessionClaims) return null;
 
-        // Clerk stores custom claims in publicMetadata
-        const publicMeta = (sessionClaims as any).publicMetadata;
-        const privateMeta = (sessionClaims as any).privateMetadata;
-        const metadata = (sessionClaims as any).metadata;
-
-        // Buscar dismissalRole primero, luego role genérico
-        const role = publicMeta?.dismissalRole ||
-            publicMeta?.role ||
-            privateMeta?.dismissalRole ||
-            privateMeta?.role ||
-            metadata?.dismissalRole ||
-            metadata?.role;
-
-        return (role as DismissalRole) || null;
+        // Use centralized role extraction
+        return extractRoleFromMetadata(sessionClaims);
     } catch (error) {
         console.error('Error getting user role:', error);
         return null;
@@ -65,62 +62,6 @@ export async function getCurrentUserId(): Promise<string | null> {
         console.error('Error getting user ID:', error);
         return null;
     }
-}
-
-/**
- * Check if user has any of the required roles
- */
-export function hasRole(userRole: DismissalRole | null, requiredRoles: DismissalRole[]): boolean {
-    return userRole ? requiredRoles.includes(userRole) : false;
-}
-
-/**
- * Check if user can access admin features
- */
-export function canAccessAdmin(userRole: DismissalRole | null): boolean {
-    return hasRole(userRole, ['admin', 'superadmin']);
-}
-
-/**
- * Check if user can access operators section
- */
-export function canAccessOperators(userRole: DismissalRole | null): boolean {
-    return hasRole(userRole, ['operator', 'admin', 'superadmin']);
-}
-
-/**
- * Check if user can allocate cars (add to queue)
- */
-export function canAllocate(userRole: DismissalRole | null): boolean {
-    return hasRole(userRole, ['allocator', 'operator', 'admin', 'superadmin']);
-}
-
-/**
- * Check if user can dispatch cars (remove from queue)
- */
-export function canDispatch(userRole: DismissalRole | null): boolean {
-    return hasRole(userRole, ['dispatcher', 'operator', 'admin', 'superadmin']);
-}
-
-/**
- * Check if user can only view (no modifications)
- */
-export function isViewerOnly(userRole: DismissalRole | null): boolean {
-    return userRole === 'viewer';
-}
-
-/**
- * Check if user is operator (needs additional permission checks)
- */
-export function isOperator(userRole: DismissalRole | null): boolean {
-    return userRole === 'operator';
-}
-
-/**
- * Check if user is superadmin
- */
-export function isSuperAdmin(userRole: DismissalRole | null): boolean {
-    return userRole === 'superadmin';
 }
 
 /**
@@ -156,26 +97,13 @@ export function checkRoleAccess(
  * Get operator permissions from session claims
  * Solo relevante si el rol es 'operator'
  */
-export async function getOperatorPermissions(): Promise<{
-    canAllocate: boolean;
-    canDispatch: boolean;
-    canView: boolean;
-} | null> {
+export async function getOperatorPermissions() {
     try {
         const { sessionClaims } = await auth();
         if (!sessionClaims) return null;
 
-        const publicMeta = (sessionClaims as any).publicMetadata;
-        const role = publicMeta?.dismissalRole || publicMeta?.role;
-
-        // Solo devolver permisos si es operator
-        if (role !== 'operator') return null;
-
-        return publicMeta?.operatorPermissions || {
-            canAllocate: false,
-            canDispatch: false,
-            canView: true // Por defecto pueden ver
-        };
+        const role = extractRoleFromMetadata(sessionClaims);
+        return extractOperatorPermissions(sessionClaims, role);
     } catch (error) {
         console.error('Error getting operator permissions:', error);
         return null;

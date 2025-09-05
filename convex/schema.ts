@@ -5,13 +5,10 @@ import { v } from "convex/values";
 
 export default defineSchema({
   /**
-   * Users table - Simplified for username-based auth
+   * Users/workers table - Simplified for username-based auth
    */
-  // convex/schema.ts - Actualizado para Clerk
-
   users: defineTable({
-    // Clerk integration - REQUERIDO
-    clerkId: v.string(), // Subject ID from Clerk
+    clerkId: v.string(),
     email: v.string(),
 
     // Display info (sync from Clerk)
@@ -19,24 +16,19 @@ export default defineSchema({
     lastName: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
 
-    // NO almacenamos role aquí - viene de Clerk metadata
-
-    // Campus assignment
     assignedCampuses: v.array(v.string()),
 
-    // Para operator, permisos específicos
     operatorPermissions: v.optional(v.object({
       canAllocate: v.boolean(),
       canDispatch: v.boolean(),
       canView: v.boolean(),
     })),
 
-    // System fields
     isActive: v.boolean(),
     createdAt: v.number(),
     lastLoginAt: v.optional(v.number()),
   })
-    .index("by_clerk_id", ["clerkId"]) // Principal índice
+    .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
     .index("by_active", ["isActive"]),
 
@@ -47,7 +39,7 @@ export default defineSchema({
     // Personal information
     firstName: v.string(),
     lastName: v.string(),
-    fullName: v.string(), // Denormalized for search/display
+    fullName: v.string(),
 
     // Academic info
     grade: v.string(), // "1st", "2nd", "3rd", etc.

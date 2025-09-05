@@ -2,6 +2,7 @@
 
 import { mutation, query } from "./_generated/server";
 import { getUserByClerkId } from "./helpers";
+import { extractRoleFromMetadata, extractOperatorPermissions } from "../lib/role-utils";
 
 /**
  * Synchronize user data from Clerk on first login
@@ -45,6 +46,7 @@ export const syncUser = mutation({
 
 /**
  * Get current user with role from Clerk metadata
+ * Now uses centralized role extraction logic
  */
 export const getCurrentUser = query({
     args: {}, // No arguments needed
@@ -55,14 +57,15 @@ export const getCurrentUser = query({
         const user = await getUserByClerkId(ctx.db, identity.subject);
         if (!user) return null;
 
-        // Add role from Clerk metadata
-        const role = (identity.publicMetadata as any)?.dismissalRole ||
-            (identity.publicMetadata as any)?.role ||
-            'viewer';
+        // Use centralized role extraction from shared utilities
+        const role = extractRoleFromMetadata(identity);
+        const operatorPermissions = extractOperatorPermissions(identity, role);
 
         return {
             ...user,
-            role
+            role,
+            // Include operator permissions if applicable
+            ...(operatorPermissions && { operatorPermissions })
         };
     }
 });
