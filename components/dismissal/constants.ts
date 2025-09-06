@@ -1,4 +1,8 @@
 // Constantes para evitar recreación en cada render
+import { CAR_COLORS } from "@/convex/types"
+
+export { CAR_COLORS }
+
 export const LANE_COLORS = {
     left: {
         primary: 'text-blue-600',
@@ -18,13 +22,8 @@ export const LANE_COLORS = {
     }
 } as const
 
-export const CAR_COLORS = [
-    '#3b82f6', '#10b981', '#ef4444', '#8b5cf6',
-    '#f97316', '#06b6d4', '#84cc16', '#f59e0b'
-] as const
-
 export const ANIMATION_DURATIONS = {
     ENTRANCE: 500,
-    EXIT: 500, // Increased from 300 to 500 for smoother exit animation
+    EXIT: 600, // Reduced from 800 to 600 for faster but still smooth animation
     REPOSITION: 300
 } as const
