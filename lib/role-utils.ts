@@ -12,7 +12,13 @@ export interface OperatorPermissions {
  * Extract role from any Clerk metadata object
  * Works for both server-side sessionClaims and Convex identity
  */
-export function extractRoleFromMetadata(metadata: any): DismissalRole {
+export function extractRoleFromMetadata(metadata: {
+    publicMetadata?: { dismissalRole?: string; role?: string };
+    privateMetadata?: { dismissalRole?: string; role?: string };
+    metadata?: { dismissalRole?: string; role?: string };
+    dismissalRole?: string;
+    role?: string;
+}): DismissalRole {
     const publicMeta = metadata.publicMetadata || metadata;
     const privateMeta = metadata.privateMetadata;
     const meta = metadata.metadata;
@@ -32,7 +38,10 @@ export function extractRoleFromMetadata(metadata: any): DismissalRole {
  * Extract operator permissions from metadata
  */
 export function extractOperatorPermissions(
-    metadata: any,
+    metadata: {
+        publicMetadata?: { operatorPermissions?: OperatorPermissions };
+        operatorPermissions?: OperatorPermissions;
+    },
     role: DismissalRole
 ): OperatorPermissions | null {
     if (role !== 'operator') return null;

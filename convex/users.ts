@@ -15,7 +15,7 @@ export const getCurrentProfile = query({
         if (!identity) return null;
 
         // Extract role from Clerk metadata using centralized logic
-        const role = extractRoleFromMetadata(identity);
+        const role = extractRoleFromMetadata(identity as any);
 
         return {
             id: identity.subject,

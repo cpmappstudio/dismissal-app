@@ -59,9 +59,11 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
         try {
             // Handle nested keys like "menu.student.title"
             if (key.includes('.')) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const result = t.raw(key as any)
                 return result || fallback
             }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return t(key as any) || fallback
         } catch {
             return fallback

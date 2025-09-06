@@ -21,7 +21,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
     const isViewer = mode === 'viewer'
 
     // Use custom hook for animation logic
-    const { removingCarId, newCarIds, handleRemoveCar, isCarRemoving } = useCarAnimations(cars)
+    const { newCarIds, handleRemoveCar, isCarRemoving } = useCarAnimations(cars)
 
     // Local state to keep track of cars being removed
     const [removingCars, setRemovingCars] = React.useState<Map<string, CarData>>(new Map())
@@ -85,7 +85,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                         ? 'flex-row-reverse gap-6'
                         : 'flex-col gap-4'
                         }`}>
-                        {extendedCars.slice().reverse().map((car, index) => {
+                        {extendedCars.slice().reverse().map((car) => {
                             const isNew = newCarIds.has(car.id)
                             const isRemoving = isCarRemoving(car.id)
 

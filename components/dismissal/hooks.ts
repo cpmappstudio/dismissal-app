@@ -25,7 +25,7 @@ export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
             prevCarIdsRef.current = new Set(cars.map(car => car.id))
             isInitializedRef.current = true
         }
-    }, []) // Run only once on mount
+    }, [cars]) // Include cars dependency
 
     // Track new cars for entrance animation - Optimized to only track car IDs
     useEffect(() => {
@@ -55,7 +55,7 @@ export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
             // Update the ref even if no new cars were added
             prevCarIdsRef.current = currentCarIds
         }
-    }, [carIds]) // Only re-run when car IDs change
+    }, [carIds, cars]) // Include cars dependency
 
     // Clean up removing cars when they're actually removed from the data
     useEffect(() => {

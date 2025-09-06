@@ -5,7 +5,6 @@ import Image from "next/image"
 import { useTranslations } from "next-intl"
 import {
     SidebarMenu,
-    SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"

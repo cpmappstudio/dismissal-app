@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
 import { Road } from "./road"
-import { CarData, ModeType, LaneType } from "./types"
+import { CarData, ModeType } from "./types"
 
 interface DismissalViewProps {
     mode: ModeType
@@ -93,13 +93,22 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: false, authError: false }
         }
 
-        const transformQueueEntry = (entry: any): CarData => ({
+        const transformQueueEntry = (entry: {
+            _id: string;
+            carNumber: number;
+            lane: "left" | "right";
+            position: number;
+            assignedTime: number;
+            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string }>;
+            campusLocation: string;
+            carColor: string;
+        }): CarData => ({
             id: entry._id,
             carNumber: entry.carNumber,
             lane: entry.lane,
             position: entry.position,
             assignedTime: new Date(entry.assignedTime),
-            students: entry.students.map((s: any) => ({
+            students: entry.students.map((s) => ({
                 id: s.studentId,
                 name: s.name,
                 grade: s.grade,

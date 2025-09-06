@@ -1,7 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Calendar } from "lucide-react"
+import { ArrowUpDown } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { Student } from "./types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"

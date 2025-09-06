@@ -10,7 +10,7 @@ interface UserButtonWrapperProps {
 }
 
 export function UserButtonWrapper({ showName = true, collapsed = false }: UserButtonWrapperProps) {
-    const { isLoaded, user } = useUser()
+    const { isLoaded } = useUser()
 
     // Contenedor con dimensiones fijas para evitar layout shifting
     const containerStyle = {

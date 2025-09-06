@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from 'next-intl'
-import { useQuery, useMutation } from "convex/react"
+import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import {
     ColumnFiltersState,
@@ -14,7 +14,7 @@ import {
     SortingState,
     useReactTable,
 } from "@tanstack/react-table"
-import { ChevronDown, Search, GraduationCap, Plus, MapPin } from "lucide-react"
+import { Search, GraduationCap, Plus, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 // import {
@@ -42,7 +42,6 @@ import { StudentFormDialog } from "./student-form-dialog"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { CAMPUS_LOCATIONS, GRADES, Grade, CampusLocation, Id } from "@/convex/types"
 import { useStudentsData } from "@/hooks/use-students-data"
-import { useDebouncedValue } from "@/hooks/use-debounced-value"
 
 // Componente de Skeleton optimizado
 function StudentsTableSkeleton() {
@@ -85,7 +84,7 @@ export function StudentsTable() {
     })
 
     // Función de filtrado personalizada para buscar por nombre O número de carro
-    const globalFilterFunction = React.useCallback((row: any, columnId: string, filterValue: string) => {
+    const globalFilterFunction = React.useCallback((row: { original: Student }, columnId: string, filterValue: string) => {
         if (!filterValue) return true
 
         const searchTerm = filterValue.toLowerCase().trim()
@@ -111,7 +110,19 @@ export function StudentsTable() {
     const data: Student[] = React.useMemo(() => {
         if (!studentsData?.students) return []
 
-        return studentsData.students.map((student: any) => ({
+        return studentsData.students.map((student: {
+            _id: string;
+            fullName: string;
+            firstName: string;
+            lastName: string;
+            birthday: string;
+            carNumber: number;
+            grade: string;
+            campusLocation: string;
+            avatarUrl?: string;
+            isActive: boolean;
+            createdAt: number;
+        }) => ({
             id: student._id,
             fullName: student.fullName,
             firstName: student.firstName,
@@ -119,7 +130,7 @@ export function StudentsTable() {
             birthday: student.birthday,
             carNumber: student.carNumber,
             grade: student.grade as Grade,
-            campusLocation: student.campusLocation,
+            campusLocation: student.campusLocation as CampusLocation,
             avatarUrl: student.avatarUrl || "",
         }))
     }, [studentsData?.students]) // Más específico que studentsData completo
@@ -329,7 +340,7 @@ export function StudentsTable() {
                                 {headerGroup.headers.map(header => (
                                     <TableHead
                                         key={header.id}
-                                        className={`whitespace-nowrap px-2 py-3 text-white lg:px-4 ${(header.column.columnDef.meta as any)?.className || ''
+                                        className={`whitespace-nowrap px-2 py-3 text-white lg:px-4 ${(header.column.columnDef.meta as { className?: string })?.className || ''
                                             }`}
                                     >
                                         {header.isPlaceholder
@@ -352,7 +363,7 @@ export function StudentsTable() {
                                     {row.getVisibleCells().map(cell => (
                                         <TableCell
                                             key={cell.id}
-                                            className={`px-2 py-3 lg:px-4 ${(cell.column.columnDef.meta as any)?.className || ''
+                                            className={`px-2 py-3 lg:px-4 ${(cell.column.columnDef.meta as { className?: string })?.className || ''
                                                 }`}
                                         >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

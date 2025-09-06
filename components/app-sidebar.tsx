@@ -5,8 +5,6 @@ import {
   BookOpen,
   User,
   GraduationCap,
-  Settings,
-  UserCog,
   FileText,
   Users,
 } from "lucide-react"
@@ -23,11 +21,8 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ModeToggle } from "./mode-toggle"
 import { LangToggle } from "./lang-toggle"
 import { UserButtonWrapper } from "./user-button-wrapper"
-import type { UserRole } from "@/convex/types"
-import type { DismissalRole } from "@/lib/role-utils"
 import { extractRoleFromMetadata } from "@/lib/role-utils"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -160,7 +155,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     return items
-  }, [t, userRole])
+  }, [t, userRole, iconMap.adminDocs, iconMap.operators])
 
   return (
     <Sidebar collapsible="icon" {...props}>

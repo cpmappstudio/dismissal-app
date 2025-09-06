@@ -7,14 +7,14 @@ import {
     DismissalRole,
     extractRoleFromMetadata,
     extractOperatorPermissions,
-    hasRole,
-    canAccessAdmin,
-    canAccessOperators,
-    canAllocate,
-    canDispatch,
-    isViewerOnly,
-    isOperator,
-    isSuperAdmin
+    // hasRole,
+    // canAccessAdmin,
+    // canAccessOperators,
+    // canAllocate,
+    // canDispatch,
+    // isViewerOnly,
+    // isOperator,
+    // isSuperAdmin
 } from './role-utils';
 
 // Rutas específicas por rol/función
@@ -44,7 +44,8 @@ export async function getCurrentUserRole(): Promise<DismissalRole | null> {
         if (!sessionClaims) return null;
 
         // Use centralized role extraction
-        return extractRoleFromMetadata(sessionClaims);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return extractRoleFromMetadata(sessionClaims as any);
     } catch (error) {
         console.error('Error getting user role:', error);
         return null;
@@ -102,8 +103,10 @@ export async function getOperatorPermissions() {
         const { sessionClaims } = await auth();
         if (!sessionClaims) return null;
 
-        const role = extractRoleFromMetadata(sessionClaims);
-        return extractOperatorPermissions(sessionClaims, role);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const role = extractRoleFromMetadata(sessionClaims as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return extractOperatorPermissions(sessionClaims as any, role);
     } catch (error) {
         console.error('Error getting operator permissions:', error);
         return null;

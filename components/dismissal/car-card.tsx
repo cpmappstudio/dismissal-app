@@ -1,20 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Trash2, Clock, Users, GraduationCap } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Trash2, Users, GraduationCap } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
     Drawer,
-    DrawerClose,
     DrawerContent,
-    DrawerDescription,
-    DrawerFooter,
     DrawerHeader,
     DrawerTitle,
     DrawerTrigger,
 } from "@/components/ui/drawer"
-import { Badge } from "@/components/ui/badge"
 import { Car } from "./car"
 import { useTranslations } from "next-intl"
 import { CarData } from "./types"
@@ -84,7 +79,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                     <div className="max-h-16 xl:max-h-32 overflow-y-auto bg-transparent z-30 relative -mt-10 xl:-mt-14"
                         style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
                         <div className="flex flex-col space-y-2">
-                            {car.students.map((student, index) => (
+                            {car.students.map((student) => (
                                 <div key={student.id} className="flex items-center gap-2">
                                     <Avatar className={`w-8 h-8 ${laneColors.background}`}>
                                         <AvatarImage src={student.imageUrl} alt={student.name} />

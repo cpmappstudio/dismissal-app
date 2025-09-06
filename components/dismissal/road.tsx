@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Maximize, Minimize } from "lucide-react"
 import { Lane } from "./lane"
-import { CarData, LaneType, ModeType } from "./types"
+import { CarData, ModeType } from "./types"
 
 interface RoadProps {
     leftLaneCars: CarData[]
@@ -18,7 +18,7 @@ interface RoadProps {
     className?: string
 }
 
-export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, onRemoveCar, isFullscreen = false, onToggleFullscreen, className }) => {
+export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, onRemoveCar, isFullscreen = false, onToggleFullscreen }) => {
     const t = useTranslations('common')
     const isViewer = mode === 'viewer'
 

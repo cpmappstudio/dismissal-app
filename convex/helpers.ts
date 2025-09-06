@@ -76,7 +76,7 @@ export async function validateUserAccess(
     if (!identity) throw new Error("Not authenticated");
 
     // Use centralized role extraction from shared utilities
-    const role = extractRoleFromMetadata(identity);
+    const role = extractRoleFromMetadata(identity as any);
 
     if (requiredRoles && !requiredRoles.includes(role)) {
         throw new Error(`Requires role: ${requiredRoles.join(' or ')}`);

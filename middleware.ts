@@ -179,7 +179,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     }
 
     // Obtener rol del usuario usando sistema centralizado
-    const userRole = extractRoleFromMetadata(authObject.sessionClaims)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userRole = extractRoleFromMetadata(authObject.sessionClaims as any)
 
     // Usuario sin rol asignado
     if (!userRole) {
