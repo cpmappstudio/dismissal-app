@@ -249,7 +249,7 @@ export const update = mutation({
 });
 
 /**
- * Soft delete a student
+ * Soft delete a student with cascade queue removal
  */
 export const deleteStudent = mutation({
     args: { studentId: v.id("students") },
@@ -262,12 +262,216 @@ export const deleteStudent = mutation({
             throw new Error("Student not found");
         }
 
-        // Soft delete
+        let carRemovedFromQueue = false;
+
+        // Check if this student's car is currently in any queue
+        if (student.carNumber > 0) {
+            const queueEntry = await ctx.db
+                .query("dismissalQueue")
+                .withIndex("by_car_campus", (q: any) =>
+                    q.eq("carNumber", student.carNumber)
+                        .eq("campusLocation", student.campusLocation)
+                )
+                .filter((q: any) => q.eq(q.field("status"), "waiting"))
+                .first();
+
+            if (queueEntry) {
+                // Get remaining students with the same car number (siblings)
+                const remainingStudents = await getStudentsByCarNumber(
+                    ctx.db,
+                    student.carNumber,
+                    student.campusLocation
+                ).then((students: any[]) =>
+                    students.filter((s: any) => s._id !== student._id && s.isActive)
+                );
+
+                if (remainingStudents.length === 0) {
+                    // No other students with this car number, remove from queue entirely
+
+                    // Create history entry for the removal
+                    const waitTimeSeconds = Math.floor((Date.now() - queueEntry.assignedTime) / 1000);
+
+                    // Get or create user record for history (use the user who added the car originally)
+                    let removedByUser = queueEntry.addedBy;
+
+                    await ctx.db.insert("dismissalHistory", {
+                        carNumber: queueEntry.carNumber,
+                        campusLocation: queueEntry.campusLocation,
+                        lane: queueEntry.lane,
+                        studentIds: queueEntry.students.map((s: any) => s.studentId),
+                        studentNames: queueEntry.students.map((s: any) => s.name),
+                        queuedAt: queueEntry.assignedTime,
+                        completedAt: Date.now(),
+                        waitTimeSeconds,
+                        addedBy: queueEntry.addedBy,
+                        removedBy: removedByUser,
+                        date: new Date().toISOString().split('T')[0]
+                    });
+
+                    // Reposition remaining cars in lane
+                    const entriesToReposition = await ctx.db
+                        .query("dismissalQueue")
+                        .withIndex("by_campus_lane_position", (q: any) =>
+                            q.eq("campusLocation", queueEntry.campusLocation)
+                                .eq("lane", queueEntry.lane)
+                        )
+                        .filter((q: any) => q.gt(q.field("position"), queueEntry.position))
+                        .collect();
+
+                    // Reposition cars
+                    for (const entry of entriesToReposition) {
+                        const { _id, _creationTime, ...entryData } = entry;
+                        const newEntry = { ...entryData, position: entry.position - 1 };
+                        await ctx.db.delete(entry._id);
+                        await ctx.db.insert("dismissalQueue", newEntry);
+                    }
+
+                    // Remove the queue entry
+                    await ctx.db.delete(queueEntry._id);
+                    carRemovedFromQueue = true;
+                } else {
+                    // Update queue entry to remove this student but keep the car
+                    const updatedStudents = queueEntry.students.filter(
+                        (s: any) => s.studentId !== student._id
+                    );
+
+                    await ctx.db.patch(queueEntry._id, {
+                        students: updatedStudents
+                    });
+                }
+            }
+        }
+
+        // Soft delete the student
         await ctx.db.patch(args.studentId, {
             isActive: false
         });
 
-        return args.studentId;
+        return {
+            studentId: args.studentId,
+            carRemoved: carRemovedFromQueue
+        };
+    }
+});
+
+/**
+ * Soft delete multiple students with cascade queue removal
+ */
+export const deleteMultipleStudents = mutation({
+    args: { studentIds: v.array(v.id("students")) },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const results = [];
+        const processedCars = new Set<string>(); // To avoid processing the same car multiple times
+
+        for (const studentId of args.studentIds) {
+            const student = await ctx.db.get(studentId);
+            if (!student) {
+                results.push({ studentId, success: false, error: "Student not found" });
+                continue;
+            }
+
+            let carRemovedFromQueue = false;
+            const carKey = `${student.carNumber}-${student.campusLocation}`;
+
+            // Check if this student's car is currently in any queue (only once per car)
+            if (student.carNumber > 0 && !processedCars.has(carKey)) {
+                processedCars.add(carKey);
+
+                const queueEntry = await ctx.db
+                    .query("dismissalQueue")
+                    .withIndex("by_car_campus", (q: any) =>
+                        q.eq("carNumber", student.carNumber)
+                            .eq("campusLocation", student.campusLocation)
+                    )
+                    .filter((q: any) => q.eq(q.field("status"), "waiting"))
+                    .first();
+
+                if (queueEntry) {
+                    // Get remaining students with the same car number after all deletions
+                    const remainingStudents = await getStudentsByCarNumber(
+                        ctx.db,
+                        student.carNumber,
+                        student.campusLocation
+                    ).then((students: any[]) =>
+                        students.filter((s: any) =>
+                            s.isActive && !args.studentIds.includes(s._id)
+                        )
+                    );
+
+                    if (remainingStudents.length === 0) {
+                        // No students will remain with this car number, remove from queue entirely
+
+                        // Create history entry for the removal
+                        const waitTimeSeconds = Math.floor((Date.now() - queueEntry.assignedTime) / 1000);
+
+                        await ctx.db.insert("dismissalHistory", {
+                            carNumber: queueEntry.carNumber,
+                            campusLocation: queueEntry.campusLocation,
+                            lane: queueEntry.lane,
+                            studentIds: queueEntry.students.map((s: any) => s.studentId),
+                            studentNames: queueEntry.students.map((s: any) => s.name),
+                            queuedAt: queueEntry.assignedTime,
+                            completedAt: Date.now(),
+                            waitTimeSeconds,
+                            addedBy: queueEntry.addedBy,
+                            removedBy: queueEntry.addedBy,
+                            date: new Date().toISOString().split('T')[0]
+                        });
+
+                        // Reposition remaining cars in lane
+                        const entriesToReposition = await ctx.db
+                            .query("dismissalQueue")
+                            .withIndex("by_campus_lane_position", (q: any) =>
+                                q.eq("campusLocation", queueEntry.campusLocation)
+                                    .eq("lane", queueEntry.lane)
+                            )
+                            .filter((q: any) => q.gt(q.field("position"), queueEntry.position))
+                            .collect();
+
+                        // Reposition cars
+                        for (const entry of entriesToReposition) {
+                            const { _id, _creationTime, ...entryData } = entry;
+                            const newEntry = { ...entryData, position: entry.position - 1 };
+                            await ctx.db.delete(entry._id);
+                            await ctx.db.insert("dismissalQueue", newEntry);
+                        }
+
+                        // Remove the queue entry
+                        await ctx.db.delete(queueEntry._id);
+                        carRemovedFromQueue = true;
+                    } else {
+                        // Update queue entry to remove deleted students but keep the car
+                        const updatedStudents = queueEntry.students.filter(
+                            (s: any) => !args.studentIds.includes(s.studentId)
+                        );
+
+                        await ctx.db.patch(queueEntry._id, {
+                            students: updatedStudents
+                        });
+                    }
+                }
+            }
+
+            // Soft delete the student
+            await ctx.db.patch(studentId, {
+                isActive: false
+            });
+
+            results.push({
+                studentId,
+                success: true,
+                carRemoved: carRemovedFromQueue
+            });
+        }
+
+        return {
+            results,
+            totalDeleted: results.filter(r => r.success).length,
+            totalCarsRemoved: results.filter(r => r.carRemoved).length
+        };
     }
 });
 

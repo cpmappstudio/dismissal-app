@@ -285,7 +285,7 @@
         "title": "Students",
         "subtitle": "Manage and view all students in the system",
         "search": {
-            "placeholder": "Search students..."
+            "placeholder": "Search students by name or car number..."
         },
         "filters": {
             "campus": {

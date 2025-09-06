@@ -17,14 +17,14 @@ import {
 import { ChevronDown, Search, GraduationCap, Plus, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+// import {
+//     DropdownMenu,
+//     DropdownMenuContent,
+//     DropdownMenuItem,
+//     DropdownMenuLabel,
+//     DropdownMenuSeparator,
+//     DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
     Table,
@@ -41,41 +41,73 @@ import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { StudentFormDialog } from "./student-form-dialog"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { CAMPUS_LOCATIONS, GRADES, Grade, CampusLocation, Id } from "@/convex/types"
+import { useStudentsData } from "@/hooks/use-students-data"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+
+// Componente de Skeleton optimizado
+function StudentsTableSkeleton() {
+    return (
+        <div className="w-full space-y-4">
+            <div className="flex items-center justify-between">
+                <Skeleton className="h-8 w-[200px]" />
+                <Skeleton className="h-8 w-[100px]" />
+            </div>
+            <div className="rounded-md border">
+                <div className="space-y-2 p-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 
 export function StudentsTable() {
     const t = useTranslations('studentsManagement')
     const columns = useColumns()
 
-    // Table state
+    // Table state - NO duplicar filtros
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [rowSelection, setRowSelection] = React.useState({})
-
-    // Filter state for Convex queries
-    const [searchFilter, setSearchFilter] = React.useState("")
-    const [campusFilter, setCampusFilter] = React.useState<CampusLocation | "">("")
-    const [gradeFilter, setGradeFilter] = React.useState<Grade | "">("")
+    const [globalFilter, setGlobalFilter] = React.useState("")
 
     // Dialog state
     const [editDialogOpen, setEditDialogOpen] = React.useState(false)
     const [selectedStudent, setSelectedStudent] = React.useState<Student | undefined>()
-    const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-    // Convex hooks - usando el patrón correcto
-    const studentsData = useQuery(api.students.list, {
-        search: searchFilter || undefined,
-        campus: campusFilter || undefined,
-        grade: gradeFilter || undefined,
-        limit: 100,
+    // Hook personalizado para datos de estudiantes - SIN filtros (enfoque estándar)
+    const studentsData = useStudentsData({
+        // Cargar TODOS los estudiantes sin filtros para que React Table maneje el filtrado
+        limit: 1000, // Ajustar según necesidades
     })
+
+    // Función de filtrado personalizada para buscar por nombre O número de carro
+    const globalFilterFunction = React.useCallback((row: any, columnId: string, filterValue: string) => {
+        if (!filterValue) return true
+
+        const searchTerm = filterValue.toLowerCase().trim()
+        const student = row.original as Student
+
+        // Buscar en el nombre completo
+        const nameMatch = student.fullName.toLowerCase().includes(searchTerm)
+
+        // Buscar en el número de carro (convertir a string para comparación)
+        const carNumberMatch = student.carNumber > 0 &&
+            student.carNumber.toString().includes(searchTerm)
+
+        return nameMatch || carNumberMatch
+    }, [])
 
     // Mutations de Convex
     const createStudent = useMutation(api.students.create)
     const updateStudent = useMutation(api.students.update)
     const deleteStudent = useMutation(api.students.deleteStudent)
+    const deleteMultipleStudents = useMutation(api.students.deleteMultipleStudents)
 
-    // Transform Convex data to match component expectations
+    // Transform Convex data con memoización mejorada
     const data: Student[] = React.useMemo(() => {
         if (!studentsData?.students) return []
 
@@ -90,12 +122,12 @@ export function StudentsTable() {
             campusLocation: student.campusLocation,
             avatarUrl: student.avatarUrl || "",
         }))
-    }, [studentsData])
+    }, [studentsData?.students]) // Más específico que studentsData completo
 
     // Loading state - Convex retorna undefined mientras carga
     const isLoading = studentsData === undefined
 
-    // Table instance
+    // Table instance - ENFOQUE ESTÁNDAR con filtrado local
     const table = useReactTable({
         data,
         columns,
@@ -103,55 +135,52 @@ export function StudentsTable() {
             sorting,
             columnFilters,
             rowSelection,
+            globalFilter,
         },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onRowSelectionChange: setRowSelection,
+        onGlobalFilterChange: setGlobalFilter,
         getCoreRowModel: getCoreRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
+        getFilteredRowModel: getFilteredRowModel(), // ✅ Filtrado local estándar
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        globalFilterFn: globalFilterFunction,
+        // manualFiltering: false por defecto - React Table maneja filtros
     })
-
-    // Update filters when table filters change - Convex optimiza esto en el backend
-    React.useEffect(() => {
-        const searchValue = table.getColumn("fullName")?.getFilterValue() as string
-        setSearchFilter(searchValue || "")
-    }, [table.getColumn("fullName")?.getFilterValue()])
-
-    React.useEffect(() => {
-        const campusValue = table.getColumn("campusLocation")?.getFilterValue() as CampusLocation
-        setCampusFilter(campusValue || "")
-    }, [table.getColumn("campusLocation")?.getFilterValue()])
-
-    React.useEffect(() => {
-        const gradeValue = table.getColumn("grade")?.getFilterValue() as Grade
-        setGradeFilter(gradeValue || "")
-    }, [table.getColumn("grade")?.getFilterValue()])
 
     // Get selected students
     const selectedStudents = table.getFilteredSelectedRowModel().rows.map(row => row.original)
 
-    // Handlers con mejor manejo de estado siguiendo patrón Convex
-    const handleDeleteStudents = async (studentIds: string[]) => {
-        setIsSubmitting(true)
+    // Handlers optimizados con useCallback y mejor manejo de errores
+    const handleDeleteStudents = React.useCallback(async (studentIds: string[]) => {
         try {
-            // Convex permite múltiples mutations en paralelo
-            const deletePromises = studentIds.map(id =>
-                deleteStudent({ studentId: id as Id<"students"> })
-            )
-            await Promise.all(deletePromises)
+            if (studentIds.length === 1) {
+                // Single student deletion
+                const result = await deleteStudent({ studentId: studentIds[0] as Id<"students"> })
+                if (result.carRemoved) {
+                    // TODO: Show toast that car was also removed from queue
+                    console.log("Car removed from queue due to student deletion")
+                }
+            } else {
+                // Multiple students deletion - use batch operation
+                const result = await deleteMultipleStudents({
+                    studentIds: studentIds as Id<"students">[]
+                })
+                if (result.totalCarsRemoved > 0) {
+                    // TODO: Show toast about cars removed from queue
+                    console.log(`${result.totalCarsRemoved} cars removed from queue due to student deletions`)
+                }
+            }
             setRowSelection({})
+            // TODO: Agregar toast de éxito aquí
         } catch (error) {
             console.error("Error deleting students:", error)
-            // Aquí podrías agregar un toast de error
-        } finally {
-            setIsSubmitting(false)
+            // TODO: Agregar toast de error aquí
         }
-    }
+    }, [deleteStudent, deleteMultipleStudents])
 
-    const handleCreateStudent = async (studentData: Omit<Student, 'id'>) => {
-        setIsSubmitting(true)
+    const handleCreateStudent = React.useCallback(async (studentData: Omit<Student, 'id'>) => {
         try {
             await createStudent({
                 firstName: studentData.firstName,
@@ -163,18 +192,16 @@ export function StudentsTable() {
                 avatarUrl: studentData.avatarUrl,
             })
             // No necesitamos recargar manualmente - Convex actualiza automáticamente
+            // TODO: Agregar toast de éxito aquí
         } catch (error) {
             console.error("Error creating student:", error)
-            // Aquí podrías agregar un toast de error
-        } finally {
-            setIsSubmitting(false)
+            // TODO: Agregar toast de error aquí
         }
-    }
+    }, [createStudent])
 
-    const handleUpdateStudent = async (studentData: Omit<Student, 'id'>) => {
+    const handleUpdateStudent = React.useCallback(async (studentData: Omit<Student, 'id'>) => {
         if (!selectedStudent) return
 
-        setIsSubmitting(true)
         try {
             await updateStudent({
                 studentId: selectedStudent.id as Id<"students">,
@@ -189,51 +216,40 @@ export function StudentsTable() {
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
+            // TODO: Agregar toast de éxito aquí
         } catch (error) {
             console.error("Error updating student:", error)
-        } finally {
-            setIsSubmitting(false)
+            // TODO: Agregar toast de error aquí
         }
-    }
+    }, [selectedStudent, updateStudent])
 
-    const handleDeleteStudent = async (studentId: string) => {
-        setIsSubmitting(true)
+    const handleDeleteStudent = React.useCallback(async (studentId: string) => {
         try {
-            await deleteStudent({ studentId: studentId as Id<"students"> })
+            const result = await deleteStudent({ studentId: studentId as Id<"students"> })
+            if (result.carRemoved) {
+                // TODO: Show toast that car was also removed from queue
+                console.log("Car removed from queue due to student deletion")
+            }
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
+            // TODO: Agregar toast de éxito aquí
         } catch (error) {
             console.error("Error deleting student:", error)
-        } finally {
-            setIsSubmitting(false)
+            // TODO: Agregar toast de error aquí
         }
-    }
+    }, [deleteStudent])
 
-    const handleRowClick = (student: Student, event: React.MouseEvent) => {
+    const handleRowClick = React.useCallback((student: Student, event: React.MouseEvent) => {
         // Skip if clicking checkbox
         if ((event.target as HTMLElement).closest('[role="checkbox"]')) return
 
         setSelectedStudent(student)
         setEditDialogOpen(true)
-    }
+    }, [])
 
     if (isLoading) {
-        return (
-            <div className="w-full space-y-4">
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-8 w-[200px]" />
-                    <Skeleton className="h-8 w-[100px]" />
-                </div>
-                <div className="rounded-md border">
-                    <div className="space-y-2 p-4">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                    </div>
-                </div>
-            </div>
-        )
+        return <StudentsTableSkeleton />
     }
 
     return (
@@ -246,10 +262,8 @@ export function StudentsTable() {
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                         <Input
                             placeholder={t('search.placeholder')}
-                            value={(table.getColumn("fullName")?.getFilterValue() as string) ?? ""}
-                            onChange={(e) =>
-                                table.getColumn("fullName")?.setFilterValue(e.target.value)
-                            }
+                            value={globalFilter ?? ""}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
                             className="pl-8 border-2 border-yankees-blue focus:ring-yankees-blue"
                             aria-label={t('search.placeholder')}
                         />
