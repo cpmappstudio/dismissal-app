@@ -114,14 +114,14 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
 
                         <div className="p-4 space-y-6">
                             {/* Car SVG Display */}
-                            <div className="flex justify-center">
+                            {/* <div className="flex justify-center">
                                 <div className="bg-gray-50 rounded-xl p-4">
                                     <Car
                                         size="lg"
                                         color={car.imageColor}
                                     />
                                 </div>
-                            </div>
+                            </div> */}
 
                             {/* Students Section */}
                             <div className="space-y-3">
@@ -132,7 +132,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     </h3>
                                 </div>
 
-                                <div className="max-h-32 xl:max-h-64 overflow-y-auto space-y-3 pr-2"
+                                <div className="space-y-3 pr-2"
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB #F3F4F6' }}>
                                     {car.students.map((student) => (
                                         <div key={student.id} className="flex items-center gap-3 p-3 bg-white border rounded-lg">
