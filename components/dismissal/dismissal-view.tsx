@@ -342,7 +342,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
             {/* Alert Component - Fixed at bottom right */}
             {alert.show && (
-                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
                     <Alert
                         variant={alert.type === 'error' ? 'destructive' : 'default'}
                         className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
