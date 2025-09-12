@@ -49,7 +49,8 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                         {/* SVG Car with dynamic color */}
                         <Car
                             size="lg"
-                            color={car.imageColor}
+                            // color={car.imageColor}
+                            color="#A6A6A6"
                             className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
                             isViewer={isViewerMode}
                         />
