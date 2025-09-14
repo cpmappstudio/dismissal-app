@@ -100,8 +100,8 @@ export type CampusLocation = typeof CAMPUS_LOCATIONS[number];
  * Academic grades supported by the system (for forms and UI)
  */
 export const GRADES = [
-    "Pre-Kinder",
-    "Kinder",
+    "PreK",
+    "K",
     "1st",
     "2nd",
     "3rd",
