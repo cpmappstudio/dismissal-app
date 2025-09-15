@@ -94,7 +94,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                             {/* Students Names and Grades - BOTTOM of car - Optimized spacing */}
                             <div className="w-full px-0.5 min-w-0 -mt-1">
                                 <div className="flex flex-col items-center w-full">
-                                    {car.students.map((student, index) => (
+                                    {car.students.map((student) => (
                                         <div key={student.id} className="text-center w-full min-w-0 -my-0.5">
                                             <div 
                                                 className="text-white font-bold drop-shadow-lg leading-none break-words hyphens-auto w-full overflow-wrap-anywhere"
