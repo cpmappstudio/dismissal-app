@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Maximize, Minimize } from "lucide-react"
 import { Lane } from "./lane"
 import { CarData, ModeType } from "./types"
+import "./road.css"
 
 interface RoadProps {
     leftLaneCars: CarData[]
@@ -36,6 +37,8 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
         }
     }, [isFullscreen, onToggleFullscreen])
 
+
+
     return (
         <div className={`flex-1 min-h-0 ${isFullscreen ? 'fixed inset-0 z-[9999] bg-white' : ''}`} style={{ marginBottom: mode === 'allocator' ? '6rem' : '0' }}>
             <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${isFullscreen
@@ -63,10 +66,77 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                 )}
 
                 <CardContent
-                    className={`flex-1 min-h-0 p-0 relative ${isViewer ? 'overflow-x-scroll overflow-y-hidden' : 'overflow-y-scroll'}`}
+                    ref={(el) => {
+                        if (el) {
+                            let isScrollbarInteraction = false
+
+                            // Bloquear scroll de rueda (mouse wheel)
+                            const handleWheel = (e: WheelEvent) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                            }
+
+                            // Detectar inicio de touch en scrollbar
+                            const handleTouchStart = (e: TouchEvent) => {
+                                const touch = e.touches[0]
+                                const rect = el.getBoundingClientRect()
+                                const scrollbarWidth = 16 // Mobile scrollbar width
+                                const touchX = touch.clientX - rect.left
+                                
+                                // Marcar si el touch inicia en la zona de scrollbar
+                                isScrollbarInteraction = touchX >= rect.width - scrollbarWidth
+                                
+                                // Si NO es scrollbar, prevenir el touch start
+                                if (!isScrollbarInteraction) {
+                                    e.preventDefault()
+                                }
+                            }
+
+                            // Solo bloquear touchmove si NO es interacción con scrollbar
+                            const handleTouchMove = (e: TouchEvent) => {
+                                if (!isScrollbarInteraction) {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                }
+                            }
+
+                            // Reset flag al terminar touch
+                            const handleTouchEnd = () => {
+                                isScrollbarInteraction = false
+                            }
+
+                            // Bloquear teclas de dirección para scroll
+                            const handleKeyDown = (e: KeyboardEvent) => {
+                                if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.key)) {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                }
+                            }
+
+                            el.addEventListener('wheel', handleWheel, { passive: false })
+                            el.addEventListener('touchstart', handleTouchStart, { passive: false })
+                            el.addEventListener('touchmove', handleTouchMove, { passive: false })
+                            el.addEventListener('touchend', handleTouchEnd, { passive: true })
+                            el.addEventListener('keydown', handleKeyDown)
+
+                            // Iniciar scroll desde abajo
+                            setTimeout(() => {
+                                el.scrollTop = el.scrollHeight
+                            }, 0)
+
+                            // Cleanup function
+                            return () => {
+                                el.removeEventListener('wheel', handleWheel)
+                                el.removeEventListener('touchstart', handleTouchStart)
+                                el.removeEventListener('touchmove', handleTouchMove)
+                                el.removeEventListener('touchend', handleTouchEnd)
+                                el.removeEventListener('keydown', handleKeyDown)
+                            }
+                        }
+                    }}
+                    className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? 'overflow-x-scroll overflow-y-hidden' : 'overflow-y-scroll'}`}
                     style={{
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: '#D1D5DB #9CA3AF'
+                        WebkitOverflowScrolling: 'touch'
                     }}
                 >
                     <div className={`relative ${isViewer ? 'min-w-max h-full flex flex-col' : 'min-h-full flex'}`}>

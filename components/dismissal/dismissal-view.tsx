@@ -24,7 +24,7 @@ interface DismissalViewProps {
 export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
 
-    const [selectedCampus, setSelectedCampus] = React.useState<string>("Poinciana Campus")
+    const [selectedCampus, setSelectedCampus] = React.useState<string>("")
     const [isFullscreen, setIsFullscreen] = React.useState(false)
     const [carInputValue, setCarInputValue] = React.useState<string>('')
     const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -263,22 +263,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             </div>
 
             {/* Main Content Area - Takes remaining space */}
-            <div className="flex-1 flex flex-col mt-4 min-h-0 relative">{!isCampusSelected ? (
-                <div className="flex-1 flex items-center justify-center">
-                    <Card className="border-2 border-dashed border-yankees-blue/50">
-                        <CardContent className="flex items-center justify-center h-48">
-                            <div className="text-center space-y-2">
-                                <Car className="h-12 w-12 text-muted-foreground mx-auto" />
-                                <CardTitle className="text-lg text-muted-foreground">{t('campus.required')}</CardTitle>
-                                <CardDescription>
-                                    {t('campus.placeholder')}
-                                </CardDescription>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            ) : (
-                <>
+            <div className="flex-1 flex flex-col mt-4 min-h-0 relative">
+                <div className={`relative ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
                     <Road
                         leftLaneCars={leftLaneCars}
                         rightLaneCars={rightLaneCars}
@@ -287,9 +273,27 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
                     />
+                    
+                    {/* Overlay cuando no hay campus */}
+                    {!isCampusSelected && (
+                        <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
+                            <Card className="bg-white shadow-xl border-2 border-yankees-blue">
+                                <CardContent className="flex items-center justify-center p-6">
+                                    <div className="text-center space-y-2">
+                                        <Car className="h-12 w-12 text-muted-foreground mx-auto" />
+                                        <CardTitle className="text-lg text-muted-foreground">{t('campus.required')}</CardTitle>
+                                        <CardDescription>
+                                            {t('campus.placeholder')}
+                                        </CardDescription>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </div>
 
-                    {/* Allocator Control with Finish Line - Responsive */}
-                    {mode === 'allocator' && (
+                {/* Allocator Control with Finish Line - Responsive */}
+                {mode === 'allocator' && isCampusSelected && (
                         <div className="absolute bottom-3 left-0 right-0 z-20 px-2">
                             <div className="flex justify-center">
                                 <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-white/30 relative overflow-hidden">
@@ -335,9 +339,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                 </div>
                             </div>
                         </div>
-                    )}
-                </>
-            )}
+                )}
             </div>
 
             {/* Alert Component - Fixed at bottom right */}
