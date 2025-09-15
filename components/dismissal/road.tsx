@@ -95,7 +95,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                                 
                                 // Check if touch is on an interactive element
                                 const touchTarget = e.target as Element
-                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer')
+                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
                                 
                                 // Si NO es scrollbar Y NO es elemento interactivo, prevenir el touch start
                                 if (!isScrollbarInteraction && !isInteractiveElement) {
@@ -106,7 +106,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                             // Solo bloquear touchmove si NO es interacción con scrollbar Y NO es elemento interactivo
                             const handleTouchMove = (e: TouchEvent) => {
                                 const touchTarget = e.target as Element
-                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer')
+                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
                                 
                                 if (!isScrollbarInteraction && !isInteractiveElement) {
                                     e.preventDefault()

@@ -42,65 +42,106 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
     const laneColors = LANE_COLORS[lane]
 
     return (
-        <div className={`relative z-30 ${isViewerMode ? 'flex flex-col items-center justify-center mx-8 mt-8 md:mt-0' : 'flex justify-center'}`}>
+        <div className={`relative z-30 ${isViewerMode ? 'flex flex-col items-center justify-center mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-2 lg:mt-0' : 'flex justify-center'}`}>
             <Drawer>
                 <DrawerTrigger asChild>
-                    <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30">
-                        {/* SVG Car with dynamic color */}
-                        <Car
-                            size="lg"
-                            // color={car.imageColor}
-                            color="#A6A6A6"
-                            className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
-                            isViewer={isViewerMode}
-                        />
-
-                        {/* Combined Car Number Badge and Remove Button */}
-                        <div className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-50 flex items-center`}>
-                            {showRemoveButton && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onRemove?.(car.id)
-                                    }}
-                                    className="p-1.5 hover:text-red-500 rounded-l-full transition-colors duration-200"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            )}
-                            <span className={`px-2 text-xl py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
-                                {car.carNumber}
-                            </span>
-                        </div>
-                    </div>
-                </DrawerTrigger>
-
-                {/* Students Information - Only shown in Viewer Mode */}
-                {isViewerMode && (
-                    <div className="max-h-16 xl:max-h-32 overflow-y-auto bg-transparent z-30 relative -mt-10 xl:-mt-14"
-                        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
-                        <div className="flex flex-col space-y-2">
-                            {car.students.map((student) => (
-                                <div key={student.id} className="flex items-center gap-2">
-                                    <Avatar className={`w-8 h-8 ${laneColors.background}`}>
-                                        <AvatarImage src={student.imageUrl} alt={student.name} />
-                                        <AvatarFallback className={`text-xs font-bold ${laneColors.textColor} bg-transparent`}>
-                                            {getStudentInitials(student.name)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="-ml-1">
-                                        <div className="text-sm text-white font-medium">
-                                            {student.name}
-                                        </div>
-                                        <div className="text-xs text-white/80">
-                                            {student.grade || `${t('car.grade')} 5`}
-                                        </div>
-                                    </div>
+                    {isViewerMode ? (
+                        /* Viewer Mode Layout - Redesigned for large screens */
+                        <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30 flex flex-col items-center">
+                            {/* Students Photos - TOP of car, aligned left of car number */}
+                            <div className="relative w-full flex items-center justify-between mb-0.5 md:mb-1 px-0.5">
+                                <div className="flex flex-wrap gap-0.5 md:gap-1 lg:gap-1.5">
+                                    {car.students.map((student) => (
+                                        <Avatar key={student.id} className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
+                                            <AvatarImage src={student.imageUrl} alt={student.name} />
+                                            <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
+                                                {getStudentInitials(student.name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    ))}
                                 </div>
-                            ))}
+                                
+                                {/* Car Number Badge - Right side */}
+                                <div className={`${laneColors.badge} text-white font-bold rounded-full shadow-lg z-50 flex items-center px-2 py-1 md:px-2.5 md:py-1 ml-2 md:ml-3 lg:ml-4`}>
+                                    {showRemoveButton && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onRemove?.(car.id)
+                                            }}
+                                            className="p-1 hover:text-red-500 rounded-l-full transition-colors duration-200"
+                                        >
+                                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                        </button>
+                                    )}
+                                    <span 
+                                        className={`${showRemoveButton ? 'rounded-r-full' : 'rounded-full'}`}
+                                        style={{ fontSize: 'clamp(0.875rem, 2.2vw, 1.125rem)' }}
+                                    >
+                                        {car.carNumber}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* SVG Car - CENTER - Optimized size */}
+                            <Car
+                                size="md"
+                                color="#A6A6A6"
+                                className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
+                                isViewer={isViewerMode}
+                            />
+
+                            {/* Students Names and Grades - BOTTOM of car - Optimized spacing */}
+                            <div className="w-full px-0.5 min-w-0 -mt-1">
+                                <div className="flex flex-col items-center w-full">
+                                    {car.students.map((student, index) => (
+                                        <div key={student.id} className="text-center w-full min-w-0 -my-0.5">
+                                            <div 
+                                                className="text-white font-bold drop-shadow-lg leading-none break-words hyphens-auto w-full overflow-wrap-anywhere"
+                                                style={{
+                                                    fontSize: 'clamp(0.75rem, 2.5vw, 1.25rem)',
+                                                    lineHeight: 'clamp(0.9rem, 3vw, 1.4rem)'
+                                                }}
+                                            >
+                                                {student.name} <span className="text-yellow-200 font-semibold">({student.grade || `${t('car.grade')} 5`})</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        /* Non-Viewer Mode Layout - Original */
+                        <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30">
+                            {/* SVG Car with dynamic color */}
+                            <Car
+                                size="lg"
+                                // color={car.imageColor}
+                                color="#A6A6A6"
+                                className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
+                                isViewer={isViewerMode}
+                            />
+
+                            {/* Combined Car Number Badge and Remove Button */}
+                            <div className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-50 flex items-center`}>
+                                {showRemoveButton && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onRemove?.(car.id)
+                                        }}
+                                        className="p-1.5 hover:text-red-500 rounded-l-full transition-colors duration-200"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                )}
+                                <span className={`px-2 text-xl py-1 ${showRemoveButton ? 'rounded-r-full' : 'rounded-full px-3'}`}>
+                                    {car.carNumber}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </DrawerTrigger>
 
                 <DrawerContent>
                     <div className="mx-auto w-full max-w-md">
