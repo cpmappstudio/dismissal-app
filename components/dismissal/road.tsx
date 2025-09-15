@@ -80,21 +80,35 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                             const handleTouchStart = (e: TouchEvent) => {
                                 const touch = e.touches[0]
                                 const rect = el.getBoundingClientRect()
-                                const scrollbarWidth = 16 // Mobile scrollbar width
+                                const scrollbarSize = 20 // Mobile scrollbar size (width/height)
                                 const touchX = touch.clientX - rect.left
+                                const touchY = touch.clientY - rect.top
                                 
-                                // Marcar si el touch inicia en la zona de scrollbar
-                                isScrollbarInteraction = touchX >= rect.width - scrollbarWidth
+                                // Detectar si el touch está en la zona de scrollbar según el modo
+                                if (isViewer) {
+                                    // Scroll horizontal: detectar scrollbar en la parte inferior
+                                    isScrollbarInteraction = touchY >= rect.height - scrollbarSize
+                                } else {
+                                    // Scroll vertical: detectar scrollbar en el lado derecho
+                                    isScrollbarInteraction = touchX >= rect.width - scrollbarSize
+                                }
                                 
-                                // Si NO es scrollbar, prevenir el touch start
-                                if (!isScrollbarInteraction) {
+                                // Check if touch is on an interactive element
+                                const touchTarget = e.target as Element
+                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer')
+                                
+                                // Si NO es scrollbar Y NO es elemento interactivo, prevenir el touch start
+                                if (!isScrollbarInteraction && !isInteractiveElement) {
                                     e.preventDefault()
                                 }
                             }
 
-                            // Solo bloquear touchmove si NO es interacción con scrollbar
+                            // Solo bloquear touchmove si NO es interacción con scrollbar Y NO es elemento interactivo
                             const handleTouchMove = (e: TouchEvent) => {
-                                if (!isScrollbarInteraction) {
+                                const touchTarget = e.target as Element
+                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer')
+                                
+                                if (!isScrollbarInteraction && !isInteractiveElement) {
                                     e.preventDefault()
                                     e.stopPropagation()
                                 }
@@ -107,7 +121,11 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
 
                             // Bloquear teclas de dirección para scroll
                             const handleKeyDown = (e: KeyboardEvent) => {
-                                if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.key)) {
+                                const keysToBlock = isViewer
+                                    ? ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
+                                    : ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
+                                
+                                if (keysToBlock.includes(e.key)) {
                                     e.preventDefault()
                                     e.stopPropagation()
                                 }
@@ -119,9 +137,15 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                             el.addEventListener('touchend', handleTouchEnd, { passive: true })
                             el.addEventListener('keydown', handleKeyDown)
 
-                            // Iniciar scroll desde abajo
+                            // Inicializar posición de scroll según el modo
                             setTimeout(() => {
-                                el.scrollTop = el.scrollHeight
+                                if (isViewer) {
+                                    // En viewer mode, iniciar desde el inicio (scroll horizontal)
+                                    el.scrollLeft = 0
+                                } else {
+                                    // En otros modos, iniciar desde abajo (scroll vertical)
+                                    el.scrollTop = el.scrollHeight
+                                }
                             }, 0)
 
                             // Cleanup function
