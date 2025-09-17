@@ -72,8 +72,8 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
 
                             // Bloquear scroll de rueda (mouse wheel)
                             const handleWheel = (e: WheelEvent) => {
-                                e.preventDefault()
-                                e.stopPropagation()
+                                // e.preventDefault()
+                                // e.stopPropagation()
                             }
 
                             // Detectar inicio de touch en scrollbar
