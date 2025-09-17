@@ -273,7 +273,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
                     />
-                    
+
                     {/* Overlay cuando no hay campus */}
                     {!isCampusSelected && (
                         <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -294,51 +294,51 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
                 {/* Allocator Control with Finish Line - Responsive */}
                 {mode === 'allocator' && isCampusSelected && (
-                        <div className="absolute bottom-3 left-0 right-0 z-20 px-2">
-                            <div className="flex justify-center">
-                                <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-white/30 relative overflow-hidden">
-                                    <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
-                                        {/* Left Arrow Button */}
-                                        <Button
-                                            onClick={() => handleAddCarToLane('left')}
-                                            disabled={!carInputValue.trim() || isSubmitting}
-                                            size="sm"
-                                            className="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
-                                        >
-                                            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-                                        </Button>
+                    <div className="absolute bottom-3 left-0 right-0 z-20 px-2">
+                        <div className="flex justify-center">
+                            <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-white/30 relative overflow-hidden">
+                                <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
+                                    {/* Left Arrow Button */}
+                                    <Button
+                                        onClick={() => handleAddCarToLane('left')}
+                                        disabled={!carInputValue.trim() || isSubmitting}
+                                        size="sm"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
+                                    >
+                                        <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    </Button>
 
-                                        {/* Car Input */}
-                                        <Input
-                                            type="number"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            placeholder={t('allocator.addCarPlaceholder')}
-                                            value={carInputValue}
-                                            onChange={(e) => {
-                                                // Solo permitir números
-                                                const value = e.target.value.replace(/[^0-9]/g, '')
-                                                setCarInputValue(value)
-                                            }}
-                                            onKeyDown={handleKeyPress}
-                                            disabled={isSubmitting}
-                                            className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white disabled:opacity-50"
-                                            autoFocus
-                                        />
+                                    {/* Car Input */}
+                                    <Input
+                                        type="number"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        placeholder={t('allocator.addCarPlaceholder')}
+                                        value={carInputValue}
+                                        onChange={(e) => {
+                                            // Solo permitir números
+                                            const value = e.target.value.replace(/[^0-9]/g, '')
+                                            setCarInputValue(value)
+                                        }}
+                                        onKeyDown={handleKeyPress}
+                                        disabled={isSubmitting}
+                                        className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white disabled:opacity-50"
+                                        autoFocus
+                                    />
 
-                                        {/* Right Arrow Button */}
-                                        <Button
-                                            onClick={() => handleAddCarToLane('right')}
-                                            disabled={!carInputValue.trim() || isSubmitting}
-                                            size="sm"
-                                            className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
-                                        >
-                                            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-                                        </Button>
-                                    </div>
+                                    {/* Right Arrow Button */}
+                                    <Button
+                                        onClick={() => handleAddCarToLane('right')}
+                                        disabled={!carInputValue.trim() || isSubmitting}
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
+                                    >
+                                        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    </Button>
                                 </div>
                             </div>
                         </div>
+                    </div>
                 )}
             </div>
 

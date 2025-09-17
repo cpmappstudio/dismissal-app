@@ -44,8 +44,8 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
             <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${isFullscreen
                 ? 'h-screen max-h-screen'
                 : mode === 'viewer' || mode === 'dispatcher'
-                    ? 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
-                    : 'h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)]'
+                    ? 'h-[calc(100vh-9rem)] max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)]'
+                    : 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
                 }`} style={{ backgroundColor: '#9CA3AF' }}>
 
                 {/* Fullscreen Toggle Button - Only visible in viewer mode */}
@@ -83,7 +83,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                                 const scrollbarSize = 20 // Mobile scrollbar size (width/height)
                                 const touchX = touch.clientX - rect.left
                                 const touchY = touch.clientY - rect.top
-                                
+
                                 // Detectar si el touch está en la zona de scrollbar según el modo
                                 if (isViewer) {
                                     // Scroll horizontal: detectar scrollbar en la parte inferior
@@ -92,11 +92,11 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                                     // Scroll vertical: detectar scrollbar en el lado derecho
                                     isScrollbarInteraction = touchX >= rect.width - scrollbarSize
                                 }
-                                
+
                                 // Check if touch is on an interactive element
                                 const touchTarget = e.target as Element
                                 const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
-                                
+
                                 // Si NO es scrollbar Y NO es elemento interactivo, prevenir el touch start
                                 if (!isScrollbarInteraction && !isInteractiveElement) {
                                     e.preventDefault()
@@ -107,7 +107,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                             const handleTouchMove = (e: TouchEvent) => {
                                 const touchTarget = e.target as Element
                                 const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
-                                
+
                                 if (!isScrollbarInteraction && !isInteractiveElement) {
                                     e.preventDefault()
                                     e.stopPropagation()
@@ -124,7 +124,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                                 const keysToBlock = isViewer
                                     ? ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
                                     : ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
-                                
+
                                 if (keysToBlock.includes(e.key)) {
                                     e.preventDefault()
                                     e.stopPropagation()
