@@ -131,7 +131,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                                 }
                             }
 
-                            el.addEventListener('wheel', handleWheel, { passive: false })
+                            // el.addEventListener('wheel', handleWheel, { passive: false })
                             el.addEventListener('touchstart', handleTouchStart, { passive: false })
                             el.addEventListener('touchmove', handleTouchMove, { passive: false })
                             el.addEventListener('touchend', handleTouchEnd, { passive: true })
@@ -150,7 +150,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
 
                             // Cleanup function
                             return () => {
-                                el.removeEventListener('wheel', handleWheel)
+                                // el.removeEventListener('wheel', handleWheel)
                                 el.removeEventListener('touchstart', handleTouchStart)
                                 el.removeEventListener('touchmove', handleTouchMove)
                                 el.removeEventListener('touchend', handleTouchEnd)
