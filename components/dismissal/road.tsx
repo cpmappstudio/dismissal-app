@@ -44,7 +44,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
             <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${isFullscreen
                 ? 'h-screen max-h-screen'
                 : mode === 'viewer' || mode === 'dispatcher'
-                    ? 'h-[calc(100vh-9rem)] max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)]'
+                    ? 'h-[calc(100vh-9rem)] md:max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)]'
                     : 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
                 }`} style={{ backgroundColor: '#9CA3AF' }}>
 

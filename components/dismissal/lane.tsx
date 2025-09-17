@@ -82,7 +82,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                 }`}>
                 {cars.length > 0 ? (
                     <div className={`flex transition-all duration-500 ease-in-out ${isViewer
-                        ? 'flex-row-reverse gap-6'
+                        ? 'flex-row-reverse'
                         : 'flex-col gap-4'
                         }`}>
                         {extendedCars.slice().reverse().map((car) => {

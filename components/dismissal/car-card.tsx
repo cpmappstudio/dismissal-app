@@ -51,16 +51,16 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                             {/* Students Photos - TOP of car, aligned left of car number */}
                             <div className="relative w-full flex items-center justify-between mb-0.5 md:mb-1 px-0.5">
                                 <div className="flex flex-wrap gap-0.5 md:gap-1 lg:gap-1.5">
-                                    {car.students.map((student) => (
+                                    {/* {car.students.map((student) => (
                                         <Avatar key={student.id} className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
                                             <AvatarImage src={student.imageUrl} alt={student.name} />
                                             <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
                                                 {getStudentInitials(student.name)}
                                             </AvatarFallback>
                                         </Avatar>
-                                    ))}
+                                    ))} */}
                                 </div>
-                                
+
                                 {/* Car Number Badge - Right side */}
                                 <div className={`${laneColors.badge} text-white font-bold rounded-full shadow-lg z-50 flex items-center px-2 py-1 md:px-2.5 md:py-1 ml-2 md:ml-3 lg:ml-4`}>
                                     {showRemoveButton && (
@@ -74,7 +74,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                             <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                                         </button>
                                     )}
-                                    <span 
+                                    <span
                                         className={`${showRemoveButton ? 'rounded-r-full' : 'rounded-full'}`}
                                         style={{ fontSize: 'clamp(0.875rem, 2.2vw, 1.125rem)' }}
                                     >
@@ -85,7 +85,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
 
                             {/* SVG Car - CENTER - Optimized size */}
                             <Car
-                                size="md"
+                                size="xl"
                                 color="#A6A6A6"
                                 className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
                                 isViewer={isViewerMode}
@@ -96,7 +96,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                 <div className="flex flex-col items-center w-full">
                                     {car.students.map((student) => (
                                         <div key={student.id} className="text-center w-full min-w-0 -my-0.5">
-                                            <div 
+                                            <div
                                                 className="text-white font-bold drop-shadow-lg leading-none break-words hyphens-auto w-full overflow-wrap-anywhere"
                                                 style={{
                                                     fontSize: 'clamp(0.75rem, 2.5vw, 1.25rem)',
