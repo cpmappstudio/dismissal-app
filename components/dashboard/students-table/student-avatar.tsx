@@ -35,16 +35,6 @@ export function StudentAvatar({
         avatarStorageId ? { storageId: avatarStorageId } : "skip"
     )
 
-    // Debug logs
-    React.useEffect(() => {
-        console.log(`🔍 StudentAvatar Debug - ${firstName} ${lastName}:`, {
-            avatarStorageId,
-            avatarUrl,
-            fallbackUrl,
-            hasStorageId: !!avatarStorageId,
-            hasAvatarUrl: !!avatarUrl
-        })
-    }, [avatarStorageId, avatarUrl, fallbackUrl, firstName, lastName])
 
     // Generate initials
     const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`
@@ -52,17 +42,14 @@ export function StudentAvatar({
     // Determine the image source to use
     const imageSrc = React.useMemo(() => {
         if (avatarStorageId && avatarUrl) {
-            console.log(`✅ Using Convex storage URL for ${firstName} ${lastName}:`, avatarUrl)
             return avatarUrl
         }
         if (fallbackUrl) {
-            console.log(`⚠️ Using fallback URL for ${firstName} ${lastName}:`, fallbackUrl)
             return fallbackUrl
         }
-        // Generate fallback avatar
-        const dicebearUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${firstName}${lastName}`
-        return dicebearUrl
-    }, [avatarStorageId, avatarUrl, fallbackUrl, firstName, lastName])
+        // No fallback image - let Avatar component show initials instead
+        return undefined
+    }, [avatarStorageId, avatarUrl, fallbackUrl])
 
     return (
         <Avatar className={`${sizeClasses[size]} flex-shrink-0 ${className}`}>
