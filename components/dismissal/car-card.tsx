@@ -19,11 +19,10 @@ import { formatTime, getStudentInitials } from "./utils"
 // Internal component to handle student display logic
 interface StudentInfoProps {
     students: CarData['students']
-    laneColors: any
-    t: any
+    t: (key: string) => string
 }
 
-const StudentInfo = React.memo<StudentInfoProps>(({ students, laneColors, t }) => {
+const StudentInfo = React.memo<StudentInfoProps>(({ students, t }) => {
     const firstStudent = students[0]
     const isSingleStudent = students.length === 1
 
@@ -167,7 +166,6 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                 <div className="w-full px-1 flex justify-start">
                                     <StudentInfo
                                         students={car.students}
-                                        laneColors={laneColors}
                                         t={t}
                                     />
                                 </div>
