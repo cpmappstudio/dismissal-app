@@ -5,7 +5,7 @@ import * as React from "react"
 interface CarProps {
     className?: string
     color?: string
-    size?: 'sm' | 'md' | 'lg' | 'xl'
+    size?: 'sm' | 'md' | 'lg' | 'xl' | 'viewer'
     style?: React.CSSProperties
     variant?: 'default' | 'blue' | 'green' | 'red' | 'purple' | 'orange'
     isViewer?: boolean
@@ -25,7 +25,8 @@ const sizeClasses = {
     sm: 'w-16 h-20',
     md: 'w-24 h-32',
     lg: 'w-32 h-40 xl:w-48 xl:h-60',
-    xl: 'w-32 h-40 md:w-48 md:h-60'
+    xl: 'w-32 h-40 md:w-48 md:h-60',
+    viewer: 'w-32 h-40  xl:w-52 xl:h-64 4xl:w-64 4xl:h-80 '
 }
 
 export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default', isViewer = false }) => {

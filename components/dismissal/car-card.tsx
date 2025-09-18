@@ -45,19 +45,19 @@ const StudentInfo = React.memo<StudentInfoProps>(({ students, laneColors, t }) =
             <div className="flex flex-col items-start">
                 {isSingleStudent ? (
                     <>
-                        <span className="pb-1">
+                        <span className="pb-1 text-sm md:text-base xl:text-lg 4xl:text-2xl">
                             {firstStudent.name}
                         </span>
-                        <span className="text-yellow-200 text-sm font-semibold">
+                        <span className="text-yellow-200 text-xs md:text-sm xl:text-base 4xl:text-lg font-semibold">
                             ({firstStudent.grade || `${t('car.grade')} 5`})
                         </span>
                     </>
                 ) : (
                     <>
-                        <span className="pb-1">
+                        <span className="pb-1 text-sm md:text-base xl:text-lg 4xl:text-2xl">
                             {`siblings ${getLastName(firstStudent.name)}`}
                         </span>
-                        <span className="text-yellow-200 text-sm font-semibold">
+                        <span className="text-yellow-200 text-xs md:text-sm xl:text-base 4xl:text-lg font-semibold">
                             ({students.map(student => student.grade || `${t('car.grade')} 5`).join(', ')})
                         </span>
                     </>
@@ -108,7 +108,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     <div className="flex-shrink-0">
                                         {car.students.length === 1 ? (
                                             // Single student - show one avatar
-                                            <Avatar className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
+                                            <Avatar className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
                                                 <AvatarImage src={car.students[0].imageUrl} alt={car.students[0].name} />
                                                 <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
                                                     {getStudentInitials(car.students[0].name)}
@@ -120,7 +120,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                                 {car.students.slice(0, 3).map((student, index) => (
                                                     <Avatar
                                                         key={student.id}
-                                                        className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                                        className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
                                                         style={{ zIndex: 30 - index }}
                                                     >
                                                         <AvatarImage src={student.imageUrl} alt={student.name} />
@@ -175,9 +175,9 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
 
                             {/* SVG Car - CENTER - Optimized size - Closer to text */}
                             <Car
-                                size="xl"
+                                size="viewer"
                                 color="#A6A6A6"
-                                className="!filter !-mt-10"
+                                className="!filter !-mt-8"
                                 isViewer={isViewerMode}
                             />
 
