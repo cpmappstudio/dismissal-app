@@ -16,6 +16,59 @@ import { CarData } from "./types"
 import { LANE_COLORS } from "./constants"
 import { formatTime, getStudentInitials } from "./utils"
 
+// Internal component to handle student display logic
+interface StudentInfoProps {
+    students: CarData['students']
+    laneColors: any
+    t: any
+}
+
+const StudentInfo = React.memo<StudentInfoProps>(({ students, laneColors, t }) => {
+    const firstStudent = students[0]
+    const isSingleStudent = students.length === 1
+
+    // Common styling for text (left aligned under avatars/badge)
+    const textClassName = "text-white font-bold drop-shadow-lg leading-none break-words hyphens-auto text-left"
+    const textStyle = {
+        fontSize: 'clamp(0.75rem, 2.5vw, 1.25rem)',
+        lineHeight: 'clamp(0.9rem, 3vw, 1.4rem)'
+    }
+
+    // Extract last name for siblings display
+    const getLastName = (fullName: string) => {
+        const parts = fullName.trim().split(' ')
+        return parts.length > 1 ? parts[parts.length - 1] : parts[0]
+    }
+
+    return (
+        <div className={textClassName} style={textStyle}>
+            <div className="flex flex-col items-start">
+                {isSingleStudent ? (
+                    <>
+                        <span className="pb-1">
+                            {firstStudent.name}
+                        </span>
+                        <span className="text-yellow-200 text-sm font-semibold">
+                            ({firstStudent.grade || `${t('car.grade')} 5`})
+                        </span>
+                    </>
+                ) : (
+                    <>
+                        <span className="pb-1">
+                            {`siblings ${getLastName(firstStudent.name)}`}
+                        </span>
+                        <span className="text-yellow-200 text-sm font-semibold">
+                            ({students.map(student => student.grade || `${t('car.grade')} 5`).join(', ')})
+                        </span>
+                    </>
+                )}
+            </div>
+        </div>
+    )
+})
+
+StudentInfo.displayName = 'StudentInfo'
+
 interface CarCardProps {
     car: CarData
     onRemove?: (carId: string) => void
@@ -47,68 +100,88 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                 <DrawerTrigger asChild>
                     {isViewerMode ? (
                         /* Viewer Mode Layout - Redesigned for large screens */
-                        <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30 flex flex-col items-center">
-                            {/* Students Photos - TOP of car, aligned left of car number */}
-                            <div className="relative w-full flex flex-row-reverse  ">
-
-
-                                {/* Car Number Badge - Right side */}
-                                <div className={`${laneColors.badge} translate-y-14 text-white font-bold rounded-full shadow-lg z-50 flex items-center px-2 py-1 md:px-2.5 md:py-1 ml-2 md:ml-3 lg:ml-4`}>
-                                    {showRemoveButton && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onRemove?.(car.id)
-                                            }}
-                                            className="p-1 hover:text-red-500 rounded-l-full transition-colors duration-200"
-                                        >
-
-                                        </button>
-                                    )}
-                                    <span
-                                        className={`${showRemoveButton ? 'rounded-r-full' : 'rounded-full'}`}
-                                        style={{ fontSize: 'clamp(0.875rem, 2.2vw, 1.125rem)' }}
-                                    >
-                                        {car.carNumber}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* SVG Car - CENTER - Optimized size */}
-                            <Car
-                                size="xl"
-                                color="#A6A6A6"
-                                className="!filter"
-                                isViewer={isViewerMode}
-                            />
-
-                            {/* Students Names and Grades - BOTTOM of car - Optimized spacing */}
-                            <div className="w-full px-0.5 min-w-0 -mt-16">
-                                <div className="flex flex-col items-center w-full">
-                                    {car.students.map((student) => (
-                                        <div key={student.id} className="w-full min-w-0 my-1">
-
-                                            <div
-                                                className="text-white font-bold drop-shadow-lg leading-none break-words hyphens-auto w-full overflow-wrap-anywhere"
-                                                style={{
-                                                    fontSize: 'clamp(0.75rem, 2.5vw, 1.25rem)',
-                                                    lineHeight: 'clamp(0.9rem, 3vw, 1.4rem)'
-                                                }}
-                                            >
-                                                <div className="flex flex-row items-center gap-2">
-                                                    <Avatar key={student.id} className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
+                        <div className="relative cursor-pointer  hover:scale-105 transition-transform duration-200 group z-30 flex flex-col items-center">
+                            <div className={`info ${laneColors.badge} flex flex-col rounded-2xl py-2 px-3 w-full mb-1`}>
+                                {/* Top row: Avatars (left) and Car Number Badge (right) */}
+                                <div className="flex justify-between items-start w-full mb-1">
+                                    {/* Left side - Avatars */}
+                                    <div className="flex-shrink-0">
+                                        {car.students.length === 1 ? (
+                                            // Single student - show one avatar
+                                            <Avatar className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
+                                                <AvatarImage src={car.students[0].imageUrl} alt={car.students[0].name} />
+                                                <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
+                                                    {getStudentInitials(car.students[0].name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        ) : (
+                                            // Multiple students - show overlapping avatars
+                                            <div className="flex -space-x-1">
+                                                {car.students.slice(0, 3).map((student, index) => (
+                                                    <Avatar
+                                                        key={student.id}
+                                                        className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                                        style={{ zIndex: 30 - index }}
+                                                    >
                                                         <AvatarImage src={student.imageUrl} alt={student.name} />
                                                         <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
                                                             {getStudentInitials(student.name)}
                                                         </AvatarFallback>
                                                     </Avatar>
-                                                    {student.name} <span className="text-yellow-200 font-semibold">({student.grade || `${t('car.grade')} 5`})</span>
-                                                </div>
+                                                ))}
+                                                {car.students.length > 3 && (
+                                                    <div
+                                                        className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 border-2 border-white shadow-lg text-xs flex items-center justify-center font-bold bg-gray-600 text-white rounded-full`}
+                                                        style={{ zIndex: 30 - 3 }}
+                                                    >
+                                                        +{car.students.length - 3}
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        )}
+                                    </div>
+
+                                    {/* Right side - Car Number Badge */}
+                                    <div className="text-white font-bold items-center rounded-full z-50 flex px-2 py-1 md:px-2.5 md:py-1">
+                                        {showRemoveButton && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onRemove?.(car.id)
+                                                }}
+                                                className="p-1 hover:text-red-500 rounded-l-full transition-colors duration-200"
+                                            >
+
+                                            </button>
+                                        )}
+                                        <span
+                                            className={`${showRemoveButton ? 'rounded-r-full' : 'rounded-full'}`}
+                                            style={{ fontSize: 'clamp(0.875rem, 2.2vw, 1.125rem)' }}
+                                        >
+                                            {car.carNumber}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Bottom row: Student Names - Centered */}
+                                <div className="w-full px-1 flex justify-start">
+                                    <StudentInfo
+                                        students={car.students}
+                                        laneColors={laneColors}
+                                        t={t}
+                                    />
                                 </div>
                             </div>
+
+                            {/* SVG Car - CENTER - Optimized size - Closer to text */}
+                            <Car
+                                size="xl"
+                                color="#A6A6A6"
+                                className="!filter !-mt-10"
+                                isViewer={isViewerMode}
+                            />
+
+
                         </div>
                     ) : (
                         /* Non-Viewer Mode Layout - Original */

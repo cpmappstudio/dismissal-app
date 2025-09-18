@@ -16,7 +16,6 @@
         "navigation": "Navigation",
         "playground": "Playground",
         "models": "Models",
-        "documentation": "Documentation",
         "settings": "Settings",
         "history": "History",
         "starred": "Starred",
@@ -27,13 +26,10 @@
         "changelog": "Changelog",
         "profile": "My Account",
         "myStudy": "My Study",
-        "studentDocs": "Documentation",
         "myClasses": "My Classes",
-        "professorDocs": "Documentation",
         "academicAdmin": "Academic Administration",
         "personalAdmin": "Personal Administration",
         "operators": "Operators",
-        "adminDocs": "Documentation",
         "menu": {
             "profile": {
                 "title": "My Account",
@@ -59,20 +55,6 @@
                     }
                 ]
             },
-            "studentDocs": {
-                "title": "Documentation",
-                "url": "/docs",
-                "items": [
-                    {
-                        "title": "Certificates & Transcripts",
-                        "url": "/docs/transcripts"
-                    },
-                    {
-                        "title": "Academic Progress Guide",
-                        "url": "/docs/progress"
-                    }
-                ]
-            },
             "professor": {
                 "title": "My Classes",
                 "url": "/teaching",
@@ -84,20 +66,6 @@
                     {
                         "title": "Teaching Progress",
                         "url": "/teaching/progress"
-                    }
-                ]
-            },
-            "professorDocs": {
-                "title": "Documentation",
-                "url": "/docs/teaching",
-                "items": [
-                    {
-                        "title": "Grading Guide",
-                        "url": "/docs/teaching/grading"
-                    },
-                    {
-                        "title": "Teaching Resources",
-                        "url": "/docs/teaching/resources"
                     }
                 ]
             },
@@ -150,20 +118,6 @@
                         "url": "/operators/viewer"
                     }
                 ]
-            },
-            "adminDocs": {
-                "title": "Documentation",
-                "url": "/docs/admin",
-                "items": [
-                    {
-                        "title": "Administration Manual",
-                        "url": "/docs/admin/manual"
-                    },
-                    {
-                        "title": "System Guides",
-                        "url": "/docs/admin/guides"
-                    }
-                ]
             }
         }
     },
@@ -209,6 +163,7 @@
             "arrivalTime": "Arrival Time",
             "students": "Students",
             "grade": "Grade",
+            "siblings": "siblings",
             "close": "Close"
         }
     },

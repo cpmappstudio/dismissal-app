@@ -27,13 +27,10 @@
         "changelog": "Registro de Cambios",
         "profile": "Mi Cuenta",
         "myStudy": "Mi Estudio",
-        "studentDocs": "Documentación",
         "myClasses": "Mis Clases",
-        "professorDocs": "Documentación",
         "academicAdmin": "Administración Académica",
         "personalAdmin": "Administración Personal",
         "operators": "Operadores",
-        "adminDocs": "Documentación",
         "menu": {
             "profile": {
                 "title": "Mi Cuenta",
@@ -59,20 +56,6 @@
                     }
                 ]
             },
-            "studentDocs": {
-                "title": "Documentación",
-                "url": "/docs",
-                "items": [
-                    {
-                        "title": "Certificados y Transcripciones",
-                        "url": "/docs/transcripts"
-                    },
-                    {
-                        "title": "Guía de Progreso Académico",
-                        "url": "/docs/progress"
-                    }
-                ]
-            },
             "professor": {
                 "title": "Mis Clases",
                 "url": "/teaching",
@@ -84,20 +67,6 @@
                     {
                         "title": "Progreso de Enseñanza",
                         "url": "/teaching/progress"
-                    }
-                ]
-            },
-            "professorDocs": {
-                "title": "Documentación",
-                "url": "/docs/teaching",
-                "items": [
-                    {
-                        "title": "Guía de Calificaciones",
-                        "url": "/docs/teaching/grading"
-                    },
-                    {
-                        "title": "Recursos Pedagógicos",
-                        "url": "/docs/teaching/resources"
                     }
                 ]
             },
@@ -150,20 +119,6 @@
                         "url": "/operators/viewer"
                     }
                 ]
-            },
-            "adminDocs": {
-                "title": "Documentación",
-                "url": "/docs/admin",
-                "items": [
-                    {
-                        "title": "Manual de Administración",
-                        "url": "/docs/admin/manual"
-                    },
-                    {
-                        "title": "Guías del Sistema",
-                        "url": "/docs/admin/guides"
-                    }
-                ]
             }
         }
     },
@@ -209,6 +164,7 @@
             "arrivalTime": "Hora de llegada",
             "students": "Estudiantes",
             "grade": "Grado",
+            "siblings": "hermanos",
             "close": "Cerrar"
         }
     },

@@ -21,7 +21,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { LangToggle } from "./lang-toggle"
+// import { LangToggle } from "./lang-toggle"
 import { UserButtonWrapper } from "./user-button-wrapper"
 import { extractRoleFromMetadata } from "@/lib/role-utils"
 
@@ -174,7 +174,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       </SidebarContent>
       <SidebarFooter>
-        <LangToggle showText={state !== "collapsed"} />
+        {/* <LangToggle showText={state !== "collapsed"} /> */}
         {/* <ModeToggle showText={state !== "collapsed"} /> */}
         <UniversityLogo />
       </SidebarFooter>
