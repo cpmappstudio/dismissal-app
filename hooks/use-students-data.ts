@@ -23,7 +23,7 @@ export function useStudentsData(filters: StudentFilters) {
         search: filters.search || undefined,
         campus: filters.campus || undefined,
         grade: filters.grade || undefined,
-        limit: filters.limit || 100,
+        limit: filters.limit || 10000, // Límite muy alto por defecto para obtener todos
         offset: filters.offset || undefined,
         carNumber: filters.carNumber || undefined,
         hasCarAssigned: filters.hasCarAssigned || undefined,

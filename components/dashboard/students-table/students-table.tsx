@@ -80,7 +80,7 @@ export function StudentsTable() {
     // Hook personalizado para datos de estudiantes - SIN filtros (enfoque estándar)
     const studentsData = useStudentsData({
         // Cargar TODOS los estudiantes sin filtros para que React Table maneje el filtrado
-        limit: 1000, // Ajustar según necesidades
+        limit: 10000, // Aumentar significativamente para asegurar que obtengamos todos
     })
 
     // Función de filtrado personalizada para buscar por nombre O número de carro
@@ -138,6 +138,17 @@ export function StudentsTable() {
     // Loading state - Convex retorna undefined mientras carga
     const isLoading = studentsData === undefined
 
+    // Debug logging para troubleshooting
+    React.useEffect(() => {
+        if (studentsData) {
+            console.log('StudentsTable - Data updated:', {
+                total: studentsData.total,
+                studentsCount: studentsData.students?.length,
+                authState: studentsData.authState
+            })
+        }
+    }, [studentsData])
+
     // Table instance - ENFOQUE ESTÁNDAR con filtrado local
     const table = useReactTable({
         data,
@@ -193,7 +204,7 @@ export function StudentsTable() {
 
     const handleCreateStudent = React.useCallback(async (studentData: Omit<Student, 'id'>) => {
         try {
-            await createStudent({
+            const result = await createStudent({
                 firstName: studentData.firstName,
                 lastName: studentData.lastName,
                 grade: studentData.grade,
@@ -202,7 +213,9 @@ export function StudentsTable() {
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
             })
-            // No necesitamos recargar manualmente - Convex actualiza automáticamente
+
+            console.log('Student created successfully:', result)
+            // Convex actualiza automáticamente la UI - los datos deberían refrescarse
             // TODO: Agregar toast de éxito aquí
         } catch (error) {
             console.error("Error creating student:", error)
@@ -393,7 +406,7 @@ export function StudentsTable() {
                         •
                     </div>
                     <div className="font-medium text-yankees-blue">
-                        {studentsData?.total || data.length} total students
+                        {studentsData?.total ?? data.length} total students
                     </div>
                 </div>
                 <div className="flex gap-2">

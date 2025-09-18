@@ -91,9 +91,9 @@ export const list = query({
             // Sort by full name for consistent ordering
             students.sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
 
-            // Pagination
+            // Pagination - usar un límite muy alto por defecto para obtener todos
             const offset = args.offset || 0;
-            const limit = args.limit || 50;
+            const limit = args.limit || 10000; // Límite muy alto por defecto
             const paginatedStudents = students.slice(offset, offset + limit);
 
             return {
