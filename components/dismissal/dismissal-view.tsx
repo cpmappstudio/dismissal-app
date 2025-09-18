@@ -75,22 +75,22 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     }, [])
 
     // Transform Convex queue data to CarData format
-    const { leftLaneCars, rightLaneCars, totalCars, isLoading, authError } = React.useMemo(() => {
+    const { leftLaneCars, rightLaneCars, isLoading, authError } = React.useMemo(() => { // add totalCars if needed
         if (!queueData) {
-            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: true, authError: false }
+            return { leftLaneCars: [], rightLaneCars: [], isLoading: true, authError: false } // add totalCars: 0, if needed
         }
 
         // Handle authentication states
         if (queueData.authState === "unauthenticated") {
-            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: true, authError: false }
+            return { leftLaneCars: [], rightLaneCars: [], isLoading: true, authError: false } // add totalCars: 0, if needed
         }
 
         if (queueData.authState === "error") {
-            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: false, authError: true }
+            return { leftLaneCars: [], rightLaneCars: [], isLoading: false, authError: true } // add totalCars: 0, if needed
         }
 
         if (!queueData.leftLane || !queueData.rightLane) {
-            return { leftLaneCars: [], rightLaneCars: [], totalCars: 0, isLoading: false, authError: false }
+            return { leftLaneCars: [], rightLaneCars: [], isLoading: false, authError: false } // add totalCars: 0, if needed
         }
 
         const transformQueueEntry = (entry: {
@@ -124,7 +124,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         return {
             leftLaneCars: leftCars,
             rightLaneCars: rightCars,
-            totalCars: leftCars.length + rightCars.length,
+            // totalCars: leftCars.length + rightCars.length,
             isLoading: false,
             authError: false
         }
