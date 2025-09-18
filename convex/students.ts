@@ -370,6 +370,17 @@ export const update = mutation({
             throw new Error("Student not found");
         }
 
+        // If updating avatar storage, delete the old one first
+        if (args.avatarStorageId !== undefined && student.avatarStorageId &&
+            student.avatarStorageId !== args.avatarStorageId) {
+            try {
+                await ctx.storage.delete(student.avatarStorageId);
+            } catch (error) {
+                console.error("Failed to delete old avatar:", error);
+                // Continue with update even if deletion fails
+            }
+        }
+
         // Build update object
         const updates: any = {};
 
