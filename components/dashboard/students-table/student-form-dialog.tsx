@@ -222,9 +222,7 @@ export function StudentFormDialog({
         if (avatarPreview) return avatarPreview
         if (student?.avatarStorageId && currentAvatarUrl) return currentAvatarUrl
         if (student?.avatarUrl) return student.avatarUrl
-        if (formData.firstName && formData.lastName) {
-            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.firstName}${formData.lastName}`
-        }
+        // No fallback avatar generation - let Avatar component show initials
         return undefined
     }
 
@@ -250,10 +248,7 @@ export function StudentFormDialog({
                 finalAvatarUrl = ""
             }
 
-            // Generate fallback avatar URL if no avatar is provided
-            if (!finalAvatarStorageId && !finalAvatarUrl) {
-                finalAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.firstName}${formData.lastName}`
-            }
+            // No automatic avatar generation - let component show initials as fallback
 
             const studentData = {
                 firstName: formData.firstName,
@@ -486,7 +481,7 @@ export function StudentFormDialog({
                                     </div>
 
                                     <p className="text-xs text-muted-foreground">
-                                        Upload an image or use fallback avatar
+                                        Upload an image or leave blank to show initials
                                     </p>
                                 </div>
                             </div>
@@ -522,7 +517,7 @@ export function StudentFormDialog({
 
                         <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
                             <p><span className="text-destructive">*</span> {t('createDialog.required')}</p>
-                            <p>Avatar will be automatically generated if none is provided.</p>
+                            <p>Student initials will be shown if no avatar is provided.</p>
                         </div>
                     </div>
                 </div>
