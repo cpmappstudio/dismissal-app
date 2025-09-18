@@ -54,7 +54,7 @@ const StudentInfo = React.memo<StudentInfoProps>(({ students, t }) => {
                 ) : (
                     <>
                         <span className="pb-1 text-sm md:text-base xl:text-lg 4xl:text-2xl">
-                            {`siblings ${getLastName(firstStudent.name)}`}
+                            {`Siblings ${getLastName(firstStudent.name)}`}
                         </span>
                         <span className="text-yellow-200 text-xs md:text-sm xl:text-base 4xl:text-lg font-semibold">
                             ({students.map(student => student.grade || `${t('car.grade')} 5`).join(', ')})
