@@ -184,6 +184,19 @@ export function StudentFormDialog({
 
             const { storageId } = await result.json()
 
+            // If there was an existing avatar in storage, delete it to avoid orphan files
+            try {
+                if (currentAvatarStorageId && currentAvatarStorageId !== storageId) {
+                    await deleteAvatarStorage({ storageId: currentAvatarStorageId })
+                }
+            } catch (err) {
+                // Log and continue — failure to delete previous avatar shouldn't block the new upload
+                console.error('Failed to delete previous avatar after upload:', err)
+            }
+
+            // Update local state to the newly uploaded storage id
+            setCurrentAvatarStorageId(storageId as Id<"_storage">)
+
             // Step 3: Save storage ID (will be done in handleSubmit)
             return storageId as Id<"_storage">
 
