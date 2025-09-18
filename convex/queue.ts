@@ -129,8 +129,7 @@ export const getCurrentQueue = query({
                 lastUpdated: Date.now(),
                 authState: "authenticated"
             };
-        } catch (error) {
-            console.error("Error fetching queue data:", error);
+        } catch {
             // Return empty state on database errors too
             return {
                 campus: args.campus,
@@ -356,8 +355,7 @@ export const checkCarInQueue = query({
             }
 
             return { inQueue: false, entry: null, authState: "authenticated" };
-        } catch (error) {
-            console.error("Error checking car in queue:", error);
+        } catch {
             return { inQueue: false, entry: null, authState: "error" };
         }
     }
@@ -468,8 +466,7 @@ export const getQueueMetrics = query({
                 todayStudents: todayHistory.reduce((sum, h) => sum + h.studentIds.length, 0),
                 authState: "authenticated"
             };
-        } catch (error) {
-            console.error("Error fetching queue metrics:", error);
+        } catch {
             return {
                 campus: args.campus,
                 currentCars: 0,
@@ -517,8 +514,7 @@ export const getRecentActivity = query({
                 waitTimeSeconds: h.waitTimeSeconds,
                 lane: h.lane
             }));
-        } catch (error) {
-            console.error("Error fetching recent activity:", error);
+        } catch {
             return [];
         }
     }

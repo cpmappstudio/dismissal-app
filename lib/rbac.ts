@@ -46,8 +46,7 @@ export async function getCurrentUserRole(): Promise<DismissalRole | null> {
         // Use centralized role extraction
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return extractRoleFromMetadata(sessionClaims as any);
-    } catch (error) {
-        console.error('Error getting user role:', error);
+    } catch {
         return null;
     }
 }
@@ -59,8 +58,7 @@ export async function getCurrentUserId(): Promise<string | null> {
     try {
         const { userId } = await auth();
         return userId;
-    } catch (error) {
-        console.error('Error getting user ID:', error);
+    } catch {
         return null;
     }
 }
@@ -107,8 +105,7 @@ export async function getOperatorPermissions() {
         const role = extractRoleFromMetadata(sessionClaims as any);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return extractOperatorPermissions(sessionClaims as any, role);
-    } catch (error) {
-        console.error('Error getting operator permissions:', error);
+    } catch {
         return null;
     }
 }

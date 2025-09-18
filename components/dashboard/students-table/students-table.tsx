@@ -172,24 +172,23 @@ export function StudentsTable() {
         try {
             if (studentIds.length === 1) {
                 // Single student deletion
-                const result = await deleteStudent({ studentId: studentIds[0] as Id<"students"> })
+                await deleteStudent({ studentId: studentIds[0] as Id<"students"> })
             } else {
                 // Multiple students deletion - use batch operation
-                const result = await deleteMultipleStudents({
+                await deleteMultipleStudents({
                     studentIds: studentIds as Id<"students">[]
                 })
             }
             setRowSelection({})
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error deleting students:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [deleteStudent, deleteMultipleStudents])
 
     const handleCreateStudent = React.useCallback(async (studentData: Omit<Student, 'id'>) => {
         try {
-            const result = await createStudent({
+            await createStudent({
                 firstName: studentData.firstName,
                 lastName: studentData.lastName,
                 grade: studentData.grade,
@@ -199,8 +198,7 @@ export function StudentsTable() {
                 avatarUrl: studentData.avatarUrl,
                 avatarStorageId: studentData.avatarStorageId,
             })
-        } catch (error) {
-            console.error("Error creating student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [createStudent])
@@ -224,21 +222,19 @@ export function StudentsTable() {
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error updating student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [selectedStudent, updateStudent])
 
     const handleDeleteStudent = React.useCallback(async (studentId: string) => {
         try {
-            const result = await deleteStudent({ studentId: studentId as Id<"students"> })
+            await deleteStudent({ studentId: studentId as Id<"students"> })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error deleting student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [deleteStudent])

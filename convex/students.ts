@@ -64,8 +64,7 @@ export const deleteAvatarStorage = mutation({
 
         try {
             await ctx.storage.delete(args.storageId);
-        } catch (error) {
-            console.error("Error deleting avatar storage:", error);
+        } catch {
             // Don't throw - storage might already be deleted
         }
     },
@@ -113,8 +112,7 @@ export const getAvatarUrl = query({
     handler: async (ctx, args) => {
         try {
             return await ctx.storage.getUrl(args.storageId);
-        } catch (error) {
-            console.error("Error getting avatar URL:", error);
+        } catch {
             return null;
         }
     }
@@ -137,15 +135,13 @@ export const getBatchAvatarUrls = query({
                 try {
                     const url = await ctx.storage.getUrl(storageId);
                     urls[storageId] = url;
-                } catch (error) {
-                    console.error(`Error getting avatar URL for ${storageId}:`, error);
+                } catch {
                     urls[storageId] = null;
                 }
             }
 
             return urls;
-        } catch (error) {
-            console.error("Error getting batch avatar URLs:", error);
+        } catch {
             return {};
         }
     }
@@ -250,8 +246,7 @@ export const list = query({
                 hasMore: offset + limit < students.length,
                 authState: "authenticated"
             };
-        } catch (error) {
-            console.error("Error fetching students:", error);
+        } catch {
             return {
                 students: [],
                 total: 0,
@@ -375,8 +370,7 @@ export const update = mutation({
             student.avatarStorageId !== args.avatarStorageId) {
             try {
                 await ctx.storage.delete(student.avatarStorageId);
-            } catch (error) {
-                console.error("Failed to delete old avatar:", error);
+            } catch {
                 // Continue with update even if deletion fails
             }
         }
@@ -431,8 +425,7 @@ export const deleteStudent = mutation({
         if (student.avatarStorageId) {
             try {
                 await ctx.storage.delete(student.avatarStorageId);
-            } catch (error) {
-                console.error("Error deleting avatar storage:", error);
+            } catch {
                 // Continue with deletion even if avatar deletion fails
             }
         }
@@ -548,8 +541,7 @@ export const deleteMultipleStudents = mutation({
             if (student.avatarStorageId) {
                 try {
                     await ctx.storage.delete(student.avatarStorageId);
-                } catch (error) {
-                    console.error("Error deleting avatar storage:", error);
+                } catch {
                     // Continue with deletion even if avatar deletion fails
                 }
             }

@@ -189,9 +189,8 @@ export function StudentFormDialog({
                 if (currentAvatarStorageId && currentAvatarStorageId !== storageId) {
                     await deleteAvatarStorage({ storageId: currentAvatarStorageId })
                 }
-            } catch (err) {
-                // Log and continue — failure to delete previous avatar shouldn't block the new upload
-                console.error('Failed to delete previous avatar after upload:', err)
+            } catch {
+                // Failure to delete previous avatar shouldn't block the new upload
             }
 
             // Update local state to the newly uploaded storage id
@@ -200,8 +199,7 @@ export function StudentFormDialog({
             // Step 3: Save storage ID (will be done in handleSubmit)
             return storageId as Id<"_storage">
 
-        } catch (error) {
-            console.error("Error uploading avatar:", error)
+        } catch {
             alert("Failed to upload avatar. Please try again.")
             return null
         } finally {
@@ -219,8 +217,8 @@ export function StudentFormDialog({
                     // For new uploads, just delete the storage file
                     await deleteAvatarStorage({ storageId: currentAvatarStorageId })
                 }
-            } catch (error) {
-                console.error("Error deleting avatar:", error)
+            } catch {
+                // Silent error handling
             }
         }
 
@@ -281,8 +279,7 @@ export function StudentFormDialog({
 
             onSubmit(studentData)
             setOpen(false)
-        } catch (error) {
-            console.error("Error submitting form:", error)
+        } catch {
             alert("Failed to save student. Please try again.")
         }
     }

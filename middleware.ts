@@ -202,12 +202,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     if (redirectUrl) {
       // Prevenir loops de redirección
       if (redirectUrl.pathname !== pathname) {
-        console.log(`[Middleware] Redirecting ${userRole} from ${pathname} to ${redirectUrl.pathname}`)
         return NextResponse.redirect(redirectUrl)
       }
 
-      // Si hay un loop, log de advertencia y denegar acceso
-      console.warn(`[Middleware] Potential redirect loop detected for ${userRole} at ${pathname}`)
+      // Si hay un loop, denegar acceso
       return new NextResponse('Forbidden', { status: 403 })
     }
 
@@ -215,8 +213,6 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return intlMiddleware(req)
 
   } catch (error) {
-    console.error('[Middleware] Critical error:', error)
-
     // En caso de error, redirigir a sign-in
     const errorUrl = new URL(`/${locale}/sign-in`, req.url)
     errorUrl.searchParams.set('error', 'auth_error')

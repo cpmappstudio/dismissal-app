@@ -178,8 +178,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         showAlert('error', 'Error', result.message || 'An unexpected error occurred')
                 }
             }
-        } catch (error) {
-            console.error("Error adding car to queue:", error)
+        } catch {
             showAlert('error', 'Error', 'Failed to add car to queue')
         } finally {
             setIsSubmitting(false)
@@ -196,8 +195,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             if (result && result.carNumber) {
                 showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
             }
-        } catch (error) {
-            console.error("Error removing car from queue:", error)
+        } catch {
             showAlert('error', 'Error', 'Failed to remove car from queue')
         } finally {
             setIsSubmitting(false)
