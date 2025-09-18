@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { Student } from "./types"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { StudentAvatar } from "./student-avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
@@ -50,14 +50,16 @@ export const useColumns = (): ColumnDef<Student>[] => {
             ),
             cell: ({ row }) => {
                 const student = row.original
-                const initials = `${student.firstName.charAt(0)}${student.lastName.charAt(0)}`
 
                 return (
                     <div className="flex items-center space-x-2 min-w-0 sm:space-x-3">
-                        <Avatar className="h-8 w-8 flex-shrink-0 sm:h-10 sm:w-10">
-                            <AvatarImage src={student.avatarUrl} alt={student.fullName} />
-                            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                        </Avatar>
+                        <StudentAvatar
+                            avatarStorageId={student.avatarStorageId}
+                            fallbackUrl={student.avatarUrl}
+                            firstName={student.firstName}
+                            lastName={student.lastName}
+                            size="md"
+                        />
                         <div className="min-w-0 flex-1">
                             <div className="font-medium truncate text-sm sm:text-base">{student.fullName}</div>
                             {/* Show grade and campus on mobile under the name */}

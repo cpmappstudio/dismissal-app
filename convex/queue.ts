@@ -59,7 +59,8 @@ function studentToSummary(student: any) {
         studentId: student._id,
         name: student.fullName,
         grade: student.grade,
-        avatarUrl: student.avatarUrl
+        avatarUrl: student.avatarUrl,
+        avatarStorageId: student.avatarStorageId
     };
 }
 

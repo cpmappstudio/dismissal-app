@@ -120,19 +120,32 @@ export function StudentsTable() {
             grade: string;
             campusLocation: string;
             avatarUrl?: string;
+            avatarStorageId?: Id<"_storage">;
             isActive: boolean;
             createdAt: number;
-        }) => ({
-            id: student._id,
-            fullName: student.fullName,
-            firstName: student.firstName,
-            lastName: student.lastName,
-            birthday: student.birthday,
-            carNumber: student.carNumber,
-            grade: student.grade as Grade,
-            campusLocation: student.campusLocation as CampusLocation,
-            avatarUrl: student.avatarUrl || "",
-        }))
+        }) => {
+            // Debug log to check avatar data
+            if (student.avatarStorageId || student.avatarUrl) {
+                console.log('Student with avatar:', {
+                    name: student.fullName,
+                    avatarStorageId: student.avatarStorageId,
+                    avatarUrl: student.avatarUrl
+                })
+            }
+
+            return {
+                id: student._id,
+                fullName: student.fullName,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                birthday: student.birthday,
+                carNumber: student.carNumber,
+                grade: student.grade as Grade,
+                campusLocation: student.campusLocation as CampusLocation,
+                avatarUrl: student.avatarUrl || "",
+                avatarStorageId: student.avatarStorageId,
+            }
+        })
     }, [studentsData?.students]) // Más específico que studentsData completo
 
     // Loading state - Convex retorna undefined mientras carga
@@ -212,6 +225,7 @@ export function StudentsTable() {
                 birthday: studentData.birthday,
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
+                avatarStorageId: studentData.avatarStorageId,
             })
 
             console.log('Student created successfully:', result)
@@ -236,6 +250,7 @@ export function StudentsTable() {
                 birthday: studentData.birthday,
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
+                avatarStorageId: studentData.avatarStorageId,
             })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)

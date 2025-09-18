@@ -1,4 +1,5 @@
 import { Grade, CampusLocation } from "@/convex/types"
+import { Id } from "@/convex/_generated/dataModel"
 
 export type Student = {
     id: string
@@ -10,6 +11,7 @@ export type Student = {
     grade: Grade
     campusLocation: CampusLocation
     avatarUrl?: string
+    avatarStorageId?: Id<"_storage">
 }
 
 // Re-export types for convenience

@@ -3,6 +3,157 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { gradeValidator } from "./types";
+import { Id } from "./_generated/dataModel";
+
+// ============================================================================
+// AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
+// ============================================================================
+
+/**
+ * Generate upload URL for avatar image (Step 1 of 3)
+ */
+export const generateAvatarUploadUrl = mutation({
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        return await ctx.storage.generateUploadUrl();
+    },
+});
+
+/**
+ * Save avatar storage ID to student record (Step 3 of 3)
+ */
+export const saveAvatarStorageId = mutation({
+    args: {
+        studentId: v.id("students"),
+        storageId: v.id("_storage"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const student = await ctx.db.get(args.studentId);
+        if (!student) {
+            throw new Error("Student not found");
+        }
+
+        // Delete old avatar if exists
+        if (student.avatarStorageId) {
+            await ctx.storage.delete(student.avatarStorageId);
+        }
+
+        // Update student with new avatar storage ID
+        await ctx.db.patch(args.studentId, {
+            avatarStorageId: args.storageId,
+            updatedAt: Date.now(),
+        });
+
+        return args.studentId;
+    },
+});
+
+/**
+ * Delete avatar storage file (for cleaning up unused uploads)
+ */
+export const deleteAvatarStorage = mutation({
+    args: { storageId: v.id("_storage") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        try {
+            await ctx.storage.delete(args.storageId);
+        } catch (error) {
+            console.error("Error deleting avatar storage:", error);
+            // Don't throw - storage might already be deleted
+        }
+    },
+});
+
+/**
+ * Delete avatar from storage and student record
+ */
+export const deleteAvatar = mutation({
+    args: { studentId: v.id("students") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const student = await ctx.db.get(args.studentId);
+        if (!student) {
+            throw new Error("Student not found");
+        }
+
+        // Delete from storage if exists
+        if (student.avatarStorageId) {
+            await ctx.storage.delete(student.avatarStorageId);
+        }
+
+        // Remove from student record
+        await ctx.db.patch(args.studentId, {
+            avatarStorageId: undefined,
+            updatedAt: Date.now(),
+        });
+
+        return args.studentId;
+    },
+});
+
+/**
+ * Get avatar URL from storage ID (for individual use)
+ */
+/**
+ * Get a single avatar URL efficiently for individual components
+ */
+export const getAvatarUrl = query({
+    args: {
+        storageId: v.id("_storage")
+    },
+    handler: async (ctx, args) => {
+        try {
+            return await ctx.storage.getUrl(args.storageId);
+        } catch (error) {
+            console.error("Error getting avatar URL:", error);
+            return null;
+        }
+    }
+});
+
+/**
+ * Get multiple avatar URLs efficiently for batch operations
+ * Use sparingly to avoid performance issues - prefer individual queries
+ */
+export const getBatchAvatarUrls = query({
+    args: {
+        storageIds: v.array(v.id("_storage"))
+    },
+    handler: async (ctx, args) => {
+        try {
+            const urls: Record<string, string | null> = {};
+
+            // Process each storage ID individually to avoid Promise.all performance issues
+            for (const storageId of args.storageIds) {
+                try {
+                    const url = await ctx.storage.getUrl(storageId);
+                    urls[storageId] = url;
+                } catch (error) {
+                    console.error(`Error getting avatar URL for ${storageId}:`, error);
+                    urls[storageId] = null;
+                }
+            }
+
+            return urls;
+        } catch (error) {
+            console.error("Error getting batch avatar URLs:", error);
+            return {};
+        }
+    }
+});
+
+// ============================================================================
+// EXISTING STUDENT FUNCTIONS
+// ============================================================================
 
 /**
  * Helper function to get students by car number
@@ -15,7 +166,6 @@ async function getStudentsByCarNumber(db: any, carNumber: number, campus: string
         .withIndex("by_car_campus", (q: any) =>
             q.eq("carNumber", carNumber)
                 .eq("campusLocation", campus)
-                .eq("isActive", true)
         )
         .collect();
 }
@@ -49,18 +199,16 @@ export const list = query({
         try {
             let students: any[];
 
+            // Since we're doing hard delete now, we don't need isActive filter
             // Optimize query - use indexes when possible
             if (args.campus) {
                 students = await ctx.db
                     .query("students")
-                    .withIndex("by_campus_active", (q: any) =>
-                        q.eq("campusLocation", args.campus!).eq("isActive", true)
-                    )
+                    .filter((q: any) => q.eq(q.field("campusLocation"), args.campus!))
                     .collect();
             } else {
                 students = await ctx.db
                     .query("students")
-                    .filter((q: any) => q.eq(q.field("isActive"), true))
                     .collect();
             }
 
@@ -124,7 +272,7 @@ export const get = query({
         if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.id);
-        if (!student || !student.isActive) {
+        if (!student) {
             return null;
         }
 
@@ -152,7 +300,8 @@ export const create = mutation({
         grade: gradeValidator,
         campusLocation: v.string(),
         carNumber: v.optional(v.number()),
-        avatarUrl: v.optional(v.string())
+        avatarUrl: v.optional(v.string()),
+        avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -188,6 +337,7 @@ export const create = mutation({
             campusLocation: args.campusLocation,
             carNumber,
             avatarUrl: args.avatarUrl,
+            avatarStorageId: args.avatarStorageId,
             isActive: true,
             createdAt: Date.now()
         });
@@ -208,14 +358,15 @@ export const update = mutation({
         grade: v.optional(gradeValidator),
         campusLocation: v.optional(v.string()),
         carNumber: v.optional(v.number()),
-        avatarUrl: v.optional(v.string())
+        avatarUrl: v.optional(v.string()),
+        avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.studentId);
-        if (!student || !student.isActive) {
+        if (!student) {
             throw new Error("Student not found");
         }
 
@@ -233,6 +384,7 @@ export const update = mutation({
             updates.carNumber = args.carNumber;
         }
         if (args.avatarUrl !== undefined) updates.avatarUrl = args.avatarUrl;
+        if (args.avatarStorageId !== undefined) updates.avatarStorageId = args.avatarStorageId;
 
         // Update full name if first or last name changed
         if (args.firstName !== undefined || args.lastName !== undefined) {
@@ -249,7 +401,7 @@ export const update = mutation({
 });
 
 /**
- * Soft delete a student with cascade queue removal
+ * Hard delete a student with cascade queue removal and avatar cleanup
  */
 export const deleteStudent = mutation({
     args: { studentId: v.id("students") },
@@ -263,6 +415,16 @@ export const deleteStudent = mutation({
         }
 
         let carRemovedFromQueue = false;
+
+        // Delete avatar from storage if exists
+        if (student.avatarStorageId) {
+            try {
+                await ctx.storage.delete(student.avatarStorageId);
+            } catch (error) {
+                console.error("Error deleting avatar storage:", error);
+                // Continue with deletion even if avatar deletion fails
+            }
+        }
 
         // Check if this student's car is currently in any queue
         if (student.carNumber > 0) {
@@ -282,7 +444,7 @@ export const deleteStudent = mutation({
                     student.carNumber,
                     student.campusLocation
                 ).then((students: any[]) =>
-                    students.filter((s: any) => s._id !== student._id && s.isActive)
+                    students.filter((s: any) => s._id !== student._id)
                 );
 
                 if (remainingStudents.length === 0) {
@@ -342,10 +504,8 @@ export const deleteStudent = mutation({
             }
         }
 
-        // Soft delete the student
-        await ctx.db.patch(args.studentId, {
-            isActive: false
-        });
+        // Hard delete the student from database
+        await ctx.db.delete(args.studentId);
 
         return {
             studentId: args.studentId,
@@ -355,7 +515,7 @@ export const deleteStudent = mutation({
 });
 
 /**
- * Soft delete multiple students with cascade queue removal
+ * Hard delete multiple students with cascade queue removal and avatar cleanup
  */
 export const deleteMultipleStudents = mutation({
     args: { studentIds: v.array(v.id("students")) },
@@ -371,6 +531,16 @@ export const deleteMultipleStudents = mutation({
             if (!student) {
                 results.push({ studentId, success: false, error: "Student not found" });
                 continue;
+            }
+
+            // Delete avatar from storage if exists
+            if (student.avatarStorageId) {
+                try {
+                    await ctx.storage.delete(student.avatarStorageId);
+                } catch (error) {
+                    console.error("Error deleting avatar storage:", error);
+                    // Continue with deletion even if avatar deletion fails
+                }
             }
 
             let carRemovedFromQueue = false;
@@ -397,7 +567,7 @@ export const deleteMultipleStudents = mutation({
                         student.campusLocation
                     ).then((students: any[]) =>
                         students.filter((s: any) =>
-                            s.isActive && !args.studentIds.includes(s._id)
+                            !args.studentIds.includes(s._id)
                         )
                     );
 
@@ -455,10 +625,8 @@ export const deleteMultipleStudents = mutation({
                 }
             }
 
-            // Soft delete the student
-            await ctx.db.patch(studentId, {
-                isActive: false
-            });
+            // Hard delete the student from database
+            await ctx.db.delete(studentId);
 
             results.push({
                 studentId,
@@ -488,7 +656,7 @@ export const assignCarNumber = mutation({
         if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.studentId);
-        if (!student || !student.isActive) {
+        if (!student) {
             throw new Error("Student not found");
         }
 
@@ -515,7 +683,7 @@ export const removeCarNumber = mutation({
         if (!identity) throw new Error("Not authenticated");
 
         const student = await ctx.db.get(args.studentId);
-        if (!student || !student.isActive) {
+        if (!student) {
             throw new Error("Student not found");
         }
 

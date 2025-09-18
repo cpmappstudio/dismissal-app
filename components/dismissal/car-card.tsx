@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Trash2, Users, GraduationCap } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { StudentAvatar } from "@/components/dashboard/students-table/student-avatar"
 import {
     Drawer,
     DrawerContent,
@@ -107,26 +108,28 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     <div className="flex-shrink-0">
                                         {car.students.length === 1 ? (
                                             // Single student - show one avatar
-                                            <Avatar className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
-                                                <AvatarImage src={car.students[0].imageUrl} alt={car.students[0].name} />
-                                                <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                    {getStudentInitials(car.students[0].name)}
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <StudentAvatar
+                                                avatarStorageId={car.students[0].avatarStorageId}
+                                                fallbackUrl={car.students[0].imageUrl}
+                                                firstName={car.students[0].name.split(' ')[0] || ''}
+                                                lastName={car.students[0].name.split(' ').slice(1).join(' ') || car.students[0].name}
+                                                size="sm"
+                                                className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                            />
                                         ) : (
                                             // Multiple students - show overlapping avatars
                                             <div className="flex -space-x-1">
                                                 {car.students.slice(0, 3).map((student, index) => (
-                                                    <Avatar
-                                                        key={student.id}
-                                                        className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
-                                                        style={{ zIndex: 30 - index }}
-                                                    >
-                                                        <AvatarImage src={student.imageUrl} alt={student.name} />
-                                                        <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                            {getStudentInitials(student.name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                                    <div key={student.id} style={{ zIndex: 30 - index }}>
+                                                        <StudentAvatar
+                                                            avatarStorageId={student.avatarStorageId}
+                                                            fallbackUrl={student.imageUrl}
+                                                            firstName={student.name.split(' ')[0] || ''}
+                                                            lastName={student.name.split(' ').slice(1).join(' ') || student.name}
+                                                            size="sm"
+                                                            className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                                        />
+                                                    </div>
                                                 ))}
                                                 {car.students.length > 3 && (
                                                     <div
@@ -249,12 +252,14 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB #F3F4F6' }}>
                                     {car.students.map((student) => (
                                         <div key={student.id} className="flex items-center gap-3 p-3 bg-white border rounded-lg">
-                                            <Avatar className={`w-12 h-12 ${laneColors.background}`}>
-                                                <AvatarImage src={student.imageUrl} alt={student.name} />
-                                                <AvatarFallback className={`text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                    {getStudentInitials(student.name)}
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <StudentAvatar
+                                                avatarStorageId={student.avatarStorageId}
+                                                fallbackUrl={student.imageUrl}
+                                                firstName={student.name.split(' ')[0] || ''}
+                                                lastName={student.name.split(' ').slice(1).join(' ') || student.name}
+                                                size="md"
+                                                className={`w-12 h-12 ${laneColors.background}`}
+                                            />
                                             <div className="flex-1">
                                                 <div className="font-semibold text-gray-900">{student.name}</div>
                                                 <div className="flex items-center gap-1 text-sm text-gray-500">
