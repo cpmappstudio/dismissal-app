@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Trash2, Users, GraduationCap } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { StudentAvatar } from "@/components/dashboard/students-table/student-avatar"
 import {
     Drawer,
@@ -15,7 +14,7 @@ import { Car } from "./car"
 import { useTranslations } from "next-intl"
 import { CarData } from "./types"
 import { LANE_COLORS } from "./constants"
-import { formatTime, getStudentInitials } from "./utils"
+import { formatTime } from "./utils"
 
 // Internal component to handle student display logic
 interface StudentInfoProps {

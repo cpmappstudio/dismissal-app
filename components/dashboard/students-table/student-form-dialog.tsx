@@ -62,7 +62,6 @@ export function StudentFormDialog({
 
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.students.generateAvatarUploadUrl)
-    const saveAvatarStorageId = useMutation(api.students.saveAvatarStorageId)
     const deleteAvatar = useMutation(api.students.deleteAvatar)
     const deleteAvatarStorage = useMutation(api.students.deleteAvatarStorage)
 
