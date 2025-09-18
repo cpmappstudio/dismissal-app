@@ -241,7 +241,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     )}
                 </div>
 
-                {/* Lane Balance Bar */}
+                {/* Lane Balance Bar
                 <Card className={cn("flex-1 border-2 rounded-md border-yankees-blue flex items-center p-3", !isCampusSelected && "opacity-50")}>
                     <div className="relative h-1.5 rounded-full bg-gray-200 overflow-hidden w-full">
                         {totalCars > 0 ? (
@@ -259,12 +259,12 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                             <div className="absolute inset-0 bg-gray-300" />
                         )}
                     </div>
-                </Card>
+                </Card> */}
             </div>
 
             {/* Main Content Area - Takes remaining space */}
             <div className="flex-1 flex flex-col mt-4 min-h-0 relative">
-                <div className={`relative ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
+                <div className={`relative  ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
                     <Road
                         leftLaneCars={leftLaneCars}
                         rightLaneCars={rightLaneCars}
@@ -294,9 +294,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
                 {/* Allocator Control with Finish Line - Responsive */}
                 {mode === 'allocator' && isCampusSelected && (
-                    <div className="absolute bottom-3 left-0 right-0 z-20 px-2">
+                    <div className="absolute bottom-8 left-0 right-0 z-20 px-2">
                         <div className="flex justify-center">
-                            <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-white/30 relative overflow-hidden">
+                            <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
                                 <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
                                     {/* Left Arrow Button */}
                                     <Button

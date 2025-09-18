@@ -77,7 +77,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
             : 'w-1/2 pb-20 md:pb-20 flex-col min-h-full'
             }`} style={{ backgroundColor: '#9CA3AF' }}>
             <div className={`flex-1 flex ${isViewer
-                ? 'flex-row justify-start gap-8'
+                ? 'flex-row justify-start gap-4'
                 : 'flex-col justify-end gap-4'
                 }`}>
                 {cars.length > 0 ? (

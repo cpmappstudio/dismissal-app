@@ -44,7 +44,7 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
             <Card className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${isFullscreen
                 ? 'h-screen max-h-screen'
                 : mode === 'viewer' || mode === 'dispatcher'
-                    ? 'h-[calc(100vh-9rem)] md:max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)]'
+                    ? 'h-[calc(100vh-9rem)] md:max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)] mb-4'
                     : 'h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]'
                 }`} style={{ backgroundColor: '#9CA3AF' }}>
 
@@ -66,98 +66,98 @@ export const Road = React.memo<RoadProps>(({ leftLaneCars, rightLaneCars, mode, 
                 )}
 
                 <CardContent
-                    ref={(el) => {
-                        if (el) {
-                            let isScrollbarInteraction = false
+                    // ref={(el) => {
+                    //     if (el) {
+                    //         let isScrollbarInteraction = false
 
-                            // Bloquear scroll de rueda (mouse wheel)
-                            // const handleWheel = (e: WheelEvent) => {
-                            //     e.preventDefault()
-                            //     e.stopPropagation()
-                            // }
+                    //         // Bloquear scroll de rueda (mouse wheel)
+                    //         // const handleWheel = (e: WheelEvent) => {
+                    //         //     e.preventDefault()
+                    //         //     e.stopPropagation()
+                    //         // }
 
-                            // Detectar inicio de touch en scrollbar
-                            const handleTouchStart = (e: TouchEvent) => {
-                                const touch = e.touches[0]
-                                const rect = el.getBoundingClientRect()
-                                const scrollbarSize = 20 // Mobile scrollbar size (width/height)
-                                const touchX = touch.clientX - rect.left
-                                const touchY = touch.clientY - rect.top
+                    //         // Detectar inicio de touch en scrollbar
+                    //         const handleTouchStart = (e: TouchEvent) => {
+                    //             const touch = e.touches[0]
+                    //             const rect = el.getBoundingClientRect()
+                    //             const scrollbarSize = 20 // Mobile scrollbar size (width/height)
+                    //             const touchX = touch.clientX - rect.left
+                    //             const touchY = touch.clientY - rect.top
 
-                                // Detectar si el touch está en la zona de scrollbar según el modo
-                                if (isViewer) {
-                                    // Scroll horizontal: detectar scrollbar en la parte inferior
-                                    isScrollbarInteraction = touchY >= rect.height - scrollbarSize
-                                } else {
-                                    // Scroll vertical: detectar scrollbar en el lado derecho
-                                    isScrollbarInteraction = touchX >= rect.width - scrollbarSize
-                                }
+                    //             // Detectar si el touch está en la zona de scrollbar según el modo
+                    //             if (isViewer) {
+                    //                 // Scroll horizontal: detectar scrollbar en la parte inferior
+                    //                 isScrollbarInteraction = touchY >= rect.height - scrollbarSize
+                    //             } else {
+                    //                 // Scroll vertical: detectar scrollbar en el lado derecho
+                    //                 isScrollbarInteraction = touchX >= rect.width - scrollbarSize
+                    //             }
 
-                                // Check if touch is on an interactive element
-                                const touchTarget = e.target as Element
-                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
+                    //             // Check if touch is on an interactive element
+                    //             const touchTarget = e.target as Element
+                    //             const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
 
-                                // Si NO es scrollbar Y NO es elemento interactivo, prevenir el touch start
-                                if (!isScrollbarInteraction && !isInteractiveElement) {
-                                    e.preventDefault()
-                                }
-                            }
+                    //             // Si NO es scrollbar Y NO es elemento interactivo, prevenir el touch start
+                    //             if (!isScrollbarInteraction && !isInteractiveElement) {
+                    //                 e.preventDefault()
+                    //             }
+                    //         }
 
-                            // Solo bloquear touchmove si NO es interacción con scrollbar Y NO es elemento interactivo
-                            const handleTouchMove = (e: TouchEvent) => {
-                                const touchTarget = e.target as Element
-                                const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
+                    //         // Solo bloquear touchmove si NO es interacción con scrollbar Y NO es elemento interactivo
+                    //         const handleTouchMove = (e: TouchEvent) => {
+                    //             const touchTarget = e.target as Element
+                    //             const isInteractiveElement = touchTarget?.closest('button, [data-slot="drawer-trigger"], [role="button"], .cursor-pointer, .viewer-scroll-container')
 
-                                if (!isScrollbarInteraction && !isInteractiveElement) {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                }
-                            }
+                    //             if (!isScrollbarInteraction && !isInteractiveElement) {
+                    //                 e.preventDefault()
+                    //                 e.stopPropagation()
+                    //             }
+                    //         }
 
-                            // Reset flag al terminar touch
-                            const handleTouchEnd = () => {
-                                isScrollbarInteraction = false
-                            }
+                    //         // Reset flag al terminar touch
+                    //         const handleTouchEnd = () => {
+                    //             isScrollbarInteraction = false
+                    //         }
 
-                            // Bloquear teclas de dirección para scroll
-                            const handleKeyDown = (e: KeyboardEvent) => {
-                                const keysToBlock = isViewer
-                                    ? ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
-                                    : ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
+                    //         // Bloquear teclas de dirección para scroll
+                    //         const handleKeyDown = (e: KeyboardEvent) => {
+                    //             const keysToBlock = isViewer
+                    //                 ? ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
+                    //                 : ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space']
 
-                                if (keysToBlock.includes(e.key)) {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                }
-                            }
+                    //             if (keysToBlock.includes(e.key)) {
+                    //                 e.preventDefault()
+                    //                 e.stopPropagation()
+                    //             }
+                    //         }
 
-                            // el.addEventListener('wheel', handleWheel, { passive: false })
-                            el.addEventListener('touchstart', handleTouchStart, { passive: false })
-                            el.addEventListener('touchmove', handleTouchMove, { passive: false })
-                            el.addEventListener('touchend', handleTouchEnd, { passive: true })
-                            el.addEventListener('keydown', handleKeyDown)
+                    //         // el.addEventListener('wheel', handleWheel, { passive: false })
+                    //         el.addEventListener('touchstart', handleTouchStart, { passive: false })
+                    //         el.addEventListener('touchmove', handleTouchMove, { passive: false })
+                    //         el.addEventListener('touchend', handleTouchEnd, { passive: true })
+                    //         el.addEventListener('keydown', handleKeyDown)
 
-                            // Inicializar posición de scroll según el modo
-                            setTimeout(() => {
-                                if (isViewer) {
-                                    // En viewer mode, iniciar desde el inicio (scroll horizontal)
-                                    el.scrollLeft = 0
-                                } else {
-                                    // En otros modos, iniciar desde abajo (scroll vertical)
-                                    el.scrollTop = el.scrollHeight
-                                }
-                            }, 0)
+                    //         // Inicializar posición de scroll según el modo
+                    //         setTimeout(() => {
+                    //             if (isViewer) {
+                    //                 // En viewer mode, iniciar desde el inicio (scroll horizontal)
+                    //                 el.scrollLeft = 0
+                    //             } else {
+                    //                 // En otros modos, iniciar desde abajo (scroll vertical)
+                    //                 el.scrollTop = el.scrollHeight
+                    //             }
+                    //         }, 0)
 
-                            // Cleanup function
-                            return () => {
-                                // el.removeEventListener('wheel', handleWheel)
-                                el.removeEventListener('touchstart', handleTouchStart)
-                                el.removeEventListener('touchmove', handleTouchMove)
-                                el.removeEventListener('touchend', handleTouchEnd)
-                                el.removeEventListener('keydown', handleKeyDown)
-                            }
-                        }
-                    }}
+                    //         // Cleanup function
+                    //         return () => {
+                    //             // el.removeEventListener('wheel', handleWheel)
+                    //             el.removeEventListener('touchstart', handleTouchStart)
+                    //             el.removeEventListener('touchmove', handleTouchMove)
+                    //             el.removeEventListener('touchend', handleTouchEnd)
+                    //             el.removeEventListener('keydown', handleKeyDown)
+                    //         }
+                    //     }
+                    // }}
                     className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? 'overflow-x-scroll overflow-y-hidden' : 'overflow-y-scroll'}`}
                     style={{
                         WebkitOverflowScrolling: 'touch'
