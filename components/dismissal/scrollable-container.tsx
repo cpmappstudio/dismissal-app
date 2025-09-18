@@ -6,12 +6,12 @@ import { CardContent } from "@/components/ui/card"
 import { useIsIOS } from "@/hooks/use-is-ios"
 import { IOSScrollbarOverlay } from "./ios-scrollbar-overlay"
 
-interface ScrollableContainerProps {
+interface ScrollableContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'className' | 'style' | 'children'> {
   children: React.ReactNode
   isViewer?: boolean
   className?: string
   style?: React.CSSProperties
-  [key: string]: any // Para permitir otras props que se pasen
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
 }
 
 /**
@@ -23,7 +23,7 @@ export const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
   isViewer = false, 
   className = '',
   style = {},
-  ...props 
+  ...restProps 
 }) => {
   const { isIOS, isChecked } = useIsIOS()
 
@@ -34,7 +34,7 @@ export const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
         isViewer={isViewer} 
         className={className}
         style={style}
-        {...props}
+        {...restProps}
       >
         {children}
       </StandardContainer>
@@ -48,7 +48,7 @@ export const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
         isViewer={isViewer} 
         className={className}
         style={style}
-        {...props}
+        {...restProps}
       >
         {children}
       </IOSEnhancedContainer>
@@ -61,7 +61,7 @@ export const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
       isViewer={isViewer} 
       className={className}
       style={style}
-      {...props}
+      {...restProps}
     >
       {children}
     </StandardContainer>
@@ -77,7 +77,7 @@ const StandardContainer: React.FC<ScrollableContainerProps> = ({
   isViewer, 
   className, 
   style,
-  ...props 
+  ...restProps 
 }) => {
   return (
     <CardContent
@@ -171,7 +171,7 @@ const StandardContainer: React.FC<ScrollableContainerProps> = ({
         WebkitOverflowScrolling: 'touch',
         ...style
       }}
-      {...props}
+      {...restProps}
     >
       {children}
     </CardContent>
@@ -187,7 +187,8 @@ const IOSEnhancedContainer: React.FC<ScrollableContainerProps> = ({
   isViewer, 
   className, 
   style,
-  ...props 
+  onScroll,
+  ...restProps 
 }) => {
   // Estados específicos para scrollbar simulada
   const [scrollbarState, setScrollbarState] = useState({
@@ -214,7 +215,7 @@ const IOSEnhancedContainer: React.FC<ScrollableContainerProps> = ({
   }, [isViewer])
 
   // Mostrar scrollbar durante scroll
-  const handleScroll = useCallback((e: React.UIEvent) => {
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     updateScrollbarPosition()
     
     setScrollbarState(prev => ({ ...prev, visible: true }))
@@ -231,10 +232,8 @@ const IOSEnhancedContainer: React.FC<ScrollableContainerProps> = ({
     }, 2000)
 
     // Llamar onScroll original si existe
-    if (props.onScroll) {
-      props.onScroll(e)
-    }
-  }, [updateScrollbarPosition, props.onScroll])
+    onScroll?.(e)
+  }, [updateScrollbarPosition, onScroll])
 
   // Manejar drag de scrollbar simulada
   const handleScrollbarDrag = useCallback((dragPosition: number) => {
@@ -266,7 +265,7 @@ const IOSEnhancedContainer: React.FC<ScrollableContainerProps> = ({
           msOverflowStyle: 'none',
           ...style
         }}
-        {...props}
+        {...restProps}
       >
         {children}
       </CardContent>
