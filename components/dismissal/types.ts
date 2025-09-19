@@ -1,9 +1,12 @@
+import { Id } from "@/convex/_generated/dataModel"
+
 export interface StudentData {
     id: string
     name: string
     grade?: string
     birthday?: string
     imageUrl?: string
+    avatarStorageId?: Id<"_storage">
 }
 
 export interface CarData {

@@ -55,6 +55,7 @@ export default defineSchema({
 
     // Additional info
     avatarUrl: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")), // Convex file storage
 
     // Status
     isActive: v.boolean(),
@@ -91,6 +92,7 @@ export default defineSchema({
       grade: v.string(),
       birthday: v.optional(v.string()),
       avatarUrl: v.optional(v.string()),
+      avatarStorageId: v.optional(v.id("_storage")),
     })),
 
     // Visual

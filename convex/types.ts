@@ -186,6 +186,7 @@ export interface StudentSummary {
     name: string;
     grade: string;
     avatarUrl?: string;
+    avatarStorageId?: Id<"_storage">;
 }
 
 // ============================================================================
@@ -220,6 +221,7 @@ export interface StudentData {
     grade?: string;
     birthday?: string;
     imageUrl?: string;
+    avatarStorageId?: Id<"_storage">;
 }
 
 /**
@@ -328,6 +330,7 @@ export interface StudentFormData {
     campusLocation: string;
     carNumber: number;
     avatarUrl?: string;
+    avatarStorageId?: Id<"_storage">;
 }
 
 /**
@@ -550,7 +553,8 @@ export function queueEntryToCarData(entry: QueueEntry): CarData {
             id: s.studentId,
             name: s.name,
             grade: s.grade,
-            imageUrl: s.avatarUrl
+            imageUrl: s.avatarUrl,
+            avatarStorageId: s.avatarStorageId
         })),
         campus: entry.campusLocation,
         imageColor: entry.carColor

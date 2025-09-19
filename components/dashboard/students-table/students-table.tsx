@@ -120,35 +120,28 @@ export function StudentsTable() {
             grade: string;
             campusLocation: string;
             avatarUrl?: string;
+            avatarStorageId?: Id<"_storage">;
             isActive: boolean;
             createdAt: number;
-        }) => ({
-            id: student._id,
-            fullName: student.fullName,
-            firstName: student.firstName,
-            lastName: student.lastName,
-            birthday: student.birthday,
-            carNumber: student.carNumber,
-            grade: student.grade as Grade,
-            campusLocation: student.campusLocation as CampusLocation,
-            avatarUrl: student.avatarUrl || "",
-        }))
+        }) => {
+
+            return {
+                id: student._id,
+                fullName: student.fullName,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                birthday: student.birthday,
+                carNumber: student.carNumber,
+                grade: student.grade as Grade,
+                campusLocation: student.campusLocation as CampusLocation,
+                avatarUrl: student.avatarUrl || "",
+                avatarStorageId: student.avatarStorageId,
+            }
+        })
     }, [studentsData?.students]) // Más específico que studentsData completo
 
     // Loading state - Convex retorna undefined mientras carga
     const isLoading = studentsData === undefined
-
-    // Debug logging para troubleshooting
-    React.useEffect(() => {
-        if (studentsData) {
-            console.log('StudentsTable - Data updated:', {
-                total: studentsData.total,
-                studentsCount: studentsData.students?.length,
-                authState: studentsData.authState
-            })
-        }
-    }, [studentsData])
-
     // Table instance - ENFOQUE ESTÁNDAR con filtrado local
     const table = useReactTable({
         data,
@@ -179,32 +172,23 @@ export function StudentsTable() {
         try {
             if (studentIds.length === 1) {
                 // Single student deletion
-                const result = await deleteStudent({ studentId: studentIds[0] as Id<"students"> })
-                if (result.carRemoved) {
-                    // TODO: Show toast that car was also removed from queue
-                    console.log("Car removed from queue due to student deletion")
-                }
+                await deleteStudent({ studentId: studentIds[0] as Id<"students"> })
             } else {
                 // Multiple students deletion - use batch operation
-                const result = await deleteMultipleStudents({
+                await deleteMultipleStudents({
                     studentIds: studentIds as Id<"students">[]
                 })
-                if (result.totalCarsRemoved > 0) {
-                    // TODO: Show toast about cars removed from queue
-                    console.log(`${result.totalCarsRemoved} cars removed from queue due to student deletions`)
-                }
             }
             setRowSelection({})
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error deleting students:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [deleteStudent, deleteMultipleStudents])
 
     const handleCreateStudent = React.useCallback(async (studentData: Omit<Student, 'id'>) => {
         try {
-            const result = await createStudent({
+            await createStudent({
                 firstName: studentData.firstName,
                 lastName: studentData.lastName,
                 grade: studentData.grade,
@@ -212,13 +196,9 @@ export function StudentsTable() {
                 birthday: studentData.birthday,
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
+                avatarStorageId: studentData.avatarStorageId,
             })
-
-            console.log('Student created successfully:', result)
-            // Convex actualiza automáticamente la UI - los datos deberían refrescarse
-            // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error creating student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [createStudent])
@@ -236,30 +216,25 @@ export function StudentsTable() {
                 birthday: studentData.birthday,
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
+                avatarStorageId: studentData.avatarStorageId,
             })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error updating student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [selectedStudent, updateStudent])
 
     const handleDeleteStudent = React.useCallback(async (studentId: string) => {
         try {
-            const result = await deleteStudent({ studentId: studentId as Id<"students"> })
-            if (result.carRemoved) {
-                // TODO: Show toast that car was also removed from queue
-                console.log("Car removed from queue due to student deletion")
-            }
+            await deleteStudent({ studentId: studentId as Id<"students"> })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // Convex actualiza automáticamente la UI
             // TODO: Agregar toast de éxito aquí
-        } catch (error) {
-            console.error("Error deleting student:", error)
+        } catch {
             // TODO: Agregar toast de error aquí
         }
     }, [deleteStudent])

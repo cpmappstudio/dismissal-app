@@ -100,25 +100,28 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: "left" | "right";
             position: number;
             assignedTime: number;
-            students: Array<{ studentId: string; name: string; grade: string; birthday?: string; avatarUrl?: string }>;
+            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string; avatarStorageId?: Id<"_storage">;  birthday?: string }>;
             campusLocation: string;
             carColor: string;
-        }): CarData => ({
-            id: entry._id,
-            carNumber: entry.carNumber,
-            lane: entry.lane,
-            position: entry.position,
-            assignedTime: new Date(entry.assignedTime),
-            students: entry.students.map((s) => ({
-                id: s.studentId,
-                name: s.name,
-                grade: s.grade,
-                birthday: s.birthday,
-                imageUrl: s.avatarUrl
-            })),
-            campus: entry.campusLocation,
-            imageColor: entry.carColor
-        })
+        }): CarData => {
+            return {
+                id: entry._id,
+                carNumber: entry.carNumber,
+                lane: entry.lane,
+                position: entry.position,
+                assignedTime: new Date(entry.assignedTime),
+                students: entry.students.map((s) => ({
+                    id: s.studentId,
+                    name: s.name,
+                    grade: s.grade,
+                    imageUrl: s.avatarUrl,
+                    avatarStorageId: s.avatarStorageId,
+                    birthday: s.birthday,
+                })),
+                campus: entry.campusLocation,
+                imageColor: entry.carColor
+            }
+        }
 
         const leftCars = queueData.leftLane.map(transformQueueEntry)
         const rightCars = queueData.rightLane.map(transformQueueEntry)
@@ -181,8 +184,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         showAlert('error', 'Error', result.message || 'An unexpected error occurred')
                 }
             }
-        } catch (error) {
-            console.error("Error adding car to queue:", error)
+        } catch {
             showAlert('error', 'Error', 'Failed to add car to queue')
         } finally {
             setIsSubmitting(false)
@@ -199,8 +201,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             if (result && result.carNumber) {
                 showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
             }
-        } catch (error) {
-            console.error("Error removing car from queue:", error)
+        } catch {
             showAlert('error', 'Error', 'Failed to remove car from queue')
         } finally {
             setIsSubmitting(false)
