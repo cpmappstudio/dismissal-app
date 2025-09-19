@@ -13,6 +13,7 @@ import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
+import { useBirthdayCars } from "@/hooks/use-birthday-cars"
 import { Road } from "./road"
 import { CarData, ModeType } from "./types"
 
@@ -99,7 +100,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: "left" | "right";
             position: number;
             assignedTime: number;
-            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string }>;
+            students: Array<{ studentId: string; name: string; grade: string; birthday?: string; avatarUrl?: string }>;
             campusLocation: string;
             carColor: string;
         }): CarData => ({
@@ -112,6 +113,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 id: s.studentId,
                 name: s.name,
                 grade: s.grade,
+                birthday: s.birthday,
                 imageUrl: s.avatarUrl
             })),
             campus: entry.campusLocation,
@@ -129,6 +131,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             authError: false
         }
     }, [queueData])
+
+    // Hook para verificar carros con estudiantes de cumpleaños
+    const allCars = [...leftLaneCars, ...rightLaneCars]
+    const { birthdayCarIds, birthdayCars, hasCarBirthday } = useBirthdayCars(allCars)
 
     // Add car function using Convex mutation
     const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
@@ -272,6 +278,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         onRemoveCar={handleRemoveCar}
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
+                        birthdayCarIds={birthdayCarIds}
                     />
 
                     {/* Overlay cuando no hay campus */}

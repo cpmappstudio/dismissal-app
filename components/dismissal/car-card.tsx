@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Trash2, Users, GraduationCap } from "lucide-react"
+import { Trash2, Users, GraduationCap, Cake } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
     Drawer,
@@ -11,6 +11,7 @@ import {
     DrawerTrigger,
 } from "@/components/ui/drawer"
 import { Car } from "./car"
+import { BirthdayDecoration } from "./birthday-decoration"
 import { useTranslations } from "next-intl"
 import { CarData } from "./types"
 import { LANE_COLORS } from "./constants"
@@ -74,10 +75,27 @@ interface CarCardProps {
     showRemoveButton?: boolean
     lane: 'left' | 'right'
     isViewerMode?: boolean
+    hasBirthdayToday?: boolean
 }
 
-export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButton = false, lane, isViewerMode = false }) => {
+export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButton = false, lane, isViewerMode = false, hasBirthdayToday = false }) => {
     const t = useTranslations('dismissal')
+
+    // Helper function to check if a student has birthday today
+    const checkStudentBirthday = React.useCallback((student: CarData['students'][0]) => {
+        if (!student.birthday) return false
+        
+        const today = new Date()
+        const utcMinus5 = new Date(today.getTime() - (5 * 60 * 60 * 1000))
+        const todayFormatted = `${String(utcMinus5.getMonth() + 1).padStart(2, '0')}/${String(utcMinus5.getDate()).padStart(2, '0')}/${utcMinus5.getFullYear()}`
+        
+        if (student.birthday.includes('/')) {
+            const [month, day] = student.birthday.split('/')
+            const birthdayThisYear = `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${utcMinus5.getFullYear()}`
+            return birthdayThisYear === todayFormatted
+        }
+        return false
+    }, [])
 
     // Helper function to get display name for multiple students
     // const getDisplayName = React.useMemo(() => {
@@ -99,43 +117,66 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                 <DrawerTrigger asChild>
                     {isViewerMode ? (
                         /* Viewer Mode Layout - Redesigned for large screens */
-                        <div className="relative cursor-pointer  hover:scale-105 transition-transform duration-200 group z-30 flex flex-col items-center">
-                            <div className={`info ${laneColors.badge} flex flex-col rounded-2xl py-2 px-3 w-full mb-1`}>
+                        <div className={`relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30 flex flex-col items-center}`}>
+                            {/* Birthday Decoration */}
+                            {hasBirthdayToday && (
+                                <BirthdayDecoration 
+                                    isViewer={true}
+                                    intensity="normal"
+                                />
+                            )}
+                            
+                            <div className={`info ${laneColors.badge} flex flex-col rounded-2xl py-2 px-3 w-full mb-1}`}>
                                 {/* Top row: Avatars (left) and Car Number Badge (right) */}
                                 <div className="flex justify-between items-start w-full mb-1">
                                     {/* Left side - Avatars */}
                                     <div className="flex-shrink-0">
                                         {car.students.length === 1 ? (
                                             // Single student - show one avatar
-                                            <Avatar className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
-                                                <AvatarImage src={car.students[0].imageUrl} alt={car.students[0].name} />
-                                                <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                    {getStudentInitials(car.students[0].name)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                        ) : (
-                                            // Multiple students - show overlapping avatars
-                                            <div className="flex -space-x-1">
-                                                {car.students.slice(0, 3).map((student, index) => (
-                                                    <Avatar
-                                                        key={student.id}
-                                                        className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
-                                                        style={{ zIndex: 30 - index }}
-                                                    >
-                                                        <AvatarImage src={student.imageUrl} alt={student.name} />
-                                                        <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                            {getStudentInitials(student.name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                ))}
-                                                {car.students.length > 3 && (
-                                                    <div
-                                                        className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 border-2 border-white shadow-lg text-xs flex items-center justify-center font-bold bg-gray-600 text-white rounded-full`}
-                                                        style={{ zIndex: 30 - 3 }}
-                                                    >
-                                                        +{car.students.length - 3}
+                                            <div className="relative">
+                                                <Avatar className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}>
+                                                    <AvatarImage src={car.students[0].imageUrl} alt={car.students[0].name} />
+                                                    <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
+                                                        {getStudentInitials(car.students[0].name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                {checkStudentBirthday(car.students[0]) && (
+                                                    <div className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full p-1">
+                                                        <Cake className="h-2 w-2" />
                                                     </div>
                                                 )}
+                                            </div>
+                                        ) : (
+                                            // Multiple students - show overlapping avatars
+                                            <div className="relative">
+                                                <div className="flex -space-x-1">
+                                                    {car.students.slice(0, 3).map((student, index) => (
+                                                        <div key={student.id} className="relative">
+                                                            <Avatar
+                                                                className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                                                style={{ zIndex: 30 - index }}
+                                                            >
+                                                                <AvatarImage src={student.imageUrl} alt={student.name} />
+                                                                <AvatarFallback className={`text-xs md:text-sm font-bold ${laneColors.textColor} bg-transparent`}>
+                                                                    {getStudentInitials(student.name)}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            {checkStudentBirthday(student) && (
+                                                                <div className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full p-1" style={{ zIndex: 40 }}>
+                                                                    <Cake className="h-2 w-2" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {car.students.length > 3 && (
+                                                        <div
+                                                            className={`w-7 h-7 md:w-9 md:h-9 lg:w-11 lg:h-11 border-2 border-white shadow-lg text-xs flex items-center justify-center font-bold bg-gray-600 text-white rounded-full`}
+                                                            style={{ zIndex: 30 - 3 }}
+                                                        >
+                                                            +{car.students.length - 3}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -174,7 +215,7 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                             {/* SVG Car - CENTER - Optimized size - Closer to text */}
                             <Car
                                 size="viewer"
-                                color="#A6A6A6"
+                                color={hasBirthdayToday ? "#D4AF37" : "#A6A6A6"}
                                 className="!filter !-mt-8"
                                 isViewer={isViewerMode}
                             />
@@ -183,12 +224,20 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
                         </div>
                     ) : (
                         /* Non-Viewer Mode Layout - Original */
-                        <div className="relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30">
+                        <div className={`relative cursor-pointer hover:scale-105 transition-transform duration-200 group z-30}`}>
+                            {/* Birthday Decoration */}
+                            {hasBirthdayToday && (
+                                <BirthdayDecoration 
+                                    isViewer={false}
+                                    intensity="normal"
+                                />
+                            )}
+                            
                             {/* SVG Car with dynamic color */}
                             <Car
                                 size="lg"
                                 // color={car.imageColor}
-                                color="#A6A6A6"
+                                color={hasBirthdayToday ? "#F59E0B" : "#A6A6A6"}
                                 className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
                                 isViewer={isViewerMode}
                             />
@@ -247,23 +296,42 @@ export const CarCard = React.memo<CarCardProps>(({ car, onRemove, showRemoveButt
 
                                 <div className="space-y-3 pr-2"
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB #F3F4F6' }}>
-                                    {car.students.map((student) => (
-                                        <div key={student.id} className="flex items-center gap-3 p-3 bg-white border rounded-lg">
-                                            <Avatar className={`w-12 h-12 ${laneColors.background}`}>
-                                                <AvatarImage src={student.imageUrl} alt={student.name} />
-                                                <AvatarFallback className={`text-sm font-bold ${laneColors.textColor} bg-transparent`}>
-                                                    {getStudentInitials(student.name)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1">
-                                                <div className="font-semibold text-gray-900">{student.name}</div>
-                                                <div className="flex items-center gap-1 text-sm text-gray-500">
-                                                    <GraduationCap className="h-3 w-3" />
-                                                    {student.grade || `${t('car.grade')} 5`}
+                                    {car.students.map((student) => {
+                                        // Check if this student has a birthday today using the shared function
+                                        const studentHasBirthday = checkStudentBirthday(student)
+
+                                        return (
+                                            <div key={student.id} className={`flex items-center gap-3 p-3 border rounded-lg ${studentHasBirthday ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                                                <div className="relative">
+                                                    <Avatar className={`w-12 h-12 ${laneColors.background}`}>
+                                                        <AvatarImage src={student.imageUrl} alt={student.name} />
+                                                        <AvatarFallback className={`text-sm font-bold ${laneColors.textColor} bg-transparent`}>
+                                                            {getStudentInitials(student.name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {studentHasBirthday && (
+                                                        <div className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full p-1">
+                                                            <Cake className="h-3 w-3" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`font-semibold ${studentHasBirthday ? 'text-yellow-800' : 'text-gray-900'} flex items-center gap-2`}>
+                                                        {student.name}
+                                                        {studentHasBirthday && (
+                                                            <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">
+                                                                ¡Cumpleaños!
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                                                        <GraduationCap className="h-3 w-3" />
+                                                        {student.grade || `${t('car.grade')} 5`}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>

@@ -14,9 +14,10 @@ interface LaneProps {
     mode: ModeType
     onRemoveCar: (carId: string) => void
     emptyMessage?: string
+    birthdayCarIds?: Set<string>
 }
 
-export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, emptyMessage }) => {
+export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, emptyMessage, birthdayCarIds }) => {
     const t = useTranslations('dismissal')
     const isViewer = mode === 'viewer'
 
@@ -110,6 +111,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                                         onRemove={onRemove}
                                         showRemoveButton={mode === 'dispatcher'}
                                         isViewerMode={mode === 'viewer'}
+                                        hasBirthdayToday={birthdayCarIds?.has(car.id) || false}
                                     />
                                 </div>
                             )
