@@ -137,7 +137,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     // Hook para verificar carros con estudiantes de cumpleaños
     const allCars = [...leftLaneCars, ...rightLaneCars]
-    const { birthdayCarIds, birthdayCars, hasCarBirthday } = useBirthdayCars(allCars)
+    const { birthdayCarIds } = useBirthdayCars(allCars)
 
     // Add car function using Convex mutation
     const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
