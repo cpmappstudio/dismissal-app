@@ -13,6 +13,7 @@ import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
+import { useCampusSession } from "@/hooks/use-campus-session"
 import { Road } from "./road"
 import { CarData, ModeType } from "./types"
 
@@ -24,7 +25,8 @@ interface DismissalViewProps {
 export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
 
-    const [selectedCampus, setSelectedCampus] = React.useState<string>("")
+    // Usar el hook de sesión de campus
+    const { selectedCampus, updateSelectedCampus, isLoaded: campusLoaded } = useCampusSession()
     const [isFullscreen, setIsFullscreen] = React.useState(false)
     const [carInputValue, setCarInputValue] = React.useState<string>('')
     const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -216,6 +218,18 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         setIsFullscreen(!isFullscreen)
     }
 
+    // Evitar render antes de cargar campus desde localStorage
+    if (!campusLoaded) {
+        return (
+            <div className={cn("w-full h-full flex flex-col items-center justify-center", className)}>
+                <div className="text-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yankees-blue mx-auto"></div>
+                    <p className="text-sm text-muted-foreground">Loading campus selection...</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className={cn("w-full h-full flex flex-col", className)}>
             {/* Campus Selection and Lane Balance */}
@@ -223,7 +237,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 <div className="flex-shrink-0 relative">
                     <FilterDropdown<CampusLocation>
                         value={selectedCampus as CampusLocation}
-                        onChange={(value) => setSelectedCampus(value)}
+                        onChange={(value) => updateSelectedCampus(value)}
                         options={CAMPUS_LOCATIONS}
                         icon={MapPin}
                         label={t('campus.select')}
