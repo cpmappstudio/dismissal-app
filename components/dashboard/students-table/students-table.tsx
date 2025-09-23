@@ -72,6 +72,10 @@ export function StudentsTable() {
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [rowSelection, setRowSelection] = React.useState({})
     const [globalFilter, setGlobalFilter] = React.useState("")
+    const [pagination, setPagination] = React.useState({
+        pageIndex: 0,
+        pageSize: 10,
+    })
 
     // Dialog state
     const [editDialogOpen, setEditDialogOpen] = React.useState(false)
@@ -151,18 +155,38 @@ export function StudentsTable() {
             columnFilters,
             rowSelection,
             globalFilter,
+            pagination,
         },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onRowSelectionChange: setRowSelection,
         onGlobalFilterChange: setGlobalFilter,
+        onPaginationChange: setPagination,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(), // ✅ Filtrado local estándar
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         globalFilterFn: globalFilterFunction,
         // manualFiltering: false por defecto - React Table maneja filtros
+        // manualPagination: false por defecto - React Table maneja paginación
+        autoResetPageIndex: false, // ✅ Evita que se resetee la página automáticamente
     })
+
+    // Efecto para ajustar la página si estamos en una página vacía después de eliminar elementos
+    React.useEffect(() => {
+        if (!isLoading && table.getPageCount() > 0) {
+            const currentPageIndex = table.getState().pagination.pageIndex
+            const totalPages = table.getPageCount()
+
+            // Si estamos en una página que ya no existe (por ejemplo, después de eliminar elementos)
+            if (currentPageIndex >= totalPages) {
+                setPagination(prev => ({
+                    ...prev,
+                    pageIndex: Math.max(0, totalPages - 1)
+                }))
+            }
+        }
+    }, [table, isLoading, setPagination, data.length]) // Reaccionar a cambios en los datos
 
     // Get selected students
     const selectedStudents = table.getFilteredSelectedRowModel().rows.map(row => row.original)
@@ -180,6 +204,7 @@ export function StudentsTable() {
                 })
             }
             setRowSelection({})
+            // La página se mantiene automáticamente con autoResetPageIndex: false
             // TODO: Agregar toast de éxito aquí
         } catch {
             // TODO: Agregar toast de error aquí
@@ -198,6 +223,8 @@ export function StudentsTable() {
                 avatarUrl: studentData.avatarUrl,
                 avatarStorageId: studentData.avatarStorageId,
             })
+            // La página se mantiene automáticamente con autoResetPageIndex: false
+            // TODO: Agregar toast de éxito aquí
         } catch {
             // TODO: Agregar toast de error aquí
         }
@@ -220,7 +247,7 @@ export function StudentsTable() {
             })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
-            // Convex actualiza automáticamente la UI
+            // La página se mantiene automáticamente con autoResetPageIndex: false
             // TODO: Agregar toast de éxito aquí
         } catch {
             // TODO: Agregar toast de error aquí
@@ -232,7 +259,7 @@ export function StudentsTable() {
             await deleteStudent({ studentId: studentId as Id<"students"> })
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
-            // Convex actualiza automáticamente la UI
+            // La página se mantiene automáticamente con autoResetPageIndex: false
             // TODO: Agregar toast de éxito aquí
         } catch {
             // TODO: Agregar toast de error aquí
@@ -382,6 +409,13 @@ export function StudentsTable() {
                     </div>
                     <div className="font-medium text-yankees-blue">
                         {studentsData?.total ?? data.length} total students
+                    </div>
+                    <div className="hidden md:block">
+                        •
+                    </div>
+                    <div className="hidden md:block">
+                        Page {table.getState().pagination.pageIndex + 1} of{" "}
+                        {table.getPageCount()}
                     </div>
                 </div>
                 <div className="flex gap-2">
