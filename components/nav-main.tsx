@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useMemo, memo } from "react"
+import { useMemo, memo, useCallback } from "react"
 import { ChevronRight, Home, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 
@@ -20,6 +20,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 export const NavMain = memo(function NavMain({
@@ -43,6 +44,7 @@ export const NavMain = memo(function NavMain({
   showDashboard?: boolean
 }) {
   const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
 
   // Memoize the path processing to avoid regex on every render
   const pathWithoutLocale = useMemo(() => {
@@ -53,6 +55,13 @@ export const NavMain = memo(function NavMain({
   const isDashboardActive = useMemo(() => {
     return pathWithoutLocale === '' || pathWithoutLocale === '/'
   }, [pathWithoutLocale])
+
+  // Handler para cerrar sidebar en móviles al hacer clic en enlaces
+  const handleLinkClick = useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [isMobile, setOpenMobile])
 
   return (
     <SidebarGroup>
@@ -65,7 +74,7 @@ export const NavMain = memo(function NavMain({
               'text-lime-300': isDashboardActive,
             })}
           >
-            <Link href="/">
+            <Link href="/" onClick={handleLinkClick}>
               <Home />
               <span>{dashboardLabel}</span>
             </Link>
@@ -96,7 +105,7 @@ export const NavMain = memo(function NavMain({
                           'text-lime-300': pathWithoutLocale === subItem.url,
                         })}
                       >
-                        <Link href={subItem.url}>
+                        <Link href={subItem.url} onClick={handleLinkClick}>
                           <span>{subItem.title}</span>
                         </Link>
                       </SidebarMenuSubButton>
