@@ -31,6 +31,19 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const [carInputValue, setCarInputValue] = React.useState<string>('')
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
+    // Ref para mantener el focus del input en modo allocator
+    const carInputRef = React.useRef<HTMLInputElement>(null)
+    const [shouldMaintainFocus, setShouldMaintainFocus] = React.useState(false)
+
+    // Ref para el timeout de la alerta
+    const alertTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+    // Ref para el requestAnimationFrame del focus
+    const focusFrameRef = React.useRef<number | null>(null)
+    // Ref para el valor actual del input (para evitar dependencias innecesarias)
+    const carInputValueRef = React.useRef<string>('')
+    // Ref para el estado de submitting (para evitar dependencias innecesarias)
+    const isSubmittingRef = React.useRef<boolean>(false)
+
     // Alert state
     const [alert, setAlert] = React.useState<{
         show: boolean
@@ -56,8 +69,25 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     // Campus selection validation
     const isCampusSelected = selectedCampus !== "all" && selectedCampus !== ""
 
+    // Helper para actualizar el valor del input (sincroniza estado y ref)
+    const updateCarInputValue = React.useCallback((value: string) => {
+        setCarInputValue(value)
+        carInputValueRef.current = value
+    }, [])
+
+    // Helper para actualizar el estado de submitting (sincroniza estado y ref)
+    const updateIsSubmitting = React.useCallback((value: boolean) => {
+        setIsSubmitting(value)
+        isSubmittingRef.current = value
+    }, [])
+
     // Function to show alerts
     const showAlert = React.useCallback((type: 'success' | 'error', title: string, message: string) => {
+        // Limpiar timeout anterior si existe
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current)
+        }
+
         setAlert({
             show: true,
             type,
@@ -66,13 +96,19 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         })
 
         // Auto-hide after 5 seconds
-        setTimeout(() => {
+        alertTimeoutRef.current = setTimeout(() => {
             setAlert(prev => ({ ...prev, show: false }))
+            alertTimeoutRef.current = null
         }, 5000)
     }, [])
 
     // Function to hide alert manually
     const hideAlert = React.useCallback(() => {
+        // Limpiar timeout si existe al ocultar manualmente
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current)
+            alertTimeoutRef.current = null
+        }
         setAlert(prev => ({ ...prev, show: false }))
     }, [])
 
@@ -137,9 +173,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     // Add car function using Convex mutation
     const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
-        if (!carInputValue.trim() || isSubmitting) return
+        const currentValue = carInputValueRef.current
+        if (!currentValue.trim() || isSubmittingRef.current) return
 
-        const carNumber = parseInt(carInputValue.trim())
+        const carNumber = parseInt(currentValue.trim())
         if (isNaN(carNumber) || carNumber <= 0) {
             showAlert('error', 'Invalid Car Number', 'Please enter a valid car number')
             return
@@ -150,7 +187,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             return
         }
 
-        setIsSubmitting(true)
+        updateIsSubmitting(true)
         try {
             const result = await addCarToQueue({
                 carNumber,
@@ -159,8 +196,24 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             })
 
             if (result.success) {
-                setCarInputValue('') // Clear input after successful add
+                updateCarInputValue('') // Clear input after successful add
                 showAlert('success', 'Car Added!', `Car ${carNumber} has been added to the ${lane} lane`)
+
+                // Mantener el focus en el input después de agregar el carro (para móviles)
+                if (shouldMaintainFocus && carInputRef.current) {
+                    // Limpiar frame anterior si existe
+                    if (focusFrameRef.current) {
+                        cancelAnimationFrame(focusFrameRef.current)
+                    }
+
+                    // Usar requestAnimationFrame para mejor rendimiento
+                    focusFrameRef.current = requestAnimationFrame(() => {
+                        if (carInputRef.current) {
+                            carInputRef.current.focus()
+                        }
+                        focusFrameRef.current = null
+                    })
+                }
             } else {
                 // Handle different error types
                 switch (result.error) {
@@ -183,15 +236,15 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         } catch {
             showAlert('error', 'Error', 'Failed to add car to queue')
         } finally {
-            setIsSubmitting(false)
+            updateIsSubmitting(false)
         }
-    }, [carInputValue, selectedCampus, isCampusSelected, addCarToQueue, isSubmitting, showAlert])
+    }, [selectedCampus, isCampusSelected, addCarToQueue, showAlert, shouldMaintainFocus, updateCarInputValue, updateIsSubmitting])
 
     // Remove car function using Convex mutation
     const handleRemoveCar = React.useCallback(async (carId: string) => {
-        if (isSubmitting) return
+        if (isSubmittingRef.current) return
 
-        setIsSubmitting(true)
+        updateIsSubmitting(true)
         try {
             const result = await removeCarFromQueue({ queueId: carId as Id<"dismissalQueue"> })
             if (result && result.carNumber) {
@@ -200,9 +253,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         } catch {
             showAlert('error', 'Error', 'Failed to remove car from queue')
         } finally {
-            setIsSubmitting(false)
+            updateIsSubmitting(false)
         }
-    }, [removeCarFromQueue, isSubmitting, showAlert])
+    }, [removeCarFromQueue, showAlert, updateIsSubmitting])
 
     // Handle keyboard shortcuts for the single input
     const handleKeyPress = React.useCallback((e: React.KeyboardEvent) => {
@@ -212,6 +265,55 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             handleAddCarToLane('right')
         }
     }, [handleAddCarToLane])
+
+    // Handlers para mantener el focus en modo allocator
+    const handleInputFocus = React.useCallback(() => {
+        if (mode === 'allocator') {
+            setShouldMaintainFocus(true)
+        }
+    }, [mode])
+
+    const handleArrowClick = React.useCallback((lane: 'left' | 'right', event: React.MouseEvent) => {
+        event.preventDefault() // Prevenir que el botón tome el focus
+        handleAddCarToLane(lane)
+    }, [handleAddCarToLane])
+
+    // Detectar clics fuera del área de allocator para desactivar el mantenimiento de focus
+    React.useEffect(() => {
+        // Solo agregar el listener si estamos en modo allocator y manteniendo focus
+        if (mode !== 'allocator' || !shouldMaintainFocus) {
+            return
+        }
+
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Element
+            // Verificar si el clic fue fuera del área del allocator
+            const isAllocatorArea = target.closest('.allocator-area')
+            if (!isAllocatorArea) {
+                setShouldMaintainFocus(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [mode, shouldMaintainFocus])
+
+    // Cleanup effect para el timeout de alerta y animationFrame
+    React.useEffect(() => {
+        return () => {
+            if (alertTimeoutRef.current) {
+                clearTimeout(alertTimeoutRef.current)
+            }
+            if (focusFrameRef.current) {
+                cancelAnimationFrame(focusFrameRef.current)
+            }
+        }
+    }, [])
+
+    // Sincronizar ref con estado del input
+    React.useEffect(() => {
+        carInputValueRef.current = carInputValue
+    }, [carInputValue])
 
     // Toggle fullscreen for viewer mode
     const toggleFullscreen = () => {
@@ -311,11 +413,11 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 {mode === 'allocator' && isCampusSelected && (
                     <div className="absolute bottom-8 left-0 right-0 z-20 px-2">
                         <div className="flex justify-center">
-                            <div className="bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
+                            <div className="allocator-area bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
                                 <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
                                     {/* Left Arrow Button */}
                                     <Button
-                                        onClick={() => handleAddCarToLane('left')}
+                                        onClick={(e) => handleArrowClick('left', e)}
                                         disabled={!carInputValue.trim() || isSubmitting}
                                         size="sm"
                                         className="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
@@ -325,6 +427,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
                                     {/* Car Input */}
                                     <Input
+                                        ref={carInputRef}
                                         type="number"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
@@ -333,8 +436,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                         onChange={(e) => {
                                             // Solo permitir números
                                             const value = e.target.value.replace(/[^0-9]/g, '')
-                                            setCarInputValue(value)
+                                            updateCarInputValue(value)
                                         }}
+                                        onFocus={handleInputFocus}
                                         onKeyDown={handleKeyPress}
                                         disabled={isSubmitting}
                                         className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white disabled:opacity-50"
@@ -343,7 +447,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
                                     {/* Right Arrow Button */}
                                     <Button
-                                        onClick={() => handleAddCarToLane('right')}
+                                        onClick={(e) => handleArrowClick('right', e)}
                                         disabled={!carInputValue.trim() || isSubmitting}
                                         size="sm"
                                         className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
