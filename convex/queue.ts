@@ -692,7 +692,6 @@ export const scheduledClearAllQueues = internalMutation({
             .collect();
 
         if (allEntries.length === 0) {
-            console.log("No cars in any queue to clear at midnight");
             return { success: true, clearedCampuses: 0, totalCarsCleared: 0 };
         }
 
@@ -712,11 +711,7 @@ export const scheduledClearAllQueues = internalMutation({
                 await clearCarFromQueue(ctx.db, entry, entry.addedBy, now);
                 totalCleared++;
             }
-
-            console.log(`Cleared ${campusEntries.length} cars from ${campus} at midnight`);
         }
-
-        console.log(`Total cleared: ${totalCleared} cars from ${campuses.length} campuses`);
 
         return {
             success: true,
