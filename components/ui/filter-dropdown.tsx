@@ -24,6 +24,7 @@ interface FilterDropdownProps<T extends string = string> {
     disabled?: boolean
     showAllOption?: boolean
     contentWidth?: string
+    optionCounts?: Record<string, number>
 }
 
 export function FilterDropdown<T extends string>({
@@ -37,7 +38,8 @@ export function FilterDropdown<T extends string>({
     className = "",
     disabled = false,
     showAllOption = true,
-    contentWidth = "w-48"
+    contentWidth = "w-48",
+    optionCounts
 }: FilterDropdownProps<T>) {
     const displayValue = !value || value === "all" ? placeholder : value
     const displayValueShort = !value || value === "all"
@@ -73,8 +75,14 @@ export function FilterDropdown<T extends string>({
                     <DropdownMenuItem
                         key={option}
                         onClick={() => onChange(option)}
+                        className="flex items-center justify-between"
                     >
-                        {option}
+                        <span>{option}</span>
+                        {optionCounts && optionCounts[option] !== undefined && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                                {optionCounts[option]}
+                            </span>
+                        )}
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>

@@ -632,3 +632,35 @@ export const clearAllCars = mutation({
         };
     }
 });
+
+/**
+ * Get car counts for all campuses
+ */
+export const getCarCountsByCampus = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            return {};
+        }
+
+        try {
+            // Get all cars in waiting status
+            const allEntries = await ctx.db
+                .query("dismissalQueue")
+                .filter(q => q.eq(q.field("status"), "waiting"))
+                .collect();
+
+            // Group by campus and count
+            const counts: Record<string, number> = {};
+            allEntries.forEach(entry => {
+                const campus = entry.campusLocation;
+                counts[campus] = (counts[campus] || 0) + 1;
+            });
+
+            return counts;
+        } catch {
+            return {};
+        }
+    }
+});

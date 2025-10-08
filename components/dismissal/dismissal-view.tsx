@@ -72,6 +72,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const queueData = useQuery(api.queue.getCurrentQueue,
         selectedCampus ? { campus: selectedCampus } : "skip"
     )
+    const carCountsByCampus = useQuery(api.queue.getCarCountsByCampus)
 
     // Mutations de Convex
     const addCarToQueue = useMutation(api.queue.addCar)
@@ -376,6 +377,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         placeholder={t('campus.select')}
                         className="w-full md:w-64"
                         showAllOption={false}
+                        optionCounts={carCountsByCampus}
                     />
                     {/* Auth State Indicator */}
                     {isLoading && (
