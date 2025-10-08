@@ -15,6 +15,7 @@ import type {
 } from "convex/server";
 import type * as auth from "../auth.js";
 import type * as campus from "../campus.js";
+import type * as crons from "../crons.js";
 import type * as helpers from "../helpers.js";
 import type * as queue from "../queue.js";
 import type * as students from "../students.js";
@@ -32,6 +33,7 @@ import type * as users from "../users.js";
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   campus: typeof campus;
+  crons: typeof crons;
   helpers: typeof helpers;
   queue: typeof queue;
   students: typeof students;

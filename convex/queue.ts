@@ -1,7 +1,7 @@
 // convex/queue.ts
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
 
 /**
@@ -105,6 +105,38 @@ async function repositionLaneCars(db: any, campus: string, lane: string, removed
         await db.delete(entry._id);
         await db.insert("dismissalQueue", newEntry);
     }
+}
+
+/**
+ * Helper function to clear a car from queue and create history entry
+ * Shared by both manual clear (clearAllCars) and scheduled clear (scheduledClearAllQueues)
+ */
+async function clearCarFromQueue(
+    db: any,
+    entry: any,
+    removedByUserId: any,
+    now: number = Date.now()
+): Promise<void> {
+    const today = new Date(now).toISOString().split('T')[0];
+    const waitTimeSeconds = Math.floor((now - entry.assignedTime) / 1000);
+
+    // Create history entry
+    await db.insert("dismissalHistory", {
+        carNumber: entry.carNumber,
+        campusLocation: entry.campusLocation,
+        lane: entry.lane,
+        studentIds: entry.students.map((s: any) => s.studentId),
+        studentNames: entry.students.map((s: any) => s.name),
+        queuedAt: entry.assignedTime,
+        completedAt: now,
+        waitTimeSeconds,
+        addedBy: entry.addedBy,
+        removedBy: removedByUserId,
+        date: today
+    });
+
+    // Delete from queue
+    await db.delete(entry._id);
 }
 
 /**
@@ -599,30 +631,11 @@ export const clearAllCars = mutation({
             };
         }
 
-        const today = new Date().toISOString().split('T')[0];
         const now = Date.now();
 
-        // Process each entry: create history record and delete from queue
+        // Process each entry using shared helper function
         for (const entry of entries) {
-            const waitTimeSeconds = Math.floor((now - entry.assignedTime) / 1000);
-
-            // Create history entry
-            await ctx.db.insert("dismissalHistory", {
-                carNumber: entry.carNumber,
-                campusLocation: entry.campusLocation,
-                lane: entry.lane,
-                studentIds: entry.students.map((s: any) => s.studentId),
-                studentNames: entry.students.map((s: any) => s.name),
-                queuedAt: entry.assignedTime,
-                completedAt: now,
-                waitTimeSeconds,
-                addedBy: entry.addedBy,
-                removedBy: user._id,
-                date: today
-            });
-
-            // Remove from queue
-            await ctx.db.delete(entry._id);
+            await clearCarFromQueue(ctx.db, entry, user._id, now);
         }
 
         return {
@@ -662,5 +675,54 @@ export const getCarCountsByCampus = query({
         } catch {
             return {};
         }
+    }
+});
+
+/**
+ * Scheduled function to clear all queues at midnight (internal only)
+ * This is called by the cron job to reset queues daily
+ */
+export const scheduledClearAllQueues = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        // Get all distinct campuses that have cars in queue
+        const allEntries = await ctx.db
+            .query("dismissalQueue")
+            .filter(q => q.eq(q.field("status"), "waiting"))
+            .collect();
+
+        if (allEntries.length === 0) {
+            console.log("No cars in any queue to clear at midnight");
+            return { success: true, clearedCampuses: 0, totalCarsCleared: 0 };
+        }
+
+        // Get unique campus locations
+        const campuses = [...new Set(allEntries.map(entry => entry.campusLocation))];
+
+        const now = Date.now();
+        let totalCleared = 0;
+
+        // Process each campus
+        for (const campus of campuses) {
+            const campusEntries = allEntries.filter(e => e.campusLocation === campus);
+
+            // Create history entries for all cars in this campus using shared helper
+            for (const entry of campusEntries) {
+                // For scheduled clears, removedBy = addedBy (system operation)
+                await clearCarFromQueue(ctx.db, entry, entry.addedBy, now);
+                totalCleared++;
+            }
+
+            console.log(`Cleared ${campusEntries.length} cars from ${campus} at midnight`);
+        }
+
+        console.log(`Total cleared: ${totalCleared} cars from ${campuses.length} campuses`);
+
+        return {
+            success: true,
+            clearedCampuses: campuses.length,
+            totalCarsCleared: totalCleared,
+            campuses
+        };
     }
 });
