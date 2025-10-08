@@ -148,7 +148,15 @@
             "description": "Remove cars when students are picked up",
             "noCars": "No cars in queue",
             "removeCar": "Remove car",
-            "carRemoved": "Car #{number} removed from {lane} lane"
+            "carRemoved": "Car #{number} removed from {lane} lane",
+            "clearAll": "Clear All Queue",
+            "clearAllConfirm": {
+                "title": "Clear All Queue",
+                "description": "Are you sure you want to remove all cars from the queue? This action cannot be undone.",
+                "cancel": "Cancel",
+                "confirm": "Clear All"
+            },
+            "allCarsCleared": "All cars have been cleared from the queue"
         },
         "table": {
             "carNumber": "Car #",

@@ -546,3 +546,89 @@ export const getRecentActivity = query({
         }
     }
 });
+
+/**
+ * Clear all cars from queue for a specific campus (dispatcher action)
+ */
+export const clearAllCars = mutation({
+    args: {
+        campus: v.string()
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        // Get or create user record
+        let user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) {
+            // Create user record if it doesn't exist
+            const userId = await ctx.db.insert("users", {
+                clerkId: identity.subject,
+                username: (identity.username as string) || (identity.email as string) || "unknown",
+                email: (identity.email as string) || (identity.emailAddress as string),
+                firstName: (identity.firstName as string) || (identity.givenName as string),
+                lastName: (identity.lastName as string) || (identity.familyName as string),
+                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
+                assignedCampuses: [args.campus],
+                isActive: true,
+                createdAt: Date.now(),
+                lastLoginAt: Date.now()
+            });
+            user = await ctx.db.get(userId);
+        }
+
+        if (!user) throw new Error("Failed to create user record");
+
+        // Get all cars in queue for this campus
+        const entries = await ctx.db
+            .query("dismissalQueue")
+            .withIndex("by_campus_status", q =>
+                q.eq("campusLocation", args.campus).eq("status", "waiting")
+            )
+            .collect();
+
+        if (entries.length === 0) {
+            return {
+                success: true,
+                clearedCount: 0,
+                message: "No cars in queue to clear"
+            };
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const now = Date.now();
+
+        // Process each entry: create history record and delete from queue
+        for (const entry of entries) {
+            const waitTimeSeconds = Math.floor((now - entry.assignedTime) / 1000);
+
+            // Create history entry
+            await ctx.db.insert("dismissalHistory", {
+                carNumber: entry.carNumber,
+                campusLocation: entry.campusLocation,
+                lane: entry.lane,
+                studentIds: entry.students.map((s: any) => s.studentId),
+                studentNames: entry.students.map((s: any) => s.name),
+                queuedAt: entry.assignedTime,
+                completedAt: now,
+                waitTimeSeconds,
+                addedBy: entry.addedBy,
+                removedBy: user._id,
+                date: today
+            });
+
+            // Remove from queue
+            await ctx.db.delete(entry._id);
+        }
+
+        return {
+            success: true,
+            clearedCount: entries.length,
+            message: `Cleared ${entries.length} car(s) from queue`
+        };
+    }
+});

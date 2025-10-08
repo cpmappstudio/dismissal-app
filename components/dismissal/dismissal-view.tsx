@@ -4,13 +4,23 @@ import * as React from "react"
 import { useTranslations } from "next-intl"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { Car, ChevronLeft, ChevronRight, MapPin, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Car, ChevronLeft, ChevronRight, MapPin, AlertCircle, CheckCircle2, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
 import { useCampusSession } from "@/hooks/use-campus-session"
@@ -30,6 +40,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const [isFullscreen, setIsFullscreen] = React.useState(false)
     const [carInputValue, setCarInputValue] = React.useState<string>('')
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+    const [showClearDialog, setShowClearDialog] = React.useState(false)
 
     // Ref para mantener el focus del input en modo allocator
     const carInputRef = React.useRef<HTMLInputElement>(null)
@@ -65,6 +76,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     // Mutations de Convex
     const addCarToQueue = useMutation(api.queue.addCar)
     const removeCarFromQueue = useMutation(api.queue.removeCar)
+    const clearAllCars = useMutation(api.queue.clearAllCars)
 
     // Campus selection validation
     const isCampusSelected = selectedCampus !== "all" && selectedCampus !== ""
@@ -257,6 +269,24 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         }
     }, [removeCarFromQueue, showAlert, updateIsSubmitting])
 
+    // Clear all cars function
+    const handleClearAllCars = React.useCallback(async () => {
+        if (isSubmittingRef.current || !isCampusSelected) return
+
+        updateIsSubmitting(true)
+        try {
+            const result = await clearAllCars({ campus: selectedCampus })
+            if (result.success) {
+                showAlert('success', t('dispatcher.allCarsCleared'), `${result.clearedCount} car(s) cleared from ${selectedCampus}`)
+                setShowClearDialog(false)
+            }
+        } catch {
+            showAlert('error', 'Error', 'Failed to clear all cars from queue')
+        } finally {
+            updateIsSubmitting(false)
+        }
+    }, [clearAllCars, selectedCampus, isCampusSelected, showAlert, updateIsSubmitting, t])
+
     // Handle keyboard shortcuts for the single input
     const handleKeyPress = React.useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -334,8 +364,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     return (
         <div className={cn("w-full h-full flex flex-col", className)}>
-            {/* Campus Selection and Lane Balance */}
-            <div className="flex flex-col gap-4  md:flex-row md:items-center md:gap-6 flex-shrink-0">
+            {/* Campus Selection and Clear All Button */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between flex-shrink-0">
                 <div className="flex-shrink-0 relative">
                     <FilterDropdown<CampusLocation>
                         value={selectedCampus as CampusLocation}
@@ -358,25 +388,19 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     )}
                 </div>
 
-                {/* Lane Balance Bar
-                <Card className={cn("flex-1 border-2 rounded-md border-yankees-blue flex items-center p-3", !isCampusSelected && "opacity-50")}>
-                    <div className="relative h-1.5 rounded-full bg-gray-200 overflow-hidden w-full">
-                        {totalCars > 0 ? (
-                            <>
-                                <div
-                                    className="absolute left-0 top-0 h-full bg-blue-500 transition-all duration-300"
-                                    style={{ width: `${(leftLaneCars.length / totalCars) * 100}%` }}
-                                />
-                                <div
-                                    className="absolute right-0 top-0 h-full bg-green-500 transition-all duration-300"
-                                    style={{ width: `${(rightLaneCars.length / totalCars) * 100}%` }}
-                                />
-                            </>
-                        ) : (
-                            <div className="absolute inset-0 bg-gray-300" />
-                        )}
-                    </div>
-                </Card> */}
+                {/* Clear All Button - Only visible in dispatcher mode */}
+                {mode === 'dispatcher' && isCampusSelected && (
+                    <Button
+                        onClick={() => setShowClearDialog(true)}
+                        disabled={isSubmitting || (leftLaneCars.length === 0 && rightLaneCars.length === 0)}
+                        variant="destructive"
+                        className="gap-2"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">{t('dispatcher.clearAll')}</span>
+                        <span className="sm:hidden">Clear</span>
+                    </Button>
+                )}
             </div>
 
             {/* Main Content Area - Takes remaining space */}
@@ -482,6 +506,29 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     </Alert>
                 </div>
             )}
+
+            {/* Clear All Confirmation Dialog */}
+            <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{t('dispatcher.clearAllConfirm.title')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {t('dispatcher.clearAllConfirm.description')}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>
+                            {t('dispatcher.clearAllConfirm.cancel')}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleClearAllCars}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isSubmitting ? 'Clearing...' : t('dispatcher.clearAllConfirm.confirm')}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

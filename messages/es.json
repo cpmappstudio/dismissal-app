@@ -149,7 +149,15 @@
             "description": "Remover carros cuando los estudiantes son recogidos",
             "noCars": "No hay carros en la fila",
             "removeCar": "Remover carro",
-            "carRemoved": "Carro #{number} removido del carril {lane}"
+            "carRemoved": "Carro #{number} removido del carril {lane}",
+            "clearAll": "Limpiar Toda la Fila",
+            "clearAllConfirm": {
+                "title": "Limpiar Toda la Fila",
+                "description": "¿Estás seguro de que quieres remover todos los carros de la fila? Esta acción no se puede deshacer.",
+                "cancel": "Cancelar",
+                "confirm": "Limpiar Todo"
+            },
+            "allCarsCleared": "Todos los carros han sido removidos de la fila"
         },
         "table": {
             "carNumber": "Carro #",
