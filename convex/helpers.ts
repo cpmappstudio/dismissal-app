@@ -135,7 +135,9 @@ export function userCanDispatch(
 // ============================================================================
 
 /**
- * Get students by car number at a specific campus
+ * Get students by car number - searches across ALL campuses
+ * Car numbers are unique across all campuses, so we search globally
+ * First tries the current campus (faster with index), then searches all campuses if needed
  */
 export async function getStudentsByCarNumber(
     db: DbReader,
@@ -144,7 +146,8 @@ export async function getStudentsByCarNumber(
 ): Promise<Doc<"students">[]> {
     if (carNumber === 0) return [];
 
-    return await db
+    // First, try to find in the current campus (optimized with index)
+    const studentsInCampus = await db
         .query("students")
         .withIndex("by_car_campus", q =>
             q.eq("carNumber", carNumber)
@@ -152,6 +155,25 @@ export async function getStudentsByCarNumber(
                 .eq("isActive", true)
         )
         .collect();
+
+    // If found in current campus, return immediately
+    if (studentsInCampus.length > 0) {
+        return studentsInCampus;
+    }
+
+    // If not found in current campus, search across ALL campuses
+    // This allows calling cars from any campus to any campus
+    const allStudents = await db
+        .query("students")
+        .filter(q =>
+            q.and(
+                q.eq(q.field("carNumber"), carNumber),
+                q.eq(q.field("isActive"), true)
+            )
+        )
+        .collect();
+
+    return allStudents;
 }
 
 /**
@@ -277,19 +299,23 @@ export async function getNextPosition(
 }
 
 /**
- * Check if car is already in queue
+ * Check if car is already in queue across ALL campuses
+ * Prevents the same car from being in multiple campus queues simultaneously
  */
 export async function isCarInQueue(
     db: DbReader,
     carNumber: number,
     campus: string
 ): Promise<boolean> {
+    // Check across ALL campuses, not just the current one
     const existing = await db
         .query("dismissalQueue")
-        .withIndex("by_car_campus", q =>
-            q.eq("carNumber", carNumber).eq("campusLocation", campus)
+        .filter(q =>
+            q.and(
+                q.eq(q.field("carNumber"), carNumber),
+                q.eq(q.field("status"), "waiting")
+            )
         )
-        .filter(q => q.eq(q.field("status"), "waiting"))
         .first();
 
     return existing !== null;

@@ -153,17 +153,35 @@ export const getBatchAvatarUrls = query({
 
 /**
  * Helper function to get students by car number
+ * Searches across ALL campuses since car numbers are unique globally
  */
 async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
     if (carNumber === 0) return [];
 
-    return await db
+    // First, try to find in the current campus (optimized with index)
+    const studentsInCampus = await db
         .query("students")
         .withIndex("by_car_campus", (q: any) =>
             q.eq("carNumber", carNumber)
                 .eq("campusLocation", campus)
         )
         .collect();
+
+    // If found in current campus, return immediately
+    if (studentsInCampus.length > 0) {
+        return studentsInCampus;
+    }
+
+    // If not found in current campus, search across ALL campuses
+    // This allows calling cars from any campus to any campus
+    const allStudents = await db
+        .query("students")
+        .filter((q: any) =>
+            q.eq(q.field("carNumber"), carNumber)
+        )
+        .collect();
+
+    return allStudents;
 }
 
 /**

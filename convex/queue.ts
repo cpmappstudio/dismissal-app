@@ -10,7 +10,8 @@ import { laneValidator } from "./types";
 async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
     if (carNumber === 0) return [];
 
-    return await db
+    // First, try to find in the current campus (optimized with index)
+    const studentsInCampus = await db
         .query("students")
         .withIndex("by_car_campus", (q: any) =>
             q.eq("carNumber", carNumber)
@@ -18,15 +19,38 @@ async function getStudentsByCarNumber(db: any, carNumber: number, campus: string
                 .eq("isActive", true)
         )
         .collect();
+
+    // If found in current campus, return immediately
+    if (studentsInCampus.length > 0) {
+        return studentsInCampus;
+    }
+
+    // If not found in current campus, search across ALL campuses
+    // This allows calling cars from any campus to any campus
+    const allStudents = await db
+        .query("students")
+        .filter((q: any) =>
+            q.and(
+                q.eq(q.field("carNumber"), carNumber),
+                q.eq(q.field("isActive"), true)
+            )
+        )
+        .collect();
+
+    return allStudents;
 }
 
 async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
+    // Check if car is in queue across ALL campuses (not just current campus)
+    // This prevents the same car from being in multiple campus queues simultaneously
     const existing = await db
         .query("dismissalQueue")
-        .withIndex("by_car_campus", (q: any) =>
-            q.eq("carNumber", carNumber).eq("campusLocation", campus)
+        .filter((q: any) =>
+            q.and(
+                q.eq(q.field("carNumber"), carNumber),
+                q.eq(q.field("status"), "waiting")
+            )
         )
-        .filter((q: any) => q.eq(q.field("status"), "waiting"))
         .first();
 
     return existing !== null;
@@ -206,13 +230,13 @@ export const addCar = mutation({
             };
         }
 
-        // Get students for this car
+        // Get students for this car (searches across all campuses)
         const students = await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
         if (students.length === 0) {
             return {
                 success: false,
                 error: "NO_STUDENTS_FOUND",
-                message: `No students found with car number ${args.carNumber} in ${args.campus}`
+                message: `No students found with car number ${args.carNumber}`
             };
         }
 
@@ -333,12 +357,15 @@ export const checkCarInQueue = query({
             const inQueue = await isCarInQueue(ctx.db, args.carNumber, args.campus);
 
             if (inQueue) {
+                // Search across all campuses to find where the car is
                 const entry = await ctx.db
                     .query("dismissalQueue")
-                    .withIndex("by_car_campus", q =>
-                        q.eq("carNumber", args.carNumber).eq("campusLocation", args.campus)
+                    .filter((q: any) =>
+                        q.and(
+                            q.eq(q.field("carNumber"), args.carNumber),
+                            q.eq(q.field("status"), "waiting")
+                        )
                     )
-                    .filter(q => q.eq(q.field("status"), "waiting"))
                     .first();
 
                 return {
