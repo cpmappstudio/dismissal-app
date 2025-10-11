@@ -84,6 +84,7 @@ interface CarCardProps {
 }
 
 export const CarCard = React.memo<CarCardProps>(
+  
   ({
     car,
     onRemove,
@@ -371,7 +372,8 @@ export const CarCard = React.memo<CarCardProps>(
                               {student.name}
                               {studentHasBirthday && (
                                 <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">
-                                  ¡Cumpleaños!
+                                  {/* {t("birthdayMessage")} */}
+                                  Happy birthday
                                 </span>
                               )}
                             </div>
