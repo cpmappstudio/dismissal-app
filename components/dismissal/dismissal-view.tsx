@@ -391,7 +391,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </div>
 
                 {/* Clear All Button - Only visible in dispatcher mode */}
-                {mode === 'dispatcher' && isCampusSelected && (
+                {/* {mode === 'dispatcher' && isCampusSelected && (
                     <Button
                         onClick={() => setShowClearDialog(true)}
                         disabled={isSubmitting || (leftLaneCars.length === 0 && rightLaneCars.length === 0)}
@@ -402,7 +402,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         <span className="hidden sm:inline">{t('dispatcher.clearAll')}</span>
                         <span className="sm:hidden">Clear</span>
                     </Button>
-                )}
+                )} */}
             </div>
 
             {/* Main Content Area - Takes remaining space */}
