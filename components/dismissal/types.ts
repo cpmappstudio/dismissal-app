@@ -4,6 +4,7 @@ export interface StudentData {
     id: string
     name: string
     grade?: string
+    birthday?: string
     imageUrl?: string
     avatarStorageId?: Id<"_storage">
 }
