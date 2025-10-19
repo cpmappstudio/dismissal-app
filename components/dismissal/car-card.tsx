@@ -130,7 +130,7 @@ export const CarCard = React.memo<CarCardProps>(
 
     return (
       <div
-        className={`relative z-30 ${isViewerMode ? "flex flex-col items-center justify-center mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-2 lg:mt-0" : "flex justify-center"}`}
+        className={`relative z-30 ${isViewerMode ? "flex flex-col items-center justify-center max-md:mx-2 md:mx-4 lg:mx-6 xl:mx-8 max-md:mt-0 md:mt-2 lg:mt-0" : "flex justify-center"}`}
       >
         <Drawer>
           <DrawerTrigger asChild>
@@ -248,7 +248,7 @@ export const CarCard = React.memo<CarCardProps>(
                 <Car
                   size="viewer"
                   color={hasBirthdayToday ? "#D4AF37" : "#A6A6A6"}
-                  className="!filter !-mt-8"
+                  className="!filter max-md:!-mt-2 md:!-mt-8"
                   isViewer={isViewerMode}
                 />
               </div>

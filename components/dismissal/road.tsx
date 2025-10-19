@@ -85,8 +85,13 @@ export const Road = React.memo<RoadProps>(
                 // Posicionar el scroll según el modo
                 setTimeout(() => {
                   if (isViewer) {
-                    // En viewer mode, iniciar desde el inicio (scroll horizontal)
-                    el.scrollLeft = 0;
+                    // En viewer mode, iniciar desde el inicio (scroll horizontal en desktop, vertical en mobile)
+                    const isMobile = window.innerWidth < 768; // md breakpoint
+                    if (isMobile) {
+                      el.scrollTop = el.scrollHeight;
+                    } else {
+                      el.scrollLeft = 0;
+                    }
                   } else {
                     // En otros modos, iniciar desde abajo (scroll vertical)
                     el.scrollTop = el.scrollHeight;
@@ -172,39 +177,68 @@ export const Road = React.memo<RoadProps>(
             //         }
             //     }
             // }}
-            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? "overflow-x-scroll overflow-y-hidden" : "overflow-y-scroll"}`}
+            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? "max-md:overflow-y-scroll md:overflow-x-scroll md:overflow-y-hidden" : "overflow-y-scroll"}`}
             style={{
               WebkitOverflowScrolling: "touch",
             }}
           >
             <div
-              className={`relative ${isViewer ? "min-w-max h-full flex flex-col" : "min-h-full flex"}`}
+              className={`relative ${isViewer ? "max-md:min-h-full max-md:flex md:min-w-max md:h-full md:flex md:flex-col" : "min-h-full flex"}`}
             >
               {/* Road Divider Line - Conditional orientation */}
               <div
                 className={`absolute z-5 ${
                   isViewer
-                    ? "top-1/2 left-16 h-2 -translate-y-1/2 w-full"
+                    ? "max-md:left-1/2 max-md:top-0 max-md:bottom-16 max-md:w-2 max-md:-translate-x-1/2 md:top-1/2 md:left-16 md:h-2 md:-translate-y-1/2 md:w-full"
                     : "left-1/2 top-0 bottom-16 w-2 -translate-x-1/2"
                 }`}
-                style={{
-                  background: isViewer
-                    ? `repeating-linear-gradient(
-                                        to right,
-                                        #ffffff 0px,
-                                        #ffffff 20px,
-                                        transparent 20px,
-                                        transparent 40px
-                                    )`
-                    : `repeating-linear-gradient(
+              >
+                {/* Mobile vertical line */}
+                {isViewer && (
+                  <div
+                    className="md:hidden absolute inset-0"
+                    style={{
+                      background: `repeating-linear-gradient(
                                         to bottom,
                                         #ffffff 0px,
                                         #ffffff 20px,
                                         transparent 20px,
                                         transparent 40px
                                     )`,
-                }}
-              />
+                    }}
+                  />
+                )}
+                {/* Desktop horizontal line */}
+                {isViewer && (
+                  <div
+                    className="max-md:hidden absolute inset-0"
+                    style={{
+                      background: `repeating-linear-gradient(
+                                        to right,
+                                        #ffffff 0px,
+                                        #ffffff 20px,
+                                        transparent 20px,
+                                        transparent 40px
+                                    )`,
+                    }}
+                  />
+                )}
+                {/* Non-viewer mode vertical line */}
+                {!isViewer && (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `repeating-linear-gradient(
+                                        to bottom,
+                                        #ffffff 0px,
+                                        #ffffff 20px,
+                                        transparent 20px,
+                                        transparent 40px
+                                    )`,
+                    }}
+                  />
+                )}
+              </div>
 
               {/* Lanes - Conditional layout */}
               <Lane
@@ -227,7 +261,7 @@ export const Road = React.memo<RoadProps>(
               <div
                 className={`absolute z-5 ${
                   isViewer
-                    ? "top-0 bottom-0 left-0 w-16"
+                    ? "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:h-16 md:top-0 md:bottom-0 md:left-0 md:w-16"
                     : "bottom-0 left-0 right-0 h-16"
                 }`}
                 style={{ backgroundColor: "#9CA3AF" }}
@@ -236,14 +270,14 @@ export const Road = React.memo<RoadProps>(
                 <div
                   className={`absolute bg-white ${
                     isViewer
-                      ? "top-0 bottom-0 right-0 w-0.5"
+                      ? "max-md:top-0 max-md:left-0 max-md:right-0 max-md:h-0.5 md:top-0 md:bottom-0 md:right-0 md:w-0.5"
                       : "top-0 left-0 right-0 h-0.5"
                   }`}
                 ></div>
                 <div
                   className={`absolute bg-white ${
                     isViewer
-                      ? "top-0 bottom-0 left-0 w-0.5"
+                      ? "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:h-0.5 md:top-0 md:bottom-0 md:left-0 md:w-0.5"
                       : "bottom-0 left-0 right-0 h-0.5"
                   }`}
                 ></div>
@@ -251,27 +285,56 @@ export const Road = React.memo<RoadProps>(
                 <div
                   className={`absolute ${
                     isViewer
-                      ? "top-2 bottom-2 left-0 right-2"
+                      ? "max-md:left-0 max-md:right-0 max-md:top-2 max-md:bottom-2 md:top-2 md:bottom-2 md:left-0 md:right-2"
                       : "left-0 right-0 top-2 bottom-2"
                   }`}
-                  style={{
-                    background: isViewer
-                      ? `repeating-linear-gradient(
-                                            to bottom,
-                                            transparent 0px,
-                                            transparent 20px,
-                                            #ffffff 20px,
-                                            #ffffff 36px
-                                        )`
-                      : `repeating-linear-gradient(
+                >
+                  {/* Mobile horizontal pattern */}
+                  {isViewer && (
+                    <div
+                      className="md:hidden absolute inset-0"
+                      style={{
+                        background: `repeating-linear-gradient(
                                             90deg,
                                             transparent 0px,
                                             transparent 20px,
                                             #ffffff 20px,
                                             #ffffff 36px
                                         )`,
-                  }}
-                />
+                      }}
+                    />
+                  )}
+                  {/* Desktop vertical pattern */}
+                  {isViewer && (
+                    <div
+                      className="max-md:hidden absolute inset-0"
+                      style={{
+                        background: `repeating-linear-gradient(
+                                            to bottom,
+                                            transparent 0px,
+                                            transparent 20px,
+                                            #ffffff 20px,
+                                            #ffffff 36px
+                                        )`,
+                      }}
+                    />
+                  )}
+                  {/* Non-viewer mode horizontal pattern */}
+                  {!isViewer && (
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: `repeating-linear-gradient(
+                                            90deg,
+                                            transparent 0px,
+                                            transparent 20px,
+                                            #ffffff 20px,
+                                            #ffffff 36px
+                                        )`,
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>

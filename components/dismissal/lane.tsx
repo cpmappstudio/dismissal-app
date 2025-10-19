@@ -74,16 +74,16 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
 
     return (
         <div className={`p-2 md:p-4 flex relative ${isViewer
-            ? `h-1/2 pl-20 md:pl-20 flex-row min-w-full ${lane === 'left' ? 'pb-1' : 'pt-1'}`
+            ? `max-md:w-1/2 max-md:pb-20 max-md:flex-col max-md:min-h-full md:h-1/2 md:pl-20 md:flex-row md:min-w-full ${lane === 'left' ? 'max-md:pr-1 md:pb-1' : 'max-md:pl-1 md:pt-1'}`
             : 'w-1/2 pb-20 md:pb-20 flex-col min-h-full'
             }`} style={{ backgroundColor: '#9CA3AF' }}>
             <div className={`flex-1 min-h-0 flex ${isViewer
-                ? 'flex-row justify-start items-center gap-4'
+                ? 'max-md:flex-col max-md:justify-end max-md:gap-4 md:flex-row md:justify-start md:items-center md:gap-4'
                 : 'flex-col justify-end gap-4'
                 }`}>
                 {cars.length > 0 ? (
                     <div className={`flex transition-all duration-500 ease-in-out ${isViewer
-                        ? 'flex-row-reverse'
+                        ? 'max-md:flex-col max-md:gap-4 md:flex-row-reverse'
                         : 'flex-col gap-4'
                         }`}>
                         {extendedCars.slice().reverse().map((car) => {
@@ -93,14 +93,26 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                             return (
                                 <div
                                     key={car.id}
-                                    className={`transition-all duration-500 ease-in-out ${isNew ? (isViewer ? 'animate-fade-in-left' : 'animate-fade-in-down') :
-                                        isRemoving ? (isViewer ? 'animate-fade-out-right' : 'animate-fade-out-down') : ''
+                                    className={`transition-all duration-500 ease-in-out ${
+                                        isNew 
+                                            ? (isViewer ? 'max-md:animate-fade-in-down md:animate-fade-in-left' : 'animate-fade-in-down')
+                                            : isRemoving 
+                                                ? (isViewer ? 'max-md:animate-fade-out-down md:animate-fade-out-right' : 'animate-fade-out-down')
+                                                : ''
                                         }`}
                                     style={{
                                         // Fallback styles in case animations don't load
                                         transform: isRemoving
-                                            ? (isViewer ? 'translateX(20px) scale(0.95)' : 'translateY(20px) scale(0.95)')
-                                            : (isViewer ? 'translateX(0) scale(1)' : 'translateY(0) scale(1)'),
+                                            ? (isViewer 
+                                                ? (typeof window !== 'undefined' && window.innerWidth < 768 
+                                                    ? 'translateY(20px) scale(0.95)' 
+                                                    : 'translateX(20px) scale(0.95)')
+                                                : 'translateY(20px) scale(0.95)')
+                                            : (isViewer 
+                                                ? (typeof window !== 'undefined' && window.innerWidth < 768 
+                                                    ? 'translateY(0) scale(1)' 
+                                                    : 'translateX(0) scale(1)')
+                                                : 'translateY(0) scale(1)'),
                                         opacity: isRemoving ? 0 : 1,
                                         transition: 'all 0.6s ease-in-out'
                                     }}
@@ -118,7 +130,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                         })}
                     </div>
                 ) : (
-                    <div className={`flex items-center justify-center text-muted-foreground ${isViewer ? 'w-48 h-full' : 'h-48'
+                    <div className={`flex items-center justify-center text-muted-foreground ${isViewer ? 'max-md:h-48 md:w-48 md:h-full' : 'h-48'
                         }`}>
                         <div className="text-center">
                             <div className={`${colors.iconColor} mb-2`}>

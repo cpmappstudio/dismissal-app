@@ -63,7 +63,7 @@ export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', s
     return (
         <svg
             viewBox="0 0 335.34 603.48"
-            className={`${sizeClass} object-contain ${isViewer ? 'transform rotate-90' : ''} ${className}`}
+            className={`${sizeClass} object-contain ${isViewer ? 'max-md:rotate-0 md:rotate-90' : ''} ${className}`}
             style={{
                 '--car-primary': finalColor,
                 '--car-darker': darkerColor,
