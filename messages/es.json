@@ -8,7 +8,8 @@
         "dark": "Oscuro",
         "system": "Sistema",
         "enterFullscreen": "Pantalla completa",
-        "exitFullscreen": "Salir de pantalla completa"
+        "exitFullscreen": "Salir de pantalla completa",
+        "birthdayMessage": "Feliz cumpleaños"
     },
     "navigation": {
         "university": "Dismissal App",

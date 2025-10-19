@@ -4,8 +4,8 @@ import * as React from "react"
 import { useTranslations } from "next-intl"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { Car, ChevronLeft, ChevronRight, MapPin, AlertCircle, CheckCircle2, Trash2 } from "lucide-react"
-
+import { Car, ChevronLeft, ChevronRight, MapPin, AlertCircle, CheckCircle2 } from "lucide-react"
+import { useCampusSession } from "@/hooks/use-campus-session"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
-import { useCampusSession } from "@/hooks/use-campus-session"
+import { useBirthdayCars } from "@/hooks/use-birthday-cars"
 import { Road } from "./road"
 import { CarData, ModeType } from "./types"
 
@@ -150,7 +150,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: "left" | "right";
             position: number;
             assignedTime: number;
-            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string; avatarStorageId?: Id<"_storage"> }>;
+            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string; avatarStorageId?: Id<"_storage">;  birthday?: string }>;
             campusLocation: string;
             carColor: string;
         }): CarData => {
@@ -165,7 +165,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     name: s.name,
                     grade: s.grade,
                     imageUrl: s.avatarUrl,
-                    avatarStorageId: s.avatarStorageId
+                    avatarStorageId: s.avatarStorageId,
+                    birthday: s.birthday,
                 })),
                 campus: entry.campusLocation,
                 imageColor: entry.carColor
@@ -183,6 +184,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             authError: false
         }
     }, [queueData])
+
+    // Hook para verificar carros con estudiantes de cumpleaños
+    const allCars = [...leftLaneCars, ...rightLaneCars]
+    const { birthdayCarIds } = useBirthdayCars(allCars)
 
     // Add car function using Convex mutation
     const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
@@ -391,7 +396,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </div>
 
                 {/* Clear All Button - Only visible in dispatcher mode */}
-                {mode === 'dispatcher' && isCampusSelected && (
+                {/* {mode === 'dispatcher' && isCampusSelected && (
                     <Button
                         onClick={() => setShowClearDialog(true)}
                         disabled={isSubmitting || (leftLaneCars.length === 0 && rightLaneCars.length === 0)}
@@ -402,7 +407,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         <span className="hidden sm:inline">{t('dispatcher.clearAll')}</span>
                         <span className="sm:hidden">Clear</span>
                     </Button>
-                )}
+                )} */}
             </div>
 
             {/* Main Content Area - Takes remaining space */}
@@ -415,6 +420,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         onRemoveCar={handleRemoveCar}
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
+                        birthdayCarIds={birthdayCarIds}
                     />
 
                     {/* Overlay cuando no hay campus */}

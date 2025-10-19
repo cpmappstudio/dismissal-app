@@ -90,6 +90,7 @@ export default defineSchema({
       studentId: v.id("students"),
       name: v.string(),
       grade: v.string(),
+      birthday: v.optional(v.string()),
       avatarUrl: v.optional(v.string()),
       avatarStorageId: v.optional(v.id("_storage")),
     })),
