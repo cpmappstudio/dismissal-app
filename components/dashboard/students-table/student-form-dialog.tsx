@@ -32,7 +32,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Student, Grade } from "./types"
+import { Student, Grade } from "../types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { CAMPUS_LOCATIONS as CAMPUS_OPTIONS, GRADES, type CampusLocation } from "@/convex/types"
 import { api } from "@/convex/_generated/api"

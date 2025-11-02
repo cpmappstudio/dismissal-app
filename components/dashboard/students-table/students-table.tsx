@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useColumns } from "./columns"
-import { Student } from "./types"
+import { Student } from "../types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { StudentFormDialog } from "./student-form-dialog"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"

@@ -13,41 +13,40 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Student } from "../types"
+import { Staff } from "../types"
 
-interface DeleteStudentsDialogProps {
-    selectedStudents: Student[]
-    onDeleteStudents: (studentIds: string[]) => void
+interface DeleteStaffDialogProps {
+    selectedStaff: Staff[]
+    onDeleteStaff: (staffIds: string[]) => void
     disabled?: boolean
     trigger?: React.ReactNode
     open?: boolean
     onOpenChange?: (open: boolean) => void
 }
 
-export function DeleteStudentsDialog({
-    selectedStudents,
-    onDeleteStudents,
+export function DeleteStaffDialog({
+    selectedStaff,
+    onDeleteStaff,
     disabled = false,
     trigger,
     open: controlledOpen,
     onOpenChange
-}: DeleteStudentsDialogProps) {
-    const t = useTranslations('studentsManagement')
+}: DeleteStaffDialogProps) {
+    const t = useTranslations('staffManagement')
     const [internalOpen, setInternalOpen] = React.useState(false)
 
-    // Use controlled or internal state
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen
     const setOpen = onOpenChange || setInternalOpen
 
     const handleDelete = () => {
-        const studentIds = selectedStudents.map(student => student.id)
-        onDeleteStudents(studentIds)
+        const ids = selectedStaff.map(s => s.id)
+        onDeleteStaff(ids)
         setOpen(false)
     }
 
-    const studentCount = selectedStudents.length
-    const isMultiple = studentCount > 1
-    const hasSelection = studentCount > 0
+    const count = selectedStaff.length
+    const isMultiple = count > 1
+    const hasSelection = count > 0
     const isDisabled = disabled || !hasSelection
 
     return (
@@ -56,26 +55,19 @@ export function DeleteStudentsDialog({
                 <DialogTrigger asChild>{trigger}</DialogTrigger>
             ) : (
                 <DialogTrigger asChild>
-                    <Button
-                        variant="destructive"
-                        disabled={isDisabled}
-                        className="w-full gap-2 md:w-auto"
-                    >
+                    <Button variant="destructive" disabled={isDisabled} className="w-full gap-2 md:w-auto">
                         <Trash2 className="h-4 w-4" />
                         <span className="hidden lg:inline">{t('actions.delete')}</span>
                         <span className="lg:hidden">{t('actions.deleteShort')}</span>
                     </Button>
                 </DialogTrigger>
             )}
+
             {hasSelection && (
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>
-                            {isMultiple ? t('deleteDialog.titlePlural') : t('deleteDialog.title')}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {t('deleteDialog.description', { count: studentCount })}
-                        </DialogDescription>
+                        <DialogTitle>{isMultiple ? t('deleteDialog.titlePlural') : t('deleteDialog.title')}</DialogTitle>
+                        <DialogDescription>{t('deleteDialog.description', { count })}</DialogDescription>
                     </DialogHeader>
 
                     <div className="grid gap-4">
@@ -83,10 +75,8 @@ export function DeleteStudentsDialog({
                             <div className="space-y-2">
                                 <p className="text-sm font-medium">{t('deleteDialog.listTitle')}</p>
                                 <ul className="space-y-1">
-                                    {selectedStudents.map((student) => (
-                                        <li key={student.id} className="text-sm text-muted-foreground truncate">
-                                            • {student.fullName} ({student.grade})
-                                        </li>
+                                    {selectedStaff.map(s => (
+                                        <li key={s.id} className="text-sm text-muted-foreground truncate">• {s.fullName} ({s.role})</li>
                                     ))}
                                 </ul>
                             </div>
@@ -94,11 +84,7 @@ export function DeleteStudentsDialog({
                     </div>
 
                     <DialogFooter className="flex justify-end gap-2">
-                        <Button
-                            variant="destructive"
-                            onClick={handleDelete}
-                            className="gap-2 "
-                        >
+                        <Button variant="destructive" onClick={handleDelete} className="gap-2">
                             <Trash2 className="h-4 w-4" />
                             {isMultiple ? t('deleteDialog.actions.deletePlural') : t('deleteDialog.actions.delete')}
                         </Button>
@@ -108,3 +94,5 @@ export function DeleteStudentsDialog({
         </Dialog>
     )
 }
+
+export default DeleteStaffDialog
