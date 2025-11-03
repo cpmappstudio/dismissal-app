@@ -229,6 +229,7 @@ export const addCar = mutation({
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
                 assignedCampuses: [args.campus],
+                role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
                 lastLoginAt: Date.now()
@@ -322,7 +323,8 @@ export const removeCar = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [],
+                assignedCampuses: ["default"], // Default campus
+                role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
                 lastLoginAt: Date.now()
@@ -607,6 +609,7 @@ export const clearAllCars = mutation({
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
                 assignedCampuses: [args.campus],
+                role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
                 lastLoginAt: Date.now()

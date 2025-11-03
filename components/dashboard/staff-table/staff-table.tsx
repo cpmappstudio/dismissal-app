@@ -13,6 +13,8 @@ import {
     useReactTable,
 } from "@tanstack/react-table"
 import { Search, MapPin, Plus, UserSearch } from "lucide-react"
+import { useQuery, useAction } from "convex/react"
+import { api } from "@/convex/_generated/api"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +28,6 @@ import {
 } from "@/components/ui/table"
 import { useColumns } from "./columns"
 import { Staff } from "../types"
-import mockStaff from "./mock-data"
 import { StaffFormDialog } from "./staff-form-dialog"
 import { DeleteStaffDialog } from "./delete-staff-dialog"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
@@ -65,10 +66,91 @@ export function StaffTable() {
         pageSize: 10,
     })
 
-    // Use mock data for now (visual only)
-    const [data, setData] = React.useState<Staff[]>(mockStaff)
+    // Convex queries and actions
+    const usersData = useQuery(api.users.listUsers, {})
+    const createUser = useAction(api.users.createUserWithClerk)
+    const updateUser = useAction(api.users.updateUserWithClerk)
+    const deleteUser = useAction(api.users.deleteUserWithClerk)
 
-    const isLoading = false
+    // Transform Convex users to Staff format
+    const data = React.useMemo<Staff[]>(() => {
+        if (!usersData) return []
+        
+        return usersData.map((user) => ({
+            id: user.clerkId,
+            fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email,
+            phoneNumber: user.phone || '',
+            role: user.role,
+            campusLocation: (user.assignedCampuses?.[0] || 'Not Assigned') as any,
+            status: (user.status || 'active') as any,
+            avatarUrl: user.imageUrl || '',
+            avatarStorageId: user.avatarStorageId,
+        }))
+    }, [usersData])
+
+    const isLoading = usersData === undefined
+
+    // Handlers for CRUD operations
+    const handleCreateStaff = async (staffData: Omit<Staff, 'id'>) => {
+        try {
+            await createUser({
+                email: staffData.email,
+                firstName: staffData.firstName,
+                lastName: staffData.lastName,
+                role: staffData.role as any,
+                assignedCampuses: [staffData.campusLocation],
+                phone: staffData.phoneNumber || undefined,
+            })
+            console.log('✅ User created successfully')
+        } catch (error: any) {
+            console.error('❌ Error creating user:', error)
+            alert(`Error: ${error.message || 'Failed to create user'}`)
+        }
+    }
+
+    const handleDeleteStaff = async (staffIds: string[]) => {
+        try {
+            // Delete users sequentially
+            for (const clerkId of staffIds) {
+                await deleteUser({ clerkUserId: clerkId })
+            }
+            setRowSelection({})
+            console.log('✅ Users deleted successfully')
+        } catch (error: any) {
+            console.error('❌ Error deleting users:', error)
+            alert(`Error: ${error.message || 'Failed to delete users'}`)
+        }
+    }
+
+    const handleUpdateStaff = async (staffData: Omit<Staff, 'id'>) => {
+        if (!selectedStaff) return
+        
+        try {
+            await updateUser({
+                clerkUserId: selectedStaff.id,
+                firstName: staffData.firstName,
+                lastName: staffData.lastName,
+                role: staffData.role as any,
+                assignedCampuses: [staffData.campusLocation] as any,
+                phone: staffData.phoneNumber || undefined,
+                status: staffData.status as any,
+            })
+            setEditDialogOpen(false)
+            setSelectedStaff(undefined)
+            console.log('✅ User updated successfully')
+        } catch (error: any) {
+            console.error('❌ Error updating user:', error)
+            alert(`Error: ${error.message || 'Failed to update user'}`)
+        }
+    }
+
+    const handleRowClick = (staff: Staff) => {
+        setSelectedStaff(staff)
+        setEditDialogOpen(true)
+    }
 
     const table = useReactTable({
         data,
@@ -156,13 +238,7 @@ export function StaffTable() {
                         <div className="flex-1 md:flex-none">
                             <StaffFormDialog
                                 mode="create"
-                                onSubmit={(staffData) => {
-                                    const newStaff: Staff = {
-                                        id: `mock-${Date.now()}`,
-                                        ...staffData
-                                    }
-                                    setData(prev => [newStaff, ...prev])
-                                }}
+                                onSubmit={handleCreateStaff}
                                 trigger={
                                     <Button className="w-full gap-2 bg-yankees-blue hover:bg-yankees-blue/90 md:w-auto">
                                         <Plus className="h-4 w-4" />
@@ -175,10 +251,7 @@ export function StaffTable() {
                         <div className="flex-1 md:flex-none">
                             <DeleteStaffDialog
                                 selectedStaff={table.getFilteredSelectedRowModel().rows.map(r => r.original)}
-                                onDeleteStaff={(ids) => {
-                                    setData(prev => prev.filter(s => !ids.includes(s.id)))
-                                    setRowSelection({})
-                                }}
+                                onDeleteStaff={handleDeleteStaff}
                                 trigger={
                                     <Button className="w-full md:w-auto" variant="ghost">{t('actions.delete')}</Button>
                                 }
@@ -214,11 +287,18 @@ export function StaffTable() {
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
                                     className="cursor-pointer border-b border-yankees-blue/20 hover:bg-muted/50"
+                                    onClick={() => handleRowClick(row.original)}
                                 >
                                     {row.getVisibleCells().map(cell => (
                                         <TableCell
                                             key={cell.id}
                                             className={`px-2 py-3 lg:px-4 ${(cell.column.columnDef.meta as { className?: string })?.className || ''}`}
+                                            onClick={(e) => {
+                                                // Prevent row click when clicking checkbox
+                                                if (cell.column.id === 'select') {
+                                                    e.stopPropagation()
+                                                }
+                                            }}
                                         >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
@@ -278,6 +358,22 @@ export function StaffTable() {
                     </Button>
                 </div>
             </div>
+
+            {/* Edit Dialog */}
+            {selectedStaff && (
+                <StaffFormDialog
+                    mode="edit"
+                    staff={selectedStaff}
+                    open={editDialogOpen}
+                    onOpenChange={setEditDialogOpen}
+                    onSubmit={handleUpdateStaff}
+                    onDelete={async (staffId) => {
+                        await handleDeleteStaff([staffId])
+                        setEditDialogOpen(false)
+                        setSelectedStaff(undefined)
+                    }}
+                />
+            )}
         </div>
     )
 }
