@@ -15,7 +15,8 @@ export type Student = {
 }
 
 export type Staff = {
-    id: string
+    id: string // clerkId for external use
+    convexId?: Id<"users"> // Internal Convex ID for mutations
     fullName: string
     firstName: string
     lastName: string

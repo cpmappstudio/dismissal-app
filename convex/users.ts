@@ -10,6 +10,145 @@ import { internal, api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 // ============================================================================
+// AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
+// ============================================================================
+
+/**
+ * Generate upload URL for avatar image (Step 1 of 3)
+ */
+export const generateAvatarUploadUrl = mutation({
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        return await ctx.storage.generateUploadUrl();
+    },
+});
+
+/**
+ * Save avatar storage ID to user record (Step 3 of 3)
+ */
+export const saveAvatarStorageId = mutation({
+    args: {
+        userId: v.id("users"),
+        storageId: v.id("_storage"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const user = await ctx.db.get(args.userId);
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        // Delete old avatar if exists
+        if (user.avatarStorageId) {
+            await ctx.storage.delete(user.avatarStorageId);
+        }
+
+        // Update user with new avatar storage ID
+        await ctx.db.patch(args.userId, {
+            avatarStorageId: args.storageId,
+            updatedAt: Date.now(),
+        });
+
+        return args.userId;
+    },
+});
+
+/**
+ * Delete avatar storage file (for cleaning up unused uploads)
+ */
+export const deleteAvatarStorage = mutation({
+    args: { storageId: v.id("_storage") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        try {
+            await ctx.storage.delete(args.storageId);
+        } catch {
+            // Don't throw - storage might already be deleted
+        }
+    },
+});
+
+/**
+ * Delete avatar from storage and user record
+ */
+export const deleteAvatar = mutation({
+    args: { userId: v.id("users") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const user = await ctx.db.get(args.userId);
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        // Delete from storage if exists
+        if (user.avatarStorageId) {
+            await ctx.storage.delete(user.avatarStorageId);
+        }
+
+        // Remove from user record
+        await ctx.db.patch(args.userId, {
+            avatarStorageId: undefined,
+            updatedAt: Date.now(),
+        });
+
+        return args.userId;
+    },
+});
+
+/**
+ * Get avatar URL from storage ID (for individual use)
+ */
+export const getAvatarUrl = query({
+    args: {
+        storageId: v.id("_storage")
+    },
+    handler: async (ctx, args) => {
+        try {
+            return await ctx.storage.getUrl(args.storageId);
+        } catch {
+            return null;
+        }
+    }
+});
+
+/**
+ * Get multiple avatar URLs efficiently for batch operations
+ * Use sparingly to avoid performance issues - prefer individual queries
+ */
+export const getBatchAvatarUrls = query({
+    args: {
+        storageIds: v.array(v.id("_storage"))
+    },
+    handler: async (ctx, args) => {
+        try {
+            const urls: Record<string, string | null> = {};
+
+            // Process each storage ID individually to avoid Promise.all performance issues
+            for (const storageId of args.storageIds) {
+                try {
+                    const url = await ctx.storage.getUrl(storageId);
+                    urls[storageId] = url;
+                } catch {
+                    urls[storageId] = null;
+                }
+            }
+
+            return urls;
+        } catch {
+            return {};
+        }
+    }
+});
+
+// ============================================================================
 // TYPES & CONSTANTS
 // ============================================================================
 
@@ -219,20 +358,28 @@ export const upsertFromClerk = internalMutation({
 
     if (existingByClerkId) {
       // Update existing user
-      await ctx.db.patch(existingByClerkId._id, {
+      // Build update object - only include avatarStorageId if it's explicitly provided
+      const updates: any = {
         email,
         firstName,
         lastName,
         fullName,
         imageUrl,
         phone,
-        avatarStorageId,
         assignedCampuses,
         role,
         status,
         isActive: status === "active",
         updatedAt: Date.now(),
-      });
+      };
+      
+      // Only update avatarStorageId if it's explicitly provided in publicMetadata
+      // This prevents overwriting the existing avatar when syncing from Clerk
+      if (publicMetadata.avatarStorageId !== undefined) {
+        updates.avatarStorageId = avatarStorageId;
+      }
+      
+      await ctx.db.patch(existingByClerkId._id, updates);
       console.log(`✅ Updated existing user: ${existingByClerkId._id}`);
       return existingByClerkId._id;
     }
@@ -245,20 +392,27 @@ export const upsertFromClerk = internalMutation({
 
     if (existingByEmail && existingByEmail.clerkId.startsWith("temp_")) {
       // Merge: replace temp clerkId with real one
-      await ctx.db.patch(existingByEmail._id, {
+      // Build update object - preserve existing avatarStorageId unless explicitly provided
+      const updates: any = {
         clerkId, // Replace temp_ with real Clerk ID
         firstName,
         lastName,
         fullName,
         imageUrl,
         phone,
-        avatarStorageId,
         assignedCampuses,
         role,
         status,
         isActive: status === "active",
         updatedAt: Date.now(),
-      });
+      };
+      
+      // Only update avatarStorageId if it's explicitly provided in publicMetadata
+      if (publicMetadata.avatarStorageId !== undefined) {
+        updates.avatarStorageId = avatarStorageId;
+      }
+      
+      await ctx.db.patch(existingByEmail._id, updates);
       console.log(`✅ Merged temp user: ${existingByEmail._id} (temp_* → ${clerkId})`);
       return existingByEmail._id;
     }
@@ -363,6 +517,7 @@ export const createUserWithClerk = action({
     role: roleValidator,
     assignedCampuses: v.array(v.string()), // Required: at least one campus
     phone: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     // Check permissions
@@ -393,6 +548,7 @@ export const createUserWithClerk = action({
             assignedCampuses: args.assignedCampuses,
             phone: args.phone,
             status: "active",
+            ...(args.avatarStorageId && { avatarStorageId: args.avatarStorageId }),
           },
           skip_password_checks: true,
           skip_password_requirement: true,
@@ -469,22 +625,42 @@ export const updateUserWithClerk = action({
     }
 
     try {
+      // First, fetch the current user to get existing metadata
+      const getUserResponse = await fetch(
+        `https://api.clerk.com/v1/users/${args.clerkUserId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!getUserResponse.ok) {
+        throw new Error(`Failed to fetch user: ${getUserResponse.status}`);
+      }
+
+      const currentUser = await getUserResponse.json();
+      
       // Build update payload
       const updateData: any = {};
       
       if (args.firstName) updateData.first_name = args.firstName;
       if (args.lastName) updateData.last_name = args.lastName;
 
-      // Update public_metadata
-      const publicMetadata: any = {};
+      // Merge with existing public_metadata to preserve avatarStorageId and other fields
+      const publicMetadata: any = {
+        ...(currentUser.public_metadata || {}), // Preserve existing metadata
+      };
+      
+      // Update only the fields that were provided
       if (args.role) publicMetadata.role = args.role;
       if (args.assignedCampuses !== undefined) publicMetadata.assignedCampuses = args.assignedCampuses;
       if (args.phone !== undefined) publicMetadata.phone = args.phone;
       if (args.status) publicMetadata.status = args.status;
 
-      if (Object.keys(publicMetadata).length > 0) {
-        updateData.public_metadata = publicMetadata;
-      }
+      updateData.public_metadata = publicMetadata;
 
       // Update user in Clerk
       const response = await fetch(

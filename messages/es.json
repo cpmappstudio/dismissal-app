@@ -103,6 +103,20 @@
                     }
                 ]
             },
+            "users": {
+                "title": "Usuarios",
+                "url": "/users",
+                "items": [
+                    {
+                        "title": "Estudiantes",
+                        "url": "/users/students"
+                    },
+                    {
+                        "title": "Personal",
+                        "url": "/users/staff"
+                    }
+                ]
+            },
             "operators": {
                 "title": "Operadores",
                 "url": "/operators",
@@ -118,20 +132,6 @@
                     {
                         "title": "Visor",
                         "url": "/operators/viewer"
-                    }
-                ]
-            },
-            "usuarios": {
-                "title": "Usuarios",
-                "url": "/users",
-                "items": [
-                    {
-                        "title": "Estudiantes",
-                        "url": "/users/students"
-                    },
-                    {
-                        "title": "Personal",
-                        "url": "/users/operators"
                     }
                 ]
             }

@@ -60,6 +60,9 @@ export function StudentFormDialog({
     const t = useTranslations('studentsManagement')
     const [internalOpen, setInternalOpen] = React.useState(false)
 
+    // Ref for file input to allow resetting
+    const fileInputRef = React.useRef<HTMLInputElement>(null)
+
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.students.generateAvatarUploadUrl)
     const deleteAvatar = useMutation(api.students.deleteAvatar)
@@ -71,10 +74,10 @@ export function StudentFormDialog({
     const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
     const [currentAvatarStorageId, setCurrentAvatarStorageId] = React.useState<Id<"_storage"> | null>(null)
 
-    // Query to get the current avatar URL from storage ID
+    // Query to get the current avatar URL from storage ID (uses local state, not prop)
     const currentAvatarUrl = useQuery(
         api.students.getAvatarUrl,
-        student?.avatarStorageId ? { storageId: student.avatarStorageId } : "skip"
+        currentAvatarStorageId ? { storageId: currentAvatarStorageId } : "skip"
     )
 
     // Use controlled or internal state
@@ -184,19 +187,8 @@ export function StudentFormDialog({
 
             const { storageId } = await result.json()
 
-            // If there was an existing avatar in storage, delete it to avoid orphan files
-            try {
-                if (currentAvatarStorageId && currentAvatarStorageId !== storageId) {
-                    await deleteAvatarStorage({ storageId: currentAvatarStorageId })
-                }
-            } catch {
-                // Failure to delete previous avatar shouldn't block the new upload
-            }
-
-            // Update local state to the newly uploaded storage id
-            setCurrentAvatarStorageId(storageId as Id<"_storage">)
-
-            // Step 3: Save storage ID (will be done in handleSubmit)
+            // Step 3: Return the storage ID to be saved in handleSubmit
+            // Note: Old avatar deletion is handled by saveAvatarStorageId mutation
             return storageId as Id<"_storage">
 
         } catch {
@@ -207,33 +199,57 @@ export function StudentFormDialog({
         }
     }
 
-    const removeAvatar = async () => {
-        if (currentAvatarStorageId) {
-            try {
-                // For existing students, use deleteAvatar to update the record
-                if (mode === 'edit' && student?.id) {
-                    await deleteAvatar({ studentId: student.id as Id<"students"> })
-                } else {
-                    // For new uploads, just delete the storage file
-                    await deleteAvatarStorage({ storageId: currentAvatarStorageId })
-                }
-            } catch {
-                // Silent error handling
-            }
+    // Remove preview of newly selected image (not yet saved)
+    const removePreview = () => {
+        // Clear preview state only (file hasn't been uploaded yet)
+        setAvatarFile(null)
+        setAvatarPreview(null)
+        
+        // Reset the file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
         }
+        
+        // Restore original avatar storage ID if editing existing student
+        if (mode === 'edit' && student?.avatarStorageId) {
+            setCurrentAvatarStorageId(student.avatarStorageId)
+        }
+        // Note: We don't delete anything from storage because the new image
+        // hasn't been uploaded yet - it only exists as a local File object
+    }
 
+    // Mark avatar for removal from DB (will be persisted on Save)
+    const removeAvatar = () => {
+        // Clear avatar state to mark for deletion
         setAvatarFile(null)
         setAvatarPreview(null)
         setCurrentAvatarStorageId(null)
-        updateFormData("avatarUrl", "")
         updateFormData("avatarStorageId", null)
+        // Note: avatarUrl is legacy, kept for backward compatibility
+        
+        // Reset the file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
     }
 
     const getAvatarDisplay = () => {
+        // Priority 1: New preview (user just selected a new image)
         if (avatarPreview) return avatarPreview
-        if (student?.avatarStorageId && currentAvatarUrl) return currentAvatarUrl
+        
+        // Priority 2: Current storage ID in local state and its URL
+        if (currentAvatarStorageId && currentAvatarUrl) return currentAvatarUrl
+        
+        // Priority 3: If currentAvatarStorageId is null but student originally had one,
+        // user clicked Remove Avatar - don't show anything (will show initials)
+        if (currentAvatarStorageId === null && student?.avatarStorageId) {
+            return undefined
+        }
+        
+        // Priority 4: Legacy avatar URL (for backward compatibility)
         if (student?.avatarUrl) return student.avatarUrl
-        // No fallback avatar generation - let Avatar component show initials
+        
+        // No avatar to display - show initials
         return undefined
     }
 
@@ -245,18 +261,26 @@ export function StudentFormDialog({
         }
 
         try {
-            // Handle avatar upload if there's a new file
-            let finalAvatarStorageId = currentAvatarStorageId
+            // Determine final avatar values
+            let finalAvatarStorageId: Id<"_storage"> | undefined
             let finalAvatarUrl = formData.avatarUrl
 
             if (avatarFile) {
-                finalAvatarStorageId = await uploadAvatar()
-                if (!finalAvatarStorageId) {
+                // New file uploaded - use it
+                const uploadedId = await uploadAvatar()
+                if (!uploadedId) {
                     alert("Failed to upload avatar. Please try again.")
                     return
                 }
+                finalAvatarStorageId = uploadedId
                 // Clear the legacy avatarUrl when using storage
                 finalAvatarUrl = ""
+            } else if (currentAvatarStorageId !== null) {
+                // No new file, but currentAvatarStorageId has a value - keep it
+                finalAvatarStorageId = currentAvatarStorageId
+            } else {
+                // currentAvatarStorageId is null - avatar was removed or never existed
+                finalAvatarStorageId = undefined
             }
 
             // No automatic avatar generation - let component show initials as fallback
@@ -274,7 +298,7 @@ export function StudentFormDialog({
                 grade: formData.grade as Grade,
                 campusLocation: formData.campusLocation as CampusLocation,
                 avatarUrl: finalAvatarUrl,
-                avatarStorageId: finalAvatarStorageId || undefined
+                avatarStorageId: finalAvatarStorageId
             }
 
             onSubmit(studentData)
@@ -468,6 +492,7 @@ export function StudentFormDialog({
                                             </Button>
                                         </Label>
                                         <Input
+                                            ref={fileInputRef}
                                             id="avatar-upload"
                                             type="file"
                                             accept="image/*"
@@ -476,7 +501,22 @@ export function StudentFormDialog({
                                             disabled={isUploadingAvatar}
                                         />
 
-                                        {(avatarPreview || currentAvatarStorageId || student?.avatarUrl) && (
+                                        {/* Show "Clear Preview" button if there's a new preview */}
+                                        {avatarPreview && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={removePreview}
+                                                disabled={isUploadingAvatar}
+                                            >
+                                                <X className="h-4 w-4 mr-1" />
+                                                Clear Preview
+                                            </Button>
+                                        )}
+
+                                        {/* Show "Remove Avatar" button if there's a saved avatar and no new preview */}
+                                        {!avatarPreview && (currentAvatarStorageId || student?.avatarStorageId || student?.avatarUrl) && (
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -485,7 +525,7 @@ export function StudentFormDialog({
                                                 disabled={isUploadingAvatar}
                                             >
                                                 <X className="h-4 w-4 mr-1" />
-                                                Remove
+                                                Remove Avatar
                                             </Button>
                                         )}
                                     </div>

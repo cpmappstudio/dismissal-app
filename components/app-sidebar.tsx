@@ -29,9 +29,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ? extractRoleFromMetadata(user.publicMetadata)
     : undefined;
 
-  // Determinar si mostrar el dashboard (Students) basado en el rol
-  const showDashboard = userRole === "admin" || userRole === "superadmin";
-
   // Configuración de íconos para cada tipo de menú
   const iconMap = {
     profile: User,
@@ -184,7 +181,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items={navItems}
           dashboardLabel={t("dashboard")}
           navigationLabel={t("navigation")}
-          showDashboard={showDashboard}
+          showDashboard={false}
         />
       </SidebarContent>
       <SidebarFooter>

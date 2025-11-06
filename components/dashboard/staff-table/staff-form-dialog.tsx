@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Plus, Upload, X, Loader2, Save, Trash2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { useMutation, useQuery } from "convex/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -29,6 +30,8 @@ import { CampusLocation } from "@/convex/types"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { CAMPUS_LOCATIONS } from "@/convex/types"
 import { DeleteStaffDialog } from "./delete-staff-dialog"
+import { api } from "@/convex/_generated/api"
+import { Id } from "@/convex/_generated/dataModel"
 
 interface StaffFormDialogProps {
     mode: 'create' | 'edit'
@@ -51,6 +54,26 @@ export function StaffFormDialog({
 }: StaffFormDialogProps) {
     const t = useTranslations('staffManagement')
     const [internalOpen, setInternalOpen] = React.useState(false)
+
+    // Ref for file input to allow resetting
+    const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+    // Convex mutations for avatar handling
+    const generateUploadUrl = useMutation(api.users.generateAvatarUploadUrl)
+    const deleteAvatar = useMutation(api.users.deleteAvatar)
+    const deleteAvatarStorage = useMutation(api.users.deleteAvatarStorage)
+
+    // Avatar upload state
+    const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
+    const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
+    const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
+    const [currentAvatarStorageId, setCurrentAvatarStorageId] = React.useState<Id<"_storage"> | null>(null)
+
+    // Query to get the current avatar URL from storage ID (uses local state, not prop)
+    const currentAvatarUrl = useQuery(
+        api.users.getAvatarUrl,
+        currentAvatarStorageId ? { storageId: currentAvatarStorageId } : "skip"
+    )
 
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen
     const setOpen = onOpenChange || setInternalOpen
@@ -83,16 +106,19 @@ export function StaffFormDialog({
     }, [mode, staff])
 
     const [formData, setFormData] = React.useState(initial)
-    const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
-    const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
 
     React.useEffect(() => {
         if (open) {
             setFormData(initial)
             setAvatarFile(null)
             setAvatarPreview(null)
+            
+            // Important: Preserve undefined vs null distinction
+            // undefined = field doesn't exist, null = explicitly removed
+            const initialAvatarId = staff?.avatarStorageId ?? null;
+            setCurrentAvatarStorageId(initialAvatarId)
         }
-    }, [open, initial])
+    }, [open, initial, staff, mode])
 
     React.useEffect(() => {
         return () => {
@@ -100,47 +126,164 @@ export function StaffFormDialog({
         }
     }, [avatarPreview])
 
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Avatar handling functions following official Convex 3-step pattern
+    const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0]
         if (!f) return
         if (!f.type.startsWith('image/')) {
-            alert('Select an image')
+            alert('Please select an image file')
+            return
+        }
+        if (f.size > 5 * 1024 * 1024) { // 5MB limit
+            alert('File size must be less than 5MB')
             return
         }
         setAvatarFile(f)
         setAvatarPreview(URL.createObjectURL(f))
     }
 
-    const removeAvatar = () => {
+    const uploadAvatar = async (): Promise<Id<"_storage"> | null> => {
+        if (!avatarFile) return null
+
+        try {
+            setIsUploadingAvatar(true)
+
+            // Step 1: Generate upload URL
+            const uploadUrl = await generateUploadUrl()
+
+            // Step 2: Upload file to Convex storage
+            const result = await fetch(uploadUrl, {
+                method: "POST",
+                headers: { "Content-Type": avatarFile.type },
+                body: avatarFile,
+            })
+
+            if (!result.ok) {
+                throw new Error("Failed to upload avatar")
+            }
+
+            const { storageId } = await result.json()
+
+            // Step 3: Return the storage ID to be saved in handleSubmit
+            // Note: We DON'T update local state here because that happens in handleSubmit
+            return storageId as Id<"_storage">
+
+        } catch {
+            alert("Failed to upload avatar. Please try again.")
+            return null
+        } finally {
+            setIsUploadingAvatar(false)
+        }
+    }
+
+    // Remove preview of newly selected image (not yet saved)
+    const removePreview = () => {
+        // Clear preview state only (file hasn't been uploaded yet)
         setAvatarFile(null)
         setAvatarPreview(null)
-        setFormData(prev => ({ ...prev, avatarUrl: "", avatarStorageId: null }))
+        
+        // Reset the file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+        
+        // Restore original avatar storage ID if editing existing user
+        // This ensures the original image is displayed again
+        if (mode === 'edit' && staff?.avatarStorageId) {
+            setCurrentAvatarStorageId(staff.avatarStorageId)
+        }
+        // Note: We don't delete anything from storage because the new image
+        // hasn't been uploaded yet - it only exists as a local File object
     }
+
+    // Mark avatar for removal from DB (will be persisted on Save)
+    const removeAvatar = () => {
+        // Clear custom avatar state to mark for deletion
+        setAvatarFile(null)
+        setAvatarPreview(null)
+        setCurrentAvatarStorageId(null)
+        // DO NOT clear avatarUrl - keep Clerk's default profile image
+        update("avatarStorageId", null)
+        
+        // Reset the file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const getAvatarDisplay = () => {
+        // Priority 1: New preview (user just selected a new image)
+        if (avatarPreview) return avatarPreview
+        
+        // Priority 2: Current storage ID in local state and its URL
+        if (currentAvatarStorageId && currentAvatarUrl) return currentAvatarUrl
+        
+        // Priority 3: If currentAvatarStorageId is null but staff originally had one,
+        // it means user clicked Remove Avatar - show Clerk's default image instead
+        if (currentAvatarStorageId === null && staff?.avatarStorageId) {
+            // Return Clerk's image if available
+            if (staff?.avatarUrl) return staff.avatarUrl
+            // Otherwise show initials (fallback)
+            return undefined
+        }
+        
+        // Priority 4: Legacy avatar URL (Clerk imageUrl)
+        if (staff?.avatarUrl) return staff.avatarUrl
+        
+        // No avatar to display - show initials
+        return undefined
+    }
+
+    const handleFile = handleAvatarFileSelect
 
     const update = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }))
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formData.firstName || !formData.lastName || !formData.role || !formData.campusLocation) return
 
-        // For now, we won't upload avatar - just use preview/local URL
-        const payload: Omit<Staff, 'id'> = {
-            fullName: `${formData.firstName} ${formData.lastName}`,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            phoneNumber: formData.phoneNumber,
-            role: formData.role,
-            campusLocation: formData.campusLocation as CampusLocation,
-            status: formData.status,
-            avatarUrl: avatarPreview || formData.avatarUrl || "",
-            avatarStorageId: undefined,
-        }
+        try {
+            // Determine final avatar values
+            let finalAvatarStorageId: Id<"_storage"> | undefined
+            let finalAvatarUrl = formData.avatarUrl
 
-        onSubmit(payload)
-        setOpen(false)
+            if (avatarFile) {
+                const uploadedId = await uploadAvatar()
+                if (!uploadedId) {
+                    alert("Failed to upload avatar. Please try again.")
+                    return
+                }
+                finalAvatarStorageId = uploadedId
+                // Clear the legacy avatarUrl when using storage
+                finalAvatarUrl = ""
+            } else if (currentAvatarStorageId !== null) {
+                // No new file, but currentAvatarStorageId has a value - keep it
+                finalAvatarStorageId = currentAvatarStorageId
+            } else {
+                // currentAvatarStorageId is null - avatar was removed or never existed
+                finalAvatarStorageId = undefined
+            }
+
+            const payload: Omit<Staff, 'id'> = {
+                fullName: `${formData.firstName} ${formData.lastName}`,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                email: formData.email,
+                phoneNumber: formData.phoneNumber,
+                role: formData.role,
+                campusLocation: formData.campusLocation as CampusLocation,
+                status: formData.status,
+                avatarUrl: finalAvatarUrl,
+                avatarStorageId: finalAvatarStorageId,
+            }
+
+            onSubmit(payload)
+            setOpen(false)
+        } catch {
+            alert("Failed to save user. Please try again.")
+        }
     }
 
     const isCreate = mode === 'create'
@@ -221,24 +364,74 @@ export function StaffFormDialog({
                                     <div className="space-y-2">
                                         <Label className="text-sm font-medium">Avatar</Label>
                                         <Avatar className="h-16 w-16">
-                                            <AvatarImage src={avatarPreview || formData.avatarUrl || undefined} alt={`${formData.firstName} ${formData.lastName}`} />
-                                            <AvatarFallback>{(formData.firstName?.[0] || '') + (formData.lastName?.[0] || '')}</AvatarFallback>
+                                            <AvatarImage 
+                                                src={getAvatarDisplay()} 
+                                                alt={`${formData.firstName} ${formData.lastName}`} 
+                                            />
+                                            <AvatarFallback>
+                                                {(formData.firstName?.[0] || '') + (formData.lastName?.[0] || '')}
+                                            </AvatarFallback>
                                         </Avatar>
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         <div className="flex gap-2">
                                             <Label htmlFor="avatar-upload" className="cursor-pointer">
-                                                <Button type="button" variant="outline" size="sm" asChild>
-                                                    <span><Upload className="h-4 w-4 mr-1"/> Upload</span>
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    disabled={isUploadingAvatar}
+                                                    asChild
+                                                >
+                                                    <span>
+                                                        {isUploadingAvatar ? (
+                                                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                                        ) : (
+                                                            <Upload className="h-4 w-4 mr-1" />
+                                                        )}
+                                                        Upload
+                                                    </span>
                                                 </Button>
                                             </Label>
-                                            <Input id="avatar-upload" type="file" accept="image/*" onChange={handleFile} className="hidden" />
+                                            <Input 
+                                                ref={fileInputRef}
+                                                id="avatar-upload" 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleFile} 
+                                                className="hidden"
+                                                disabled={isUploadingAvatar}
+                                            />
 
-                                            {(avatarPreview || formData.avatarUrl) && (
-                                                <Button type="button" variant="outline" size="sm" onClick={removeAvatar}><X className="h-4 w-4 mr-1"/> Remove</Button>
+                                            {/* Show "Clear Preview" button if there's a new preview */}
+                                            {avatarPreview && (
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={removePreview}
+                                                    disabled={isUploadingAvatar}
+                                                >
+                                                    <X className="h-4 w-4 mr-1" /> Clear Preview
+                                                </Button>
+                                            )}
+
+                                            {/* Show "Remove Avatar" button if there's a saved avatar and no new preview */}
+                                            {!avatarPreview && (currentAvatarStorageId || staff?.avatarStorageId || staff?.avatarUrl) && (
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={removeAvatar}
+                                                    disabled={isUploadingAvatar}
+                                                >
+                                                    <X className="h-4 w-4 mr-1" /> Remove Avatar
+                                                </Button>
                                             )}
                                         </div>
-                                        <p className="text-xs text-muted-foreground">{t('createDialog.avatarNote')}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Upload an image or leave blank to show initials
+                                        </p>
                                     </div>
                                 </div>
                             </div>

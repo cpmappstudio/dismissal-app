@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { Staff } from "../types"
-import { StudentAvatar } from "../students-table/student-avatar"
+import { UserAvatar } from "./user-avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
@@ -53,7 +53,7 @@ export const useColumns = (): ColumnDef<Staff>[] => {
 
 				return (
 					<div className="flex items-center space-x-2 min-w-0 sm:space-x-3">
-						<StudentAvatar
+						<UserAvatar
 							avatarStorageId={staff.avatarStorageId}
 							fallbackUrl={staff.avatarUrl}
 							firstName={staff.firstName}

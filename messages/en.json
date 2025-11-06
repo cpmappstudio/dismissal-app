@@ -373,7 +373,7 @@
     "title": "Staff",
     "subtitle": "Manage and view all staff members in the system",
     "search": {
-      "placeholder": "Search staff by name, email or phone..."
+      "placeholder": "Search staff by name"
     },
     "filters": {
       "campus": {

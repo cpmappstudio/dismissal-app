@@ -109,6 +109,7 @@ export function StudentsTable() {
     const updateStudent = useMutation(api.students.update)
     const deleteStudent = useMutation(api.students.deleteStudent)
     const deleteMultipleStudents = useMutation(api.students.deleteMultipleStudents)
+    const deleteAvatar = useMutation(api.students.deleteAvatar)
 
     // Transform Convex data con memoización mejorada
     const data: Student[] = React.useMemo(() => {
@@ -234,6 +235,10 @@ export function StudentsTable() {
         if (!selectedStudent) return
 
         try {
+            const oldAvatarId = selectedStudent.avatarStorageId;
+            const newAvatarId = studentData.avatarStorageId;
+            
+            // Update student data - the mutation handles avatar deletion automatically
             await updateStudent({
                 studentId: selectedStudent.id as Id<"students">,
                 firstName: studentData.firstName,
@@ -243,8 +248,15 @@ export function StudentsTable() {
                 birthday: studentData.birthday,
                 carNumber: studentData.carNumber,
                 avatarUrl: studentData.avatarUrl,
-                avatarStorageId: studentData.avatarStorageId,
+                avatarStorageId: newAvatarId || undefined,
             })
+            
+            // Only call deleteAvatar if avatar was explicitly set to null/undefined
+            // and there was an avatar before (this handles the "Remove Avatar" case)
+            if (!newAvatarId && oldAvatarId) {
+                await deleteAvatar({ studentId: selectedStudent.id as Id<"students"> })
+            }
+            
             setEditDialogOpen(false)
             setSelectedStudent(undefined)
             // La página se mantiene automáticamente con autoResetPageIndex: false
@@ -252,7 +264,7 @@ export function StudentsTable() {
         } catch {
             // TODO: Agregar toast de error aquí
         }
-    }, [selectedStudent, updateStudent])
+    }, [selectedStudent, updateStudent, deleteAvatar])
 
     const handleDeleteStudent = React.useCallback(async (studentId: string) => {
         try {
