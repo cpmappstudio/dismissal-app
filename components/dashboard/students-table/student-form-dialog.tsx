@@ -65,8 +65,6 @@ export function StudentFormDialog({
 
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.students.generateAvatarUploadUrl)
-    const deleteAvatar = useMutation(api.students.deleteAvatar)
-    const deleteAvatarStorage = useMutation(api.students.deleteAvatarStorage)
 
     // Avatar upload state
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null)

@@ -31,7 +31,7 @@ import { Staff } from "../types";
 import { StaffFormDialog } from "./staff-form-dialog";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { CAMPUS_LOCATIONS } from "@/convex/types";
+import { CAMPUS_LOCATIONS, CampusLocation } from "@/convex/types";
 
 // Simple skeleton placeholder
 function StaffTableSkeleton() {
@@ -92,8 +92,8 @@ export function StaffTable() {
       email: user.email,
       phoneNumber: user.phone || "",
       role: user.role,
-      campusLocation: (user.assignedCampuses?.[0] || "Not Assigned") as any,
-      status: (user.status || "active") as any,
+      campusLocation: (user.assignedCampuses?.[0] || "Not Assigned") as CampusLocation,
+      status: (user.status || "active") as "active" | "inactive",
       avatarUrl: user.imageUrl || "",
       avatarStorageId: user.avatarStorageId,
     }));
@@ -114,9 +114,10 @@ export function StaffTable() {
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
 
-    } catch (error: any) {
-      console.error("❌ Error creating user:", error);
-      alert(`Error: ${error.message || "Failed to create user"}`);
+    } catch (error) {
+      const err = error as Error;
+      console.error("❌ Error creating user:", err);
+      alert(`Error: ${err.message || "Failed to create user"}`);
     }
   };
 
@@ -127,9 +128,10 @@ export function StaffTable() {
         await deleteUser({ clerkUserId: clerkId });
       }
       setRowSelection({});
-    } catch (error: any) {
-      console.error("❌ Error deleting users:", error);
-      alert(`Error: ${error.message || "Failed to delete users"}`);
+    } catch (error) {
+      const err = error as Error;
+      console.error("❌ Error deleting users:", err);
+      alert(`Error: ${err.message || "Failed to delete users"}`);
     }
   };
 
@@ -146,7 +148,7 @@ export function StaffTable() {
         role: staffData.role as Role,
         assignedCampuses: [staffData.campusLocation] as string[],
         phone: staffData.phoneNumber || undefined,
-        status: staffData.status as any,
+        status: staffData.status as "active" | "inactive",
       });
 
       // Handle avatar changes
@@ -181,9 +183,10 @@ export function StaffTable() {
 
       setEditDialogOpen(false);
       setSelectedStaff(undefined);
-    } catch (error: any) {
-      console.error("❌ Error updating user:", error);
-      alert(`Error: ${error.message || "Failed to update user"}`);
+    } catch (error) {
+      const err = error as Error;
+      console.error("❌ Error updating user:", err);
+      alert(`Error: ${err.message || "Failed to update user"}`);
     }
   };
 
