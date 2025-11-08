@@ -10,45 +10,46 @@ export default defineSchema({
   users: defineTable({
     clerkId: v.string(),
     username: v.optional(v.string()), // Made optional for Clerk-only users
-    email: v.string(), // Required for matching
+    email: v.optional(v.string()), // Required for matching
 
     // Display info (sync from Clerk)
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     fullName: v.optional(v.string()), // Computed name
     imageUrl: v.optional(v.string()),
-    
+
     // Role-based access control
-    role: v.union(
-      v.literal("viewer"),
-      v.literal("dispatcher"),
-      v.literal("allocator"),
-      v.literal("operator"),
-      v.literal("admin"),
-      v.literal("superadmin")
+    role: v.optional(
+      v.union(
+        v.literal("viewer"),
+        v.literal("dispatcher"),
+        v.literal("allocator"),
+        v.literal("operator"),
+        v.literal("admin"),
+        v.literal("superadmin"),
+      ),
     ),
 
     // Campus assignment
     assignedCampuses: v.array(v.string()), // Campuses user can access (required, at least one)
 
     // Legacy operator permissions (deprecated, use role instead)
-    operatorPermissions: v.optional(v.object({
-      canAllocate: v.boolean(),
-      canDispatch: v.boolean(),
-      canView: v.boolean(),
-    })),
+    operatorPermissions: v.optional(
+      v.object({
+        canAllocate: v.boolean(),
+        canDispatch: v.boolean(),
+        canView: v.boolean(),
+      }),
+    ),
 
     // Additional info
     phone: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
 
     // Status
-    status: v.optional(v.union(
-      v.literal("active"),
-      v.literal("inactive"),
-    )),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     isActive: v.boolean(),
-    
+
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
@@ -105,21 +106,20 @@ export default defineSchema({
     campusLocation: v.string(),
 
     // Lane assignment
-    lane: v.union(
-      v.literal("left"),
-      v.literal("right")
-    ),
+    lane: v.union(v.literal("left"), v.literal("right")),
     position: v.number(), // 1 = front of lane
 
     // Denormalized student info for performance
-    students: v.array(v.object({
-      studentId: v.id("students"),
-      name: v.string(),
-      grade: v.string(),
-      birthday: v.optional(v.string()),
-      avatarUrl: v.optional(v.string()),
-      avatarStorageId: v.optional(v.id("_storage")),
-    })),
+    students: v.array(
+      v.object({
+        studentId: v.id("students"),
+        name: v.string(),
+        grade: v.string(),
+        birthday: v.optional(v.string()),
+        avatarUrl: v.optional(v.string()),
+        avatarStorageId: v.optional(v.id("_storage")),
+      }),
+    ),
 
     // Visual
     carColor: v.string(), // Hex color
@@ -131,10 +131,7 @@ export default defineSchema({
     addedBy: v.id("users"),
 
     // Status
-    status: v.union(
-      v.literal("waiting"),
-      v.literal("completed")
-    ),
+    status: v.union(v.literal("waiting"), v.literal("completed")),
   })
     .index("by_campus_lane_position", ["campusLocation", "lane", "position"])
     .index("by_campus_status", ["campusLocation", "status"])
@@ -218,15 +215,13 @@ export default defineSchema({
       v.literal("user_permissions_updated"),
       v.literal("user_status_updated"),
       v.literal("login"),
-      v.literal("logout")
+      v.literal("logout"),
     ),
 
     // Target
-    targetType: v.optional(v.union(
-      v.literal("student"),
-      v.literal("queue"),
-      v.literal("user")
-    )),
+    targetType: v.optional(
+      v.union(v.literal("student"), v.literal("queue"), v.literal("user")),
+    ),
     targetId: v.optional(v.string()),
 
     // Where
