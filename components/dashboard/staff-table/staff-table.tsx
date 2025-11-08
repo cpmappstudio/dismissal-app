@@ -108,13 +108,12 @@ export function StaffTable() {
         email: staffData.email,
         firstName: staffData.firstName,
         lastName: staffData.lastName,
-        role: staffData.role as any,
+        role: staffData.role as Role,
         assignedCampuses: [staffData.campusLocation],
         phone: staffData.phoneNumber || undefined,
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
 
-      console.log("✅ User created successfully");
     } catch (error: any) {
       console.error("❌ Error creating user:", error);
       alert(`Error: ${error.message || "Failed to create user"}`);
@@ -128,7 +127,6 @@ export function StaffTable() {
         await deleteUser({ clerkUserId: clerkId });
       }
       setRowSelection({});
-      console.log("✅ Users deleted successfully");
     } catch (error: any) {
       console.error("❌ Error deleting users:", error);
       alert(`Error: ${error.message || "Failed to delete users"}`);
@@ -139,19 +137,14 @@ export function StaffTable() {
     if (!selectedStaff) return;
 
     try {
-      console.log("🔍 Avatar Debug:", {
-        original: selectedStaff.avatarStorageId,
-        incoming: staffData.avatarStorageId,
-        changed: staffData.avatarStorageId !== selectedStaff.avatarStorageId
-      });
 
       // Update user in Clerk (basic info only - no avatar)
       await updateUser({
         clerkUserId: selectedStaff.id,
         firstName: staffData.firstName,
         lastName: staffData.lastName,
-        role: staffData.role as any,
-        assignedCampuses: [staffData.campusLocation] as any,
+        role: staffData.role as Role,
+        assignedCampuses: [staffData.campusLocation] as string[],
         phone: staffData.phoneNumber || undefined,
         status: staffData.status as any,
       });
@@ -164,16 +157,13 @@ export function StaffTable() {
         const avatarChanged = newAvatarId !== oldAvatarId;
         
         if (avatarChanged) {
-          console.log("🔄 Avatar changed detected");
           
           // Case 1: Avatar was removed (had one, now null/undefined)
           if (!newAvatarId && oldAvatarId) {
-            console.log("🗑️ Deleting avatar");
             await deleteAvatar({ userId: convexUser._id });
           }
           // Case 2: Avatar was replaced (had one, now has different one)
           else if (newAvatarId && oldAvatarId && newAvatarId !== oldAvatarId) {
-            console.log("� Replacing avatar");
             await saveAvatarStorageId({
               userId: convexUser._id,
               storageId: newAvatarId,
@@ -181,20 +171,16 @@ export function StaffTable() {
           }
           // Case 3: Avatar was added (didn't have one, now has one)
           else if (newAvatarId && !oldAvatarId) {
-            console.log("➕ Adding new avatar");
             await saveAvatarStorageId({
               userId: convexUser._id,
               storageId: newAvatarId,
             });
           }
-        } else {
-          console.log("✅ Avatar unchanged - preserving");
         }
       }
 
       setEditDialogOpen(false);
       setSelectedStaff(undefined);
-      console.log("✅ User updated successfully");
     } catch (error: any) {
       console.error("❌ Error updating user:", error);
       alert(`Error: ${error.message || "Failed to update user"}`);
@@ -237,6 +223,9 @@ export function StaffTable() {
     "viewer",
     "operator",
   ] as const;
+
+  // Extraer el tipo Role desde ROLE_OPTIONS
+  type Role = typeof ROLE_OPTIONS[number];
 
   // Dialog state for create/edit
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);

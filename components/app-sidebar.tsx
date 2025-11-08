@@ -166,7 +166,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     return items;
-  }, [t, userRole, iconMap.adminDocs, iconMap.operators]);
+  }, [t, userRole, iconMap]);
 
   return (
     <Sidebar collapsible="icon" {...props}>

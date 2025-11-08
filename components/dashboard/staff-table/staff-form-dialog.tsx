@@ -4,7 +4,6 @@ import * as React from "react"
 import { Plus, Upload, X, Loader2, Save, Trash2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useMutation, useQuery } from "convex/react"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -27,7 +26,6 @@ import {
 } from "@/components/ui/select"
 import { Staff } from "../types"
 import { CampusLocation } from "@/convex/types"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { CAMPUS_LOCATIONS } from "@/convex/types"
 import { DeleteStaffDialog } from "./delete-staff-dialog"
 import { api } from "@/convex/_generated/api"
@@ -60,8 +58,6 @@ export function StaffFormDialog({
 
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.users.generateAvatarUploadUrl)
-    const deleteAvatar = useMutation(api.users.deleteAvatar)
-    const deleteAvatarStorage = useMutation(api.users.deleteAvatarStorage)
 
     // Avatar upload state
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
@@ -236,13 +232,13 @@ export function StaffFormDialog({
 
     const handleFile = handleAvatarFileSelect
 
-    const update = (field: string, value: any) => {
+    const update = (field: string, value: string | Id<"_storage"> | null) => {
         setFormData(prev => ({ ...prev, [field]: value }))
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.firstName || !formData.lastName || !formData.role || !formData.campusLocation) return
+        if (!formData.firstName || !formData.lastName || !formData.email || !formData.role || !formData.campusLocation) return
 
         try {
             // Determine final avatar values
@@ -321,8 +317,8 @@ export function StaffFormDialog({
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium">{t('createDialog.fields.email.label')}</Label>
-                                    <Input value={formData.email} onChange={(e) => update('email', e.target.value)} placeholder={t('createDialog.fields.email.placeholder')} />
+                                    <Label className="text-sm font-medium">{t('createDialog.fields.email.label')} <span className="text-destructive">*</span></Label>
+                                    <Input value={formData.email} onChange={(e) => update('email', e.target.value)} placeholder={t('createDialog.fields.email.placeholder')} required />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium">{t('createDialog.fields.phone.label')}</Label>
