@@ -13,26 +13,26 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Student } from "../types"
+import { Staff } from "../types"
 
-interface DeleteStudentsDialogProps {
-    selectedStudents: Student[]
-    onDeleteStudents: (studentIds: string[]) => void
+interface DeleteStaffDialogProps {
+    selectedStaff: Staff[]
+    onDeleteStaff: (staffIds: string[]) => void
     disabled?: boolean
     trigger?: React.ReactNode
     open?: boolean
     onOpenChange?: (open: boolean) => void
 }
 
-export function DeleteStudentsDialog({
-    selectedStudents,
-    onDeleteStudents,
+export function DeleteStaffDialog({
+    selectedStaff,
+    onDeleteStaff,
     disabled = false,
     trigger,
     open: controlledOpen,
     onOpenChange
-}: DeleteStudentsDialogProps) {
-    const t = useTranslations('studentsManagement')
+}: DeleteStaffDialogProps) {
+    const t = useTranslations('staffManagement')
     const [internalOpen, setInternalOpen] = React.useState(false)
 
     // Use controlled or internal state
@@ -40,14 +40,14 @@ export function DeleteStudentsDialog({
     const setOpen = onOpenChange || setInternalOpen
 
     const handleDelete = () => {
-        const studentIds = selectedStudents.map(student => student.id)
-        onDeleteStudents(studentIds)
+        const staffIds = selectedStaff.map(staff => staff.id)
+        onDeleteStaff(staffIds)
         setOpen(false)
     }
 
-    const studentCount = selectedStudents.length
-    const isMultiple = studentCount > 1
-    const hasSelection = studentCount > 0
+    const staffCount = selectedStaff.length
+    const isMultiple = staffCount > 1
+    const hasSelection = staffCount > 0
     const isDisabled = disabled || !hasSelection
 
     return (
@@ -67,6 +67,7 @@ export function DeleteStudentsDialog({
                     </Button>
                 </DialogTrigger>
             )}
+
             {hasSelection && (
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -74,7 +75,7 @@ export function DeleteStudentsDialog({
                             {isMultiple ? t('deleteDialog.titlePlural') : t('deleteDialog.title')}
                         </DialogTitle>
                         <DialogDescription>
-                            {t('deleteDialog.description', { count: studentCount })}
+                            {t('deleteDialog.description', { count: staffCount })}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -83,9 +84,9 @@ export function DeleteStudentsDialog({
                             <div className="space-y-2">
                                 <p className="text-sm font-medium">{t('deleteDialog.listTitle')}</p>
                                 <ul className="space-y-1">
-                                    {selectedStudents.map((student) => (
-                                        <li key={student.id} className="text-sm text-muted-foreground truncate">
-                                            • {student.fullName} ({student.grade})
+                                    {selectedStaff.map((staff) => (
+                                        <li key={staff.id} className="text-sm text-muted-foreground truncate">
+                                            • {staff.fullName} ({staff.role})
                                         </li>
                                     ))}
                                 </ul>
@@ -108,3 +109,5 @@ export function DeleteStudentsDialog({
         </Dialog>
     )
 }
+
+export default DeleteStaffDialog

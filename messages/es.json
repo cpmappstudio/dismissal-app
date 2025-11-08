@@ -103,6 +103,20 @@
                     }
                 ]
             },
+            "users": {
+                "title": "Usuarios",
+                "url": "/users",
+                "items": [
+                    {
+                        "title": "Estudiantes",
+                        "url": "/users/students"
+                    },
+                    {
+                        "title": "Personal",
+                        "url": "/users/staff"
+                    }
+                ]
+            },
             "operators": {
                 "title": "Operadores",
                 "url": "/operators",
@@ -353,6 +367,119 @@
                 "cancel": "Cancelar",
                 "delete": "Eliminar Estudiante",
                 "deletePlural": "Eliminar Estudiantes"
+            }
+        }
+    },
+    "staffManagement": {
+        "title": "Personal",
+        "subtitle": "Administra y visualiza todo el personal del sistema",
+        "search": {
+            "placeholder": "Buscar personal por nombre, correo o teléfono..."
+        },
+        "filters": {
+            "campus": {
+                "all": "Todos los Campus",
+                "short": "Campus",
+                "label": "Ubicación del Campus"
+            },
+            "role": {
+                "all": "Todos los Roles",
+                "short": "Rol",
+                "label": "Rol"
+            }
+        },
+        "actions": {
+            "add": "Agregar Personal",
+            "addShort": "Agregar",
+            "delete": "Eliminar Personal",
+            "deleteShort": "Eliminar"
+        },
+        "table": {
+            "headers": {
+                "name": "Nombre",
+                "role": "Rol",
+                "campus": "Campus",
+                "email": "Correo",
+                "phone": "Teléfono",
+                "status": "Estado"
+            },
+            "noResults": "No se encontró personal.",
+            "pagination": {
+                "selected": "{selected} de {total} fila(s) seleccionada(s).",
+                "selectedShort": "{selected}/{total} seleccionado(s)",
+                "previous": "Anterior",
+                "previousShort": "Ant",
+                "next": "Siguiente"
+            }
+        },
+        "createDialog": {
+            "title": "Crear Nuevo Personal",
+            "subtitle": "Agrega un nuevo miembro del personal al sistema. Completa toda la información requerida a continuación.",
+            "sections": {
+                "personal": "Información Personal",
+                "work": "Información Laboral",
+                "additional": "Información Adicional"
+            },
+            "fields": {
+                "firstName": {
+                    "label": "Nombre",
+                    "placeholder": "Ingresa el nombre"
+                },
+                "lastName": {
+                    "label": "Apellido",
+                    "placeholder": "Ingresa el apellido"
+                },
+                "email": {
+                    "label": "Correo",
+                    "placeholder": "Ingresa el correo electrónico"
+                },
+                "phone": {
+                    "label": "Teléfono",
+                    "placeholder": "Ingresa el número de teléfono"
+                },
+                "role": {
+                    "label": "Rol",
+                    "placeholder": "Selecciona rol"
+                },
+                "campus": {
+                    "label": "Ubicación del Campus",
+                    "placeholder": "Selecciona campus"
+                },
+                "avatarUrl": {
+                    "label": "URL del Avatar"
+                }
+            },
+            "required": "Campos requeridos",
+            "avatarNote": "Si no se proporciona una URL de avatar, se generará una automáticamente.",
+            "actions": {
+                "cancel": "Cancelar",
+                "create": "Crear Personal"
+            }
+        },
+        "editDialog": {
+            "title": "Editar Personal",
+            "subtitle": "Actualiza la información del miembro del personal. Haz tus cambios y guarda.",
+            "actions": {
+                "cancel": "Cancelar",
+                "save": "Guardar Cambios",
+                "delete": "Eliminar Personal"
+            },
+            "deleteConfirm": {
+                "title": "Eliminar Personal",
+                "description": "¿Estás seguro de que quieres eliminar a {name}? Esta acción no se puede deshacer.",
+                "cancel": "Cancelar",
+                "confirm": "Eliminar"
+            }
+        },
+        "deleteDialog": {
+            "title": "Eliminar Personal",
+            "titlePlural": "Eliminar Miembros del Personal",
+            "description": "¿Estás seguro de que quieres eliminar {count, plural, one {este miembro del personal} other {estos # miembros del personal}}? Esta acción no se puede deshacer.",
+            "listTitle": "Personal a eliminar:",
+            "actions": {
+                "cancel": "Cancelar",
+                "delete": "Eliminar Personal",
+                "deletePlural": "Eliminar Personal"
             }
         }
     },

@@ -9,30 +9,56 @@ export default defineSchema({
    */
   users: defineTable({
     clerkId: v.string(),
-    username: v.string(),
-    email: v.optional(v.string()), // Optional for backwards compatibility
+    username: v.optional(v.string()), // Made optional for Clerk-only users
+    email: v.string(), // Required for matching
 
     // Display info (sync from Clerk)
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
+    fullName: v.optional(v.string()), // Computed name
     imageUrl: v.optional(v.string()),
+    
+    // Role-based access control
+    role: v.union(
+      v.literal("viewer"),
+      v.literal("dispatcher"),
+      v.literal("allocator"),
+      v.literal("operator"),
+      v.literal("admin"),
+      v.literal("superadmin")
+    ),
 
-    assignedCampuses: v.array(v.string()),
+    // Campus assignment
+    assignedCampuses: v.array(v.string()), // Campuses user can access (required, at least one)
 
+    // Legacy operator permissions (deprecated, use role instead)
     operatorPermissions: v.optional(v.object({
       canAllocate: v.boolean(),
       canDispatch: v.boolean(),
       canView: v.boolean(),
     })),
 
+    // Additional info
+    phone: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")),
+
+    // Status
+    status: v.optional(v.union(
+      v.literal("active"),
+      v.literal("inactive"),
+    )),
     isActive: v.boolean(),
+    
+    // Timestamps
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
     lastLoginAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_username", ["username"])
     .index("by_email", ["email"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_role", ["role"]),
 
   /**
    * Students table

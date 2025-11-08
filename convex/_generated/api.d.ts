@@ -17,6 +17,7 @@ import type * as auth from "../auth.js";
 import type * as campus from "../campus.js";
 import type * as crons from "../crons.js";
 import type * as helpers from "../helpers.js";
+import type * as http from "../http.js";
 import type * as queue from "../queue.js";
 import type * as students from "../students.js";
 import type * as types from "../types.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   campus: typeof campus;
   crons: typeof crons;
   helpers: typeof helpers;
+  http: typeof http;
   queue: typeof queue;
   students: typeof students;
   types: typeof types;
