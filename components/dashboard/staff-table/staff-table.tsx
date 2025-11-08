@@ -86,13 +86,15 @@ export function StaffTable() {
       fullName:
         user.fullName ||
         `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-        user.email,
+        user.email ||
+        "",
       firstName: user.firstName || "",
       lastName: user.lastName || "",
-      email: user.email,
+      email: user.email || "",
       phoneNumber: user.phone || "",
-      role: user.role,
-      campusLocation: (user.assignedCampuses?.[0] || "Not Assigned") as CampusLocation,
+      role: user.role || "",
+      campusLocation: (user.assignedCampuses?.[0] ||
+        "Not Assigned") as CampusLocation,
       status: (user.status || "active") as "active" | "inactive",
       avatarUrl: user.imageUrl || "",
       avatarStorageId: user.avatarStorageId,
@@ -113,7 +115,6 @@ export function StaffTable() {
         phone: staffData.phoneNumber || undefined,
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
-
     } catch (error) {
       const err = error as Error;
       console.error("❌ Error creating user:", err);
@@ -139,7 +140,6 @@ export function StaffTable() {
     if (!selectedStaff) return;
 
     try {
-
       // Update user in Clerk (basic info only - no avatar)
       await updateUser({
         clerkUserId: selectedStaff.id,
@@ -157,9 +157,8 @@ export function StaffTable() {
         const oldAvatarId = selectedStaff.avatarStorageId;
         const newAvatarId = staffData.avatarStorageId;
         const avatarChanged = newAvatarId !== oldAvatarId;
-        
+
         if (avatarChanged) {
-          
           // Case 1: Avatar was removed (had one, now null/undefined)
           if (!newAvatarId && oldAvatarId) {
             await deleteAvatar({ userId: convexUser._id });
@@ -228,7 +227,7 @@ export function StaffTable() {
   ] as const;
 
   // Extraer el tipo Role desde ROLE_OPTIONS
-  type Role = typeof ROLE_OPTIONS[number];
+  type Role = (typeof ROLE_OPTIONS)[number];
 
   // Dialog state for create/edit
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
