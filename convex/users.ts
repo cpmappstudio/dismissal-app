@@ -275,9 +275,29 @@ export const listUsers = query({
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   handler: async (ctx, args) => {
-    // Check permissions
-    await requireRoles(ctx, ["admin", "superadmin"]);
+    // Check authentication first
+    const identity = await ctx.auth.getUserIdentity();
+    
+    if (!identity) {
+      // Return empty array when not authenticated (graceful degradation)
+      return [];
+    }
 
+    // Get user from database
+    const user = await userByClerkId(ctx, identity.subject);
+    
+    if (!user) {
+      // User not found in database
+      return [];
+    }
+
+    // Check if user has required role
+    if (!["admin", "superadmin"].includes(user.role)) {
+      // Insufficient permissions - return empty array
+      return [];
+    }
+
+    // User is authenticated and authorized - proceed with query
     let usersQuery = ctx.db.query("users");
 
     // Apply filters
