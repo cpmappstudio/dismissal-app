@@ -34,9 +34,6 @@ import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { CAMPUS_LOCATIONS, CampusLocation } from "@/convex/types";
 
-// Role type matching Convex schema
-type Role = "viewer" | "dispatcher" | "allocator" | "operator" | "admin" | "superadmin";
-
 // Simple skeleton placeholder
 function StaffTableSkeleton() {
   return (

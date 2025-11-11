@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { Plus, Upload, X, Loader2, Save, Trash2, User } from "lucide-react"
+import { Plus, Upload, X, Loader2, Save, Trash2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useMutation, useQuery } from "convex/react"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,6 @@ import { CAMPUS_LOCATIONS } from "@/convex/types"
 import { DeleteStaffDialog } from "./delete-staff-dialog"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
-import { UserButton } from "@clerk/clerk-react"
 
 interface StaffFormDialogProps {
     mode: 'create' | 'edit'

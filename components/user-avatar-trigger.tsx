@@ -34,8 +34,6 @@ export function UserAvatarTrigger({
     return null
   }
 
-  const initials = `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`
-
   return (
     <Avatar className={`h-${size/4} w-${size/4} ${className}`}>
       <AvatarImage 

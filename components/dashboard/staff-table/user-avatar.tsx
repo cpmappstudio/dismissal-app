@@ -58,9 +58,6 @@ export function UserAvatar({
         }
     }, [avatarStorageId, lastStorageId])
 
-    // Generate initials
-    const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`
-
     // Determine the image source to use
     const imageSrc = React.useMemo(() => {
         let currentImage: string | undefined = undefined
