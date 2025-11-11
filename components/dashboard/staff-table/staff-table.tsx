@@ -210,7 +210,7 @@ export function StaffTable() {
             try {
               await user.reload();
             } catch (error) {
-              console.warn("Second reload failed, but first succeeded");
+              console.warn("Second reload failed, but first succeeded", error);
             }
           }, 500);
           
@@ -219,7 +219,7 @@ export function StaffTable() {
             try {
               await user.reload();
             } catch (error) {
-              console.warn("Third reload failed");
+              console.warn("Third reload failed", error);
             }
           }, 1500);
         }
