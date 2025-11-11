@@ -61,7 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: menuConfig.users.title,
           url: menuConfig.users.url,
           icon: iconMap.profile,
-          isActive: false,
+          isActive: true,
           items: menuConfig.users.items.map((i) => ({
             title: i.title,
             url: i.url,
