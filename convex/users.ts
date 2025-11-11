@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, internalMutation, action, internalQuery } from "./_generated/server";
+import { query, mutation, internalMutation, action, internalQuery, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
@@ -27,6 +27,7 @@ export const generateAvatarUploadUrl = mutation({
 
 /**
  * Save avatar storage ID to user record (Step 3 of 3)
+ * Also returns the avatar URL to update Clerk
  */
 export const saveAvatarStorageId = mutation({
     args: {
@@ -47,13 +48,16 @@ export const saveAvatarStorageId = mutation({
             await ctx.storage.delete(user.avatarStorageId);
         }
 
+        // Get the public URL for the new avatar (to sync with Clerk)
+        const avatarUrl = await ctx.storage.getUrl(args.storageId);
+
         // Update user with new avatar storage ID
         await ctx.db.patch(args.userId, {
             avatarStorageId: args.storageId,
             updatedAt: Date.now(),
         });
 
-        return args.userId;
+        return { userId: args.userId, avatarUrl };
     },
 });
 
@@ -275,9 +279,29 @@ export const listUsers = query({
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   handler: async (ctx, args) => {
-    // Check permissions
-    await requireRoles(ctx, ["admin", "superadmin"]);
+    // Check authentication first
+    const identity = await ctx.auth.getUserIdentity();
+    
+    if (!identity) {
+      // Return empty array when not authenticated (graceful degradation)
+      return [];
+    }
 
+    // Get user from database
+    const user = await userByClerkId(ctx, identity.subject);
+    
+    if (!user) {
+      // User not found in database
+      return [];
+    }
+
+    // Check if user has required role
+    if (!["admin", "superadmin"].includes(user.role)) {
+      // Insufficient permissions - return empty array
+      return [];
+    }
+
+    // User is authenticated and authorized - proceed with query
     let usersQuery = ctx.db.query("users");
 
     // Apply filters
@@ -323,6 +347,7 @@ export const getUserByClerkIdInternal = internalQuery({
 /**
  * Upsert user from Clerk webhook
  * Idempotent operation that handles create/update and temp user merging
+ * Schedules avatar sync to Clerk if avatarStorageId is present
  */
 export const upsertFromClerk = internalMutation({
   args: { data: v.any() },
@@ -348,13 +373,16 @@ export const upsertFromClerk = internalMutation({
     const avatarStorageId = publicMetadata.avatarStorageId || undefined;
     const status = publicMetadata.status || "active";
 
-    console.log(`📝 Upserting user: ${email} (${clerkId}) with role: ${role}`);
+    console.log(`📝 Upserting user: ${email} (${clerkId}) with role: ${role}${avatarStorageId ? ' with avatar' : ''}`);
 
     // 1. Check if user exists by clerkId
     const existingByClerkId = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
       .first();
+
+    let userId: any;
+    let isNewUser = false;
 
     if (existingByClerkId) {
       // Update existing user
@@ -381,62 +409,75 @@ export const upsertFromClerk = internalMutation({
       
       await ctx.db.patch(existingByClerkId._id, updates);
       console.log(`✅ Updated existing user: ${existingByClerkId._id}`);
-      return existingByClerkId._id;
+      userId = existingByClerkId._id;
     }
-
     // 2. Check for temp user merge by email
-    const existingByEmail = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .first();
+    else {
+      const existingByEmail = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
 
-    if (existingByEmail && existingByEmail.clerkId.startsWith("temp_")) {
-      // Merge: replace temp clerkId with real one
-      // Build update object - preserve existing avatarStorageId unless explicitly provided
-      const updates: any = {
-        clerkId, // Replace temp_ with real Clerk ID
-        firstName,
-        lastName,
-        fullName,
-        imageUrl,
-        phone,
-        assignedCampuses,
-        role,
-        status,
-        isActive: status === "active",
-        updatedAt: Date.now(),
-      };
-      
-      // Only update avatarStorageId if it's explicitly provided in publicMetadata
-      if (publicMetadata.avatarStorageId !== undefined) {
-        updates.avatarStorageId = avatarStorageId;
+      if (existingByEmail && existingByEmail.clerkId.startsWith("temp_")) {
+        // Merge: replace temp clerkId with real one
+        // Build update object - preserve existing avatarStorageId unless explicitly provided
+        const updates: any = {
+          clerkId, // Replace temp_ with real Clerk ID
+          firstName,
+          lastName,
+          fullName,
+          imageUrl,
+          phone,
+          assignedCampuses,
+          role,
+          status,
+          isActive: status === "active",
+          updatedAt: Date.now(),
+        };
+        
+        // Only update avatarStorageId if it's explicitly provided in publicMetadata
+        if (publicMetadata.avatarStorageId !== undefined) {
+          updates.avatarStorageId = avatarStorageId;
+        }
+        
+        await ctx.db.patch(existingByEmail._id, updates);
+        console.log(`✅ Merged temp user: ${existingByEmail._id} (temp_* → ${clerkId})`);
+        userId = existingByEmail._id;
+      } else {
+        // 3. Create new user
+        userId = await ctx.db.insert("users", {
+          clerkId,
+          email,
+          firstName,
+          lastName,
+          fullName,
+          imageUrl,
+          phone,
+          avatarStorageId,
+          assignedCampuses,
+          role,
+          status,
+          isActive: status === "active",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        
+        console.log(`✅ Created new user: ${userId}`);
+        isNewUser = true;
       }
-      
-      await ctx.db.patch(existingByEmail._id, updates);
-      console.log(`✅ Merged temp user: ${existingByEmail._id} (temp_* → ${clerkId})`);
-      return existingByEmail._id;
     }
 
-    // 3. Create new user
-    const newUserId = await ctx.db.insert("users", {
-      clerkId,
-      email,
-      firstName,
-      lastName,
-      fullName,
-      imageUrl,
-      phone,
-      avatarStorageId,
-      assignedCampuses,
-      role,
-      status,
-      isActive: status === "active",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+    // Schedule avatar sync to Clerk if avatarStorageId is present and imageUrl doesn't match
+    if (avatarStorageId && (!imageUrl || isNewUser)) {
+      console.log(`📸 Scheduling avatar sync to Clerk for user: ${clerkId}`);
+      await ctx.scheduler.runAfter(0, internal.users.syncAvatarToClerk, {
+        userId,
+        clerkId,
+        avatarStorageId,
+      });
+    }
     
-    console.log(`✅ Created new user: ${newUserId}`);
-    return newUserId;
+    return userId;
   }
 });
 
@@ -508,6 +549,7 @@ async function checkAdminPermissions(ctx: any) {
 /**
  * Create user in Clerk with role assignment
  * Sends invitation email and syncs via webhook
+ * Includes avatarStorageId in public_metadata for Convex Storage sync
  */
 export const createUserWithClerk = action({
   args: {
@@ -532,6 +574,23 @@ export const createUserWithClerk = action({
     }
 
     try {
+      // Build public_metadata with avatarStorageId for Convex → Clerk sync
+      const publicMetadata: any = {
+        role: args.role,
+        assignedCampuses: args.assignedCampuses,
+        status: "active",
+      };
+      
+      // Include phone if provided
+      if (args.phone) {
+        publicMetadata.phone = args.phone;
+      }
+      
+      // Include avatarStorageId if provided (Convex Storage reference)
+      if (args.avatarStorageId) {
+        publicMetadata.avatarStorageId = args.avatarStorageId;
+      }
+
       // Create user in Clerk
       const response = await fetch("https://api.clerk.com/v1/users", {
         method: "POST",
@@ -543,13 +602,7 @@ export const createUserWithClerk = action({
           email_address: [args.email],
           first_name: args.firstName,
           last_name: args.lastName,
-          public_metadata: {
-            role: args.role,
-            assignedCampuses: args.assignedCampuses,
-            phone: args.phone,
-            status: "active",
-            ...(args.avatarStorageId && { avatarStorageId: args.avatarStorageId }),
-          },
+          public_metadata: publicMetadata,
           skip_password_checks: true,
           skip_password_requirement: true,
         }),
@@ -561,7 +614,7 @@ export const createUserWithClerk = action({
       }
 
       const clerkUser = await response.json();
-      console.log(`✅ Created user in Clerk: ${clerkUser.id}`);
+      console.log(`✅ Created user in Clerk: ${clerkUser.id}${args.avatarStorageId ? ' (with avatar)' : ''}`);
 
       // Create invitation
       const inviteResponse = await fetch("https://api.clerk.com/v1/invitations", {
@@ -604,6 +657,7 @@ export const createUserWithClerk = action({
 /**
  * Update user in Clerk
  * Updates metadata and syncs via webhook
+ * Preserves or updates avatarStorageId in public_metadata for Convex Storage sync
  */
 export const updateUserWithClerk = action({
   args: {
@@ -614,6 +668,7 @@ export const updateUserWithClerk = action({
     assignedCampuses: v.optional(v.array(v.string())),
     phone: v.optional(v.string()),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
+    avatarStorageId: v.optional(v.union(v.id("_storage"), v.null())), // Allow null to remove avatar
   },
   handler: async (ctx, args) => {
     // Check permissions
@@ -659,6 +714,19 @@ export const updateUserWithClerk = action({
       if (args.assignedCampuses !== undefined) publicMetadata.assignedCampuses = args.assignedCampuses;
       if (args.phone !== undefined) publicMetadata.phone = args.phone;
       if (args.status) publicMetadata.status = args.status;
+      
+      // Handle avatarStorageId updates (Convex → Clerk sync)
+      if (args.avatarStorageId !== undefined) {
+        if (args.avatarStorageId === null) {
+          // Explicitly remove avatar
+          delete publicMetadata.avatarStorageId;
+          console.log(`🗑️ Removing avatarStorageId from Clerk metadata for user: ${args.clerkUserId}`);
+        } else {
+          // Update with new avatar storage ID
+          publicMetadata.avatarStorageId = args.avatarStorageId;
+          console.log(`📸 Updating avatarStorageId in Clerk metadata for user: ${args.clerkUserId}`);
+        }
+      }
 
       updateData.public_metadata = publicMetadata;
 
@@ -745,6 +813,193 @@ export const deleteUserWithClerk = action({
       const err = error as Error;
       console.error("❌ Error deleting user:", err.message);
       throw new Error(`Failed to delete user: ${err.message}`);
+    }
+  }
+});
+
+/**
+ * Internal action to sync avatar from Convex Storage to Clerk
+ * Called automatically after webhook creates/updates user with avatarStorageId
+ * Downloads image from Convex and uploads to Clerk as multipart form data
+ */
+export const syncAvatarToClerk = internalAction({
+  args: {
+    userId: v.id("users"),
+    clerkId: v.string(),
+    avatarStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    try {
+      // Get the avatar URL from Convex Storage via query
+      const avatarUrl = await ctx.runQuery(internal.users.getAvatarUrlInternal, {
+        storageId: args.avatarStorageId,
+      });
+      
+      if (!avatarUrl) {
+        console.warn(`⚠️ Could not get avatar URL for storage ID: ${args.avatarStorageId}`);
+        return;
+      }
+
+      // Update Clerk profile image using the Set Profile Image endpoint
+      const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+      if (!clerkSecretKey) {
+        console.error("CLERK_SECRET_KEY not configured");
+        return;
+      }
+
+      console.log(`📸 Syncing avatar to Clerk for user ${args.clerkId} from URL: ${avatarUrl.substring(0, 60)}...`);
+
+      // Download the image from Convex Storage
+      const imageResponse = await fetch(avatarUrl);
+      if (!imageResponse.ok) {
+        console.error(`❌ Failed to download image from Convex Storage`);
+        return;
+      }
+
+      const imageBlob = await imageResponse.blob();
+      const imageBuffer = await imageBlob.arrayBuffer();
+
+      // Upload to Clerk using multipart/form-data
+      const formData = new FormData();
+      formData.append('file', new Blob([imageBuffer], { type: imageBlob.type }), 'avatar.jpg');
+
+      const response = await fetch(
+        `https://api.clerk.com/v1/users/${args.clerkId}/profile_image`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(`❌ Failed to update Clerk profile image: ${response.status} - ${error}`);
+        return;
+      }
+
+      const result = await response.json();
+      console.log(`✅ Successfully synced avatar to Clerk for user: ${args.clerkId}`);
+      console.log(`   New image URL: ${result.public_url || result.image_url || 'unknown'}`);
+    } catch (error) {
+      console.error(`❌ Error syncing avatar to Clerk:`, error);
+    }
+  }
+});
+
+/**
+ * Internal query to get avatar URL (for internal use only)
+ */
+export const getAvatarUrlInternal = internalQuery({
+  args: {
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    try {
+      return await ctx.storage.getUrl(args.storageId);
+    } catch {
+      return null;
+    }
+  }
+});
+
+/**
+ * Update user profile image in Clerk
+ * Syncs Convex Storage avatar to Clerk's imageUrl
+ * Takes avatarStorageId, gets fresh URL, downloads and uploads to Clerk
+ */
+export const updateClerkProfileImage = action({
+  args: {
+    clerkUserId: v.string(),
+    avatarStorageId: v.union(v.id("_storage"), v.null()), // null to remove image
+  },
+  handler: async (ctx, args) => {
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) {
+      throw new Error("CLERK_SECRET_KEY not configured");
+    }
+
+    try {
+      if (args.avatarStorageId === null) {
+        // Delete profile image from Clerk
+        const response = await fetch(
+          `https://api.clerk.com/v1/users/${args.clerkUserId}/profile_image`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${clerkSecretKey}`,
+            },
+          }
+        );
+
+        if (!response.ok && response.status !== 404) {
+          const error = await response.text();
+          throw new Error(`Clerk API error: ${response.status} - ${error}`);
+        }
+
+        console.log(`✅ Removed profile image from Clerk: ${args.clerkUserId}`);
+        return {
+          success: true,
+          clerkUserId: args.clerkUserId,
+          imageUrl: null,
+        };
+      } else {
+        // Get fresh URL from Convex Storage
+        const avatarUrl = await ctx.runQuery(internal.users.getAvatarUrlInternal, {
+          storageId: args.avatarStorageId,
+        });
+
+        if (!avatarUrl) {
+          throw new Error(`Could not get avatar URL from storage ID: ${args.avatarStorageId}`);
+        }
+
+        // Download the image from Convex Storage
+        console.log(`📸 Downloading image from Convex Storage for user: ${args.clerkUserId}`);
+        const imageResponse = await fetch(avatarUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image from Convex Storage: ${imageResponse.status}`);
+        }
+
+        const imageBlob = await imageResponse.blob();
+        const imageBuffer = await imageBlob.arrayBuffer();
+
+        // Upload to Clerk using multipart/form-data
+        const formData = new FormData();
+        formData.append('file', new Blob([imageBuffer], { type: imageBlob.type }), 'avatar.jpg');
+
+        const response = await fetch(
+          `https://api.clerk.com/v1/users/${args.clerkUserId}/profile_image`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${clerkSecretKey}`,
+            },
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`Clerk API error: ${response.status} - ${error}`);
+        }
+
+        const result = await response.json();
+        console.log(`✅ Updated profile image in Clerk: ${args.clerkUserId}`);
+        console.log(`   New Clerk image URL: ${result.public_url || result.image_url || 'unknown'}`);
+
+        return {
+          success: true,
+          clerkUserId: result.id || args.clerkUserId,
+          imageUrl: result.public_url || result.image_url,
+        };
+      }
+      
+    } catch (error) {
+      const err = error as Error;
+      console.error("❌ Error updating profile image:", err.message);
+      throw new Error(`Failed to update profile image: ${err.message}`);
     }
   }
 });

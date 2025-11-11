@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { Plus, Upload, X, Loader2, Save, Trash2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useMutation, useQuery } from "convex/react"
@@ -66,9 +67,10 @@ export function StaffFormDialog({
     const [currentAvatarStorageId, setCurrentAvatarStorageId] = React.useState<Id<"_storage"> | null>(null)
 
     // Query to get the current avatar URL from storage ID (uses local state, not prop)
+    // Skip query if currentAvatarStorageId is null (avatar explicitly removed)
     const currentAvatarUrl = useQuery(
         api.users.getAvatarUrl,
-        currentAvatarStorageId ? { storageId: currentAvatarStorageId } : "skip"
+        currentAvatarStorageId !== null && currentAvatarStorageId ? { storageId: currentAvatarStorageId } : "skip"
     )
 
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen
@@ -211,19 +213,16 @@ export function StaffFormDialog({
         // Priority 1: New preview (user just selected a new image)
         if (avatarPreview) return avatarPreview
         
-        // Priority 2: Current storage ID in local state and its URL
-        if (currentAvatarStorageId && currentAvatarUrl) return currentAvatarUrl
-        
-        // Priority 3: If currentAvatarStorageId is null but staff originally had one,
-        // it means user clicked Remove Avatar - show Clerk's default image instead
-        if (currentAvatarStorageId === null && staff?.avatarStorageId) {
-            // Return Clerk's image if available
-            if (staff?.avatarUrl) return staff.avatarUrl
-            // Otherwise show initials (fallback)
+        // Priority 2: If avatar was explicitly removed (null), don't show anything
+        // This prevents the glitch where removed avatar briefly reappears
+        if (currentAvatarStorageId === null) {
             return undefined
         }
         
-        // Priority 4: Legacy avatar URL (Clerk imageUrl)
+        // Priority 3: Current storage ID in local state and its URL
+        if (currentAvatarStorageId && currentAvatarUrl) return currentAvatarUrl
+        
+        // Priority 4: Legacy avatar URL (Clerk imageUrl) - only if we haven't removed it
         if (staff?.avatarUrl) return staff.avatarUrl
         
         // No avatar to display - show initials
@@ -364,8 +363,14 @@ export function StaffFormDialog({
                                                 src={getAvatarDisplay()} 
                                                 alt={`${formData.firstName} ${formData.lastName}`} 
                                             />
-                                            <AvatarFallback>
-                                                {(formData.firstName?.[0] || '') + (formData.lastName?.[0] || '')}
+                                            <AvatarFallback className="bg-muted">
+                                                <Image 
+                                                    src="/default-avatar.png" 
+                                                    alt="Default avatar" 
+                                                    width={64} 
+                                                    height={64}
+                                                    className="object-cover"
+                                                />
                                             </AvatarFallback>
                                         </Avatar>
                                     </div>

@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { UserAvatarTrigger } from "@/components/user-avatar-trigger"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -273,7 +274,11 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      {/* Show user avatar on mobile, panel icon on medium+ screens */}
+      <span className="md:hidden">
+        <UserAvatarTrigger size={28} />
+      </span>
+      <PanelLeftIcon className="hidden md:block h-4 w-4" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )

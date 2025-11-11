@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useQuery } from "convex/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { api } from "@/convex/_generated/api"
@@ -21,6 +22,12 @@ const sizeClasses = {
     lg: "h-16 w-16"
 }
 
+const sizePixels = {
+    sm: 24,
+    md: 40, // Using larger size for md
+    lg: 64
+}
+
 export function UserAvatar({
     avatarStorageId,
     fallbackUrl,
@@ -35,21 +42,51 @@ export function UserAvatar({
         avatarStorageId ? { storageId: avatarStorageId } : "skip"
     )
 
+    // Keep track of the last valid image and storage ID to prevent glitches during loading
+    const [lastValidImage, setLastValidImage] = React.useState<string | undefined>(undefined)
+    const [lastStorageId, setLastStorageId] = React.useState<Id<"_storage"> | undefined>(undefined)
 
-    // Generate initials
-    const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`
+    // Clear cache when avatarStorageId is removed (changes from value to undefined)
+    React.useEffect(() => {
+        if (lastStorageId && !avatarStorageId) {
+            // Avatar was removed - clear the cache
+            setLastValidImage(undefined)
+            setLastStorageId(undefined)
+        } else if (avatarStorageId && avatarStorageId !== lastStorageId) {
+            // Avatar storage ID changed - update tracking
+            setLastStorageId(avatarStorageId)
+        }
+    }, [avatarStorageId, lastStorageId])
 
     // Determine the image source to use
     const imageSrc = React.useMemo(() => {
+        let currentImage: string | undefined = undefined
+
+        // Priority 1: If we have a storage ID, use its URL
         if (avatarStorageId && avatarUrl) {
-            return avatarUrl
+            currentImage = avatarUrl
         }
-        if (fallbackUrl) {
-            return fallbackUrl
+        // Priority 2: If storage ID is explicitly undefined (not just loading),
+        // and we have a fallback URL from Clerk, use it
+        else if (!avatarStorageId && fallbackUrl) {
+            currentImage = fallbackUrl
         }
-        // No fallback image - let Avatar component show initials instead
+        
+        // Update last valid image if we have a new one
+        if (currentImage) {
+            setLastValidImage(currentImage)
+            return currentImage
+        }
+        
+        // If loading (avatarStorageId exists but avatarUrl is undefined),
+        // keep showing the last valid image to prevent glitch
+        if (avatarStorageId && !avatarUrl && lastValidImage) {
+            return lastValidImage
+        }
+        
+        // No valid image source - show PNG fallback
         return undefined
-    }, [avatarStorageId, avatarUrl, fallbackUrl])
+    }, [avatarStorageId, avatarUrl, fallbackUrl, lastValidImage])
 
     return (
         <Avatar className={`${sizeClasses[size]} flex-shrink-0 ${className}`}>
@@ -58,8 +95,14 @@ export function UserAvatar({
                 alt={`${firstName} ${lastName}`}
                 loading="lazy"
             />
-            <AvatarFallback className="text-xs">
-                {initials}
+            <AvatarFallback className="bg-muted">
+                <Image 
+                    src="/default-avatar.png" 
+                    alt="Default avatar" 
+                    width={sizePixels[size]} 
+                    height={sizePixels[size]}
+                    className="object-cover"
+                />
             </AvatarFallback>
         </Avatar>
     )

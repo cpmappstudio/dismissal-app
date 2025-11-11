@@ -15,6 +15,7 @@ import {
 import { Search, MapPin, Plus, UserSearch } from "lucide-react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useUser } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ function StaffTableSkeleton() {
 export function StaffTable() {
   const t = useTranslations("staffManagement");
   const columns = useColumns();
+  const { user } = useUser(); // Get current Clerk user to reload after avatar update
 
   // Table state
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -75,6 +77,7 @@ export function StaffTable() {
   const deleteUser = useAction(api.users.deleteUserWithClerk);
   const saveAvatarStorageId = useMutation(api.users.saveAvatarStorageId);
   const deleteAvatar = useMutation(api.users.deleteAvatar);
+  const updateClerkProfileImage = useAction(api.users.updateClerkProfileImage);
 
   // Transform Convex users to Staff format
   const data = React.useMemo<Staff[]>(() => {
@@ -96,7 +99,9 @@ export function StaffTable() {
       campusLocation: (user.assignedCampuses?.[0] ||
         "Not Assigned") as CampusLocation,
       status: (user.status || "active") as "active" | "inactive",
-      avatarUrl: user.imageUrl || "",
+      // Only use Clerk's imageUrl if there's no custom avatar storage ID
+      // This prevents showing old Clerk image when custom avatar is removed
+      avatarUrl: !user.avatarStorageId ? (user.imageUrl || "") : "",
       avatarStorageId: user.avatarStorageId,
     }));
   }, [usersData]);
@@ -106,6 +111,7 @@ export function StaffTable() {
   // Handlers for CRUD operations
   const handleCreateStaff = async (staffData: Omit<Staff, "id">) => {
     try {
+      // Create user in Clerk (avatar will be synced via webhook and updateUserWithClerk)
       await createUser({
         email: staffData.email,
         firstName: staffData.firstName,
@@ -115,6 +121,11 @@ export function StaffTable() {
         phone: staffData.phoneNumber || undefined,
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
+
+      // Note: The avatar sync to Clerk's profile_image_url happens after webhook
+      // creates the user in Convex. For now, the avatar is stored in public_metadata
+      // and will be synced when the user is first edited or manually synced.
+
     } catch (error) {
       const err = error as Error;
       console.error("❌ Error creating user:", err);
@@ -140,7 +151,35 @@ export function StaffTable() {
     if (!selectedStaff) return;
 
     try {
-      // Update user in Clerk (basic info only - no avatar)
+      // Check if avatar changed
+      const oldAvatarId = selectedStaff.avatarStorageId;
+      const newAvatarId = staffData.avatarStorageId;
+      const avatarChanged = newAvatarId !== oldAvatarId;
+
+      // Handle avatar changes in Convex Storage first
+      const convexUser = usersData?.find((u) => u.clerkId === selectedStaff.id);
+      if (convexUser && avatarChanged) {
+        // Case 1: Avatar was removed (had one, now null/undefined)
+        if (!newAvatarId && oldAvatarId) {
+          await deleteAvatar({ userId: convexUser._id });
+        }
+        // Case 2: Avatar was replaced (had one, now has different one)
+        else if (newAvatarId && oldAvatarId && newAvatarId !== oldAvatarId) {
+          await saveAvatarStorageId({
+            userId: convexUser._id,
+            storageId: newAvatarId,
+          });
+        }
+        // Case 3: Avatar was added (didn't have one, now has one)
+        else if (newAvatarId && !oldAvatarId) {
+          await saveAvatarStorageId({
+            userId: convexUser._id,
+            storageId: newAvatarId,
+          });
+        }
+      }
+
+      // Update user in Clerk (including avatarStorageId in public_metadata)
       await updateUser({
         clerkUserId: selectedStaff.id,
         firstName: staffData.firstName,
@@ -149,34 +188,40 @@ export function StaffTable() {
         assignedCampuses: [staffData.campusLocation] as string[],
         phone: staffData.phoneNumber || undefined,
         status: staffData.status as "active" | "inactive",
+        avatarStorageId: staffData.avatarStorageId || null, // Sync avatar to Clerk metadata
       });
 
-      // Handle avatar changes
-      const convexUser = usersData?.find((u) => u.clerkId === selectedStaff.id);
-      if (convexUser) {
-        const oldAvatarId = selectedStaff.avatarStorageId;
-        const newAvatarId = staffData.avatarStorageId;
-        const avatarChanged = newAvatarId !== oldAvatarId;
+      // Sync profile image to Clerk if avatar changed
+      if (avatarChanged) {
+        await updateClerkProfileImage({
+          clerkUserId: selectedStaff.id,
+          avatarStorageId: newAvatarId || null, // Pass storageId directly
+        });
 
-        if (avatarChanged) {
-          // Case 1: Avatar was removed (had one, now null/undefined)
-          if (!newAvatarId && oldAvatarId) {
-            await deleteAvatar({ userId: convexUser._id });
-          }
-          // Case 2: Avatar was replaced (had one, now has different one)
-          else if (newAvatarId && oldAvatarId && newAvatarId !== oldAvatarId) {
-            await saveAvatarStorageId({
-              userId: convexUser._id,
-              storageId: newAvatarId,
-            });
-          }
-          // Case 3: Avatar was added (didn't have one, now has one)
-          else if (newAvatarId && !oldAvatarId) {
-            await saveAvatarStorageId({
-              userId: convexUser._id,
-              storageId: newAvatarId,
-            });
-          }
+        // Reload Clerk user data to reflect new avatar in UserButton
+        // This updates the UI without a full page reload
+        if (user && user.id === selectedStaff.id) {
+          // Multiple reload attempts to ensure Clerk has processed the new image
+          // Clerk may need a moment to process the uploaded image
+          await user.reload();
+          
+          // Second reload after short delay for better reliability
+          setTimeout(async () => {
+            try {
+              await user.reload();
+            } catch (error) {
+              console.warn("Second reload failed, but first succeeded", error);
+            }
+          }, 500);
+          
+          // Third reload after slightly longer delay as final fallback
+          setTimeout(async () => {
+            try {
+              await user.reload();
+            } catch (error) {
+              console.warn("Third reload failed", error);
+            }
+          }, 1500);
         }
       }
 
