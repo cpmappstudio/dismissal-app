@@ -92,13 +92,15 @@ export function StaffTable() {
       fullName:
         user.fullName ||
         `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-        user.email,
+        user.email ||
+        "",
       firstName: user.firstName || "",
       lastName: user.lastName || "",
-      email: user.email,
+      email: user.email || "",
       phoneNumber: user.phone || "",
-      role: user.role,
-      campusLocation: (user.assignedCampuses?.[0] || "Not Assigned") as CampusLocation,
+      role: user.role || "",
+      campusLocation: (user.assignedCampuses?.[0] ||
+        "Not Assigned") as CampusLocation,
       status: (user.status || "active") as "active" | "inactive",
       // Only use Clerk's imageUrl if there's no custom avatar storage ID
       // This prevents showing old Clerk image when custom avatar is removed
@@ -273,7 +275,7 @@ export function StaffTable() {
   ] as const;
 
   // Extraer el tipo Role desde ROLE_OPTIONS
-  type Role = typeof ROLE_OPTIONS[number];
+  type Role = (typeof ROLE_OPTIONS)[number];
 
   // Dialog state for create/edit
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
