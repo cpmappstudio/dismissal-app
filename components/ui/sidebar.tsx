@@ -24,6 +24,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { UserButton } from "@clerk/clerk-react"
+import { UserAvatarTrigger } from "@/components/user-avatar-trigger"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -273,7 +275,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      <UserAvatarTrigger size={28} />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
