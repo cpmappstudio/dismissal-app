@@ -181,7 +181,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items={navItems}
           dashboardLabel={t("dashboard")}
           navigationLabel={t("navigation")}
-          showDashboard={true}
+          showDashboard={userRole === "admin" || userRole === "superadmin"}
         />
       </SidebarContent>
       <SidebarFooter>
