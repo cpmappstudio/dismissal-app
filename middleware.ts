@@ -122,8 +122,12 @@ const getRedirectUrl = (
   locale: string,
   baseUrl: string
 ): URL | null => {
-  // REGLA 1: Todos los roles en ruta raíz son redirigidos a su ruta específica
+  // REGLA 1: Admin y superadmin pueden ver el dashboard en la raíz
+  // Otros roles son redirigidos a su ruta específica
   if (pathWithoutLocale === '/') {
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      return null // Permitir acceso al dashboard
+    }
     return new URL(`/${locale}${DEFAULT_REDIRECTS[userRole]}`, baseUrl)
   }
 

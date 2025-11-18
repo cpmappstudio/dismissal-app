@@ -13,7 +13,7 @@
     },
     "navigation": {
         "university": "Dismissal App",
-        "dashboard": "Estudiantes",
+        "dashboard": "Inicio",
         "navigation": "Navegación",
         "playground": "Área de Pruebas",
         "models": "Modelos",
@@ -258,6 +258,70 @@
                 "progressAnalysis": "Análisis de Progreso",
                 "academicCalendar": "Calendario Académico"
             }
+        }
+    },
+    "adminDashboard": {
+        "welcome": {
+            "title": "Bienvenido, Administrador",
+            "subtitle": "Tienes acceso completo a todas las funciones del sistema. Gestiona usuarios y accede a todas las herramientas de operadores."
+        },
+        "permissions": {
+            "title": "Tus Permisos de Administrador",
+            "description": "Como administrador, puedes crear y gestionar estudiantes, personal, y acceder a todas las funcionalidades de operadores incluyendo asignación, despacho y visualización."
+        },
+        "cards": {
+            "students": {
+                "badge": "Gestión",
+                "title": "Gestionar Estudiantes",
+                "description": "Crear, editar y administrar todos los estudiantes del sistema.",
+                "action": "Ir a Estudiantes"
+            },
+            "staff": {
+                "badge": "Gestión",
+                "title": "Gestionar Personal",
+                "description": "Administrar miembros del personal, asignar roles y gestionar permisos de acceso al sistema.",
+                "action": "Ir a Personal"
+            },
+            "operators": {
+                "badge": "Acceso Total",
+                "title": "Funciones de Operador",
+                "description": "Acceso completo a todas las herramientas de operadores: asignador, despachador y visor de la fila de salida.",
+                "action": "Ir a Operadores"
+            },
+            "allocator": {
+                "badge": "Asignación",
+                "title": "Asignador",
+                "description": "Asignar vehículos a los carriles de salida para organizar la fila de recogida de estudiantes.",
+                "action": "Ir a Asignador"
+            },
+            "dispatcher": {
+                "badge": "Despacho",
+                "title": "Despachador",
+                "description": "Despachar vehículos de la fila cuando los estudiantes son recogidos y gestionar el flujo de salida.",
+                "action": "Ir a Despachador"
+            },
+            "viewer": {
+                "badge": "Visualización",
+                "title": "Visor",
+                "description": "Visualizar en tiempo real el estado de la fila de salida y monitorear el proceso de recogida.",
+                "action": "Ir a Visor"
+            }
+        },
+        "userManagement": {
+            "title": "Gestión de Usuarios",
+            "subtitle": "Administra estudiantes y personal del sistema."
+        },
+        "operatorsSection": {
+            "title": "Herramientas de Operación",
+            "subtitle": "Accede a las funciones de gestión de fila de salida."
+        },
+        "stats": {
+            "totalStudents": "Total de Estudiantes",
+            "totalStudentsDescription": "Estudiantes registrados en el sistema",
+            "totalStaff": "Total de Personal",
+            "totalStaffDescription": "Miembros del personal activos",
+            "activeCampuses": "Campus Activos",
+            "activeCampusesDescription": "Ubicaciones en operación"
         }
     },
     "studentsManagement": {
