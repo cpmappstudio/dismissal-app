@@ -13,7 +13,7 @@
   },
   "navigation": {
     "university": "Dismissal App",
-    "dashboard": "Students",
+    "dashboard": "Home",
     "navigation": "Navigation",
     "playground": "Playground",
     "models": "Models",
@@ -257,6 +257,70 @@
         "progressAnalysis": "Progress Analysis",
         "academicCalendar": "Academic Calendar"
       }
+    }
+  },
+  "adminDashboard": {
+    "welcome": {
+      "title": "Welcome, Administrator",
+      "subtitle": "You have full access to all system functions. Manage users and access all operator tools."
+    },
+    "permissions": {
+      "title": "Your Admin Permissions",
+      "description": "As an administrator, you can create and manage students, staff, and access all operator functionalities including allocation, dispatch, and viewing."
+    },
+    "cards": {
+      "students": {
+        "badge": "Management",
+        "title": "Manage Students",
+        "description": "Create, edit, and manage all students in the system.",
+        "action": "Go to Students"
+      },
+      "staff": {
+        "badge": "Management",
+        "title": "Manage Staff",
+        "description": "Administer staff members, assign roles, and manage system access permissions.",
+        "action": "Go to Staff"
+      },
+      "operators": {
+        "badge": "Full Access",
+        "title": "Operator Functions",
+        "description": "Complete access to all operator tools: allocator, dispatcher, and dismissal queue viewer.",
+        "action": "Go to Operators"
+      },
+      "allocator": {
+        "badge": "Allocation",
+        "title": "Allocator",
+        "description": "Assign vehicles to dismissal lanes to organize the student pickup queue.",
+        "action": "Go to Allocator"
+      },
+      "dispatcher": {
+        "badge": "Dispatch",
+        "title": "Dispatcher",
+        "description": "Dispatch vehicles from the queue when students are picked up and manage the exit flow.",
+        "action": "Go to Dispatcher"
+      },
+      "viewer": {
+        "badge": "Viewing",
+        "title": "Viewer",
+        "description": "View real-time status of the dismissal queue and monitor the pickup process.",
+        "action": "Go to Viewer"
+      }
+    },
+    "userManagement": {
+      "title": "User Management",
+      "subtitle": "Manage students and staff in the system."
+    },
+    "operatorsSection": {
+      "title": "Operator Tools",
+      "subtitle": "Access dismissal queue management functions."
+    },
+    "stats": {
+      "totalStudents": "Total Students",
+      "totalStudentsDescription": "Students registered in the system",
+      "totalStaff": "Total Staff",
+      "totalStaffDescription": "Active staff members",
+      "activeCampuses": "Active Campuses",
+      "activeCampusesDescription": "Locations in operation"
     }
   },
   "studentsManagement": {

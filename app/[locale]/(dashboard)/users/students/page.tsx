@@ -1,9 +1,9 @@
-import AdminDashboard from "@/components/dashboard/admin-dashboard";
+import { StudentsTable } from "@/components/dashboard/students-table";
 
 export default async function StudentsPage() {
   return (
     <div className="dashboard-container">
-      <AdminDashboard />
+      <StudentsTable/>
     </div>
   );
 }
