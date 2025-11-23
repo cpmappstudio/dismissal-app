@@ -70,6 +70,22 @@ export function StaffTable() {
     pageSize: 10,
   });
 
+  // Efecto para resetear la página cuando cambia la búsqueda global
+  React.useEffect(() => {
+    setPagination((prev) => ({
+      ...prev,
+      pageIndex: 0,
+    }));
+  }, [globalFilter]);
+
+  // Efecto para resetear la página cuando cambian los filtros de columna
+  React.useEffect(() => {
+    setPagination((prev) => ({
+      ...prev,
+      pageIndex: 0,
+    }));
+  }, [columnFilters]);
+
   // Convex queries and actions
   const usersData = useQuery(api.users.listUsers, {});
   const createUser = useAction(api.users.createUserWithClerk);
@@ -101,7 +117,7 @@ export function StaffTable() {
       status: (user.status || "active") as "active" | "inactive",
       // Only use Clerk's imageUrl if there's no custom avatar storage ID
       // This prevents showing old Clerk image when custom avatar is removed
-      avatarUrl: !user.avatarStorageId ? (user.imageUrl || "") : "",
+      avatarUrl: !user.avatarStorageId ? user.imageUrl || "" : "",
       avatarStorageId: user.avatarStorageId,
     }));
   }, [usersData]);
@@ -125,7 +141,6 @@ export function StaffTable() {
       // Note: The avatar sync to Clerk's profile_image_url happens after webhook
       // creates the user in Convex. For now, the avatar is stored in public_metadata
       // and will be synced when the user is first edited or manually synced.
-
     } catch (error) {
       const err = error as Error;
       console.error("❌ Error creating user:", err);
@@ -204,7 +219,7 @@ export function StaffTable() {
           // Multiple reload attempts to ensure Clerk has processed the new image
           // Clerk may need a moment to process the uploaded image
           await user.reload();
-          
+
           // Second reload after short delay for better reliability
           setTimeout(async () => {
             try {
@@ -213,7 +228,7 @@ export function StaffTable() {
               console.warn("Second reload failed, but first succeeded", error);
             }
           }, 500);
-          
+
           // Third reload after slightly longer delay as final fallback
           setTimeout(async () => {
             try {
