@@ -439,6 +439,7 @@
     "search": {
       "placeholder": "Search staff by name"
     },
+
     "filters": {
       "campus": {
         "all": "All Campus",
@@ -522,6 +523,10 @@
     "editDialog": {
       "title": "Edit Staff",
       "subtitle": "Update staff member information. Make your changes and save.",
+      "protectedAccount": {
+        "title": "Protected Account",
+        "description": "Superadmin users can't be deleted or have their role changed."
+      },
       "actions": {
         "cancel": "Cancel",
         "save": "Save Changes",
@@ -539,6 +544,12 @@
       "titlePlural": "Delete Staff Members",
       "description": "Are you sure you want to delete {count, plural, one {this staff member} other {these # staff members}}? This action cannot be undone.",
       "listTitle": "Staff to be deleted:",
+      "noDeletableStaff": "None of the selected users can be deleted.",
+      "protectedListTitle": "Protected staff (will not be deleted):",
+      "superadminWarning": {
+        "title": "Protected Accounts",
+        "description": "{count, plural, =1 {1 superadmin user} other {# superadmin users}} cannot be deleted and will be excluded from this operation."
+      },
       "actions": {
         "cancel": "Cancel",
         "delete": "Delete Staff",
