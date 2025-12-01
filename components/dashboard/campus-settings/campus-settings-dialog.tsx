@@ -426,7 +426,24 @@ export function CampusSettingsDialog({
 
       if (isEditing) {
         // Update existing campus
-        const updates: any = {};
+        const updates: {
+          campusName?: string;
+          description?: string;
+          code?: string;
+          logoStorageId?: Id<"_storage"> | null;
+          directorId?: Id<"users"> | null;
+          directorName?: string;
+          directorEmail?: string;
+          status?: "active" | "inactive" | "maintenance";
+          availableGrades?: Grade[];
+          address?: {
+            street?: string;
+            city?: string;
+            state?: string;
+            zipCode?: string;
+            country?: string;
+          };
+        } = {};
 
         if (uploadedLogoStorageId) {
           updates.logoStorageId = uploadedLogoStorageId;
@@ -517,7 +534,23 @@ export function CampusSettingsDialog({
           return;
         }
 
-        const campusData: any = {
+        const campusData: {
+          campusName: string;
+          description?: string;
+          code?: string;
+          logoStorageId?: Id<"_storage">;
+          directorId?: Id<"users">;
+          directorName?: string;
+          directorEmail?: string;
+          availableGrades?: Grade[];
+          address?: {
+            street?: string;
+            city?: string;
+            state?: string;
+            zipCode?: string;
+            country?: string;
+          };
+        } = {
           campusName: campusName.trim(),
         };
 
@@ -641,6 +674,9 @@ export function CampusSettingsDialog({
             <div className="grid gap-6">
               {/* Hidden inputs */}
               <input type="hidden" name="status" value={selectedStatus} />
+              <input type="hidden" name="country" value={selectedCountry} />
+              <input type="hidden" name="state" value={selectedState} />
+              <input type="hidden" name="city" value={selectedCity} />
 
               {/* Loading state */}
               {!isClerkLoaded && (
