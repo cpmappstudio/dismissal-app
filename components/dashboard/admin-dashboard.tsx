@@ -11,7 +11,7 @@ import {
   CardAction,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, ArrowRight, User, UserCog } from "lucide-react";
+import { Users, ArrowRight, User, UserCog, Building2 } from "lucide-react";
 
 export default function AdminDashboard() {
   const t = useTranslations();
@@ -37,18 +37,57 @@ export default function AdminDashboard() {
           id="actions-heading"
           className="text-xl md:text-2xl font-semibold mb-3 md:mb-4"
         >
-          {t("adminDashboard.userManagement.title")}
+          {t("adminDashboard.management.title")}
         </h2>
         <p className="text-xs md:text-sm text-muted-foreground mb-4 md:mb-6">
-          {t("adminDashboard.userManagement.subtitle")}
+          {t("adminDashboard.management.subtitle")}
         </p>
         {/* Manage Students Card */}
-        <article className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <article className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+          <Card className="flex flex-col md:grid md:grid-cols-3">
+            {/* Left column - Icon (2/5) */}
+            <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
+              <Building2
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                aria-hidden="true"
+              />
+            </CardHeader>
+
+            {/* Right column - Content (3/5) */}
+            <CardContent className="md:col-span-2 flex flex-col justify-between px-4 py-3 md:px-3 md:py-2">
+              <div className="flex-1 space-y-2">
+                <CardTitle className="text-base md:text-lg">
+                  {t("adminDashboard.cards.campuses.title")}
+                </CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  {t("adminDashboard.cards.campuses.description")}
+                </CardDescription>
+              </div>
+              <CardAction>
+                <Button
+                  asChild
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                >
+                  <Link
+                    href="/management/campuses"
+                    aria-label={t("adminDashboard.cards.campuses.action")}
+                  >
+                    <span>{t("adminDashboard.cards.campuses.action")}</span>
+                    <ArrowRight
+                      className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </Button>
+              </CardAction>
+            </CardContent>
+          </Card>
+
           <Card className="flex flex-col md:grid md:grid-cols-3">
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <Users
-                className="h-10 w-10 md:h-12 md:w-12 text-deep-koamaru"
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -66,7 +105,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-deep-koamaru hover:bg-deep-koamaru/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/users/students"
@@ -88,7 +127,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <User
-                className="h-10 w-10 md:h-12 md:w-12 text-deep-koamaru"
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -106,7 +145,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-deep-koamaru hover:bg-deep-koamaru/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/users/staff"
@@ -139,7 +178,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-deep-koamaru"
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -157,7 +196,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-deep-koamaru hover:bg-deep-koamaru/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/operators/allocator"
@@ -179,7 +218,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-deep-koamaru"
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -197,7 +236,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-deep-koamaru hover:bg-deep-koamaru/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/operators/dispatcher"
@@ -219,7 +258,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-deep-koamaru"
+                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -237,7 +276,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-deep-koamaru hover:bg-deep-koamaru/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/operators/viewer"

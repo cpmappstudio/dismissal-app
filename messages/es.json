@@ -103,17 +103,21 @@
           }
         ]
       },
-      "users": {
-        "title": "Usuarios",
-        "url": "/users",
+      "management": {
+        "title": "Gestión",
+        "url": "/management",
         "items": [
           {
+            "title": "Campuses",
+            "url": "/management/campuses"
+          },
+          {
             "title": "Estudiantes",
-            "url": "/users/students"
+            "url": "/management/students"
           },
           {
             "title": "Personal",
-            "url": "/users/staff"
+            "url": "/management/staff"
           }
         ]
       },
@@ -270,6 +274,12 @@
       "description": "Como administrador, puedes crear y gestionar estudiantes, personal, y acceder a todas las funcionalidades de operadores incluyendo asignación, despacho y visualización."
     },
     "cards": {
+      "campuses": {
+        "badge": "Gestión",
+        "title": "Gestionar Campus",
+        "description": "Crear, editar y administrar todas las ubicaciones del campus en el sistema.",
+        "action": "Ir a Campus"
+      },
       "students": {
         "badge": "Gestión",
         "title": "Gestionar Estudiantes",
@@ -307,9 +317,9 @@
         "action": "Ir a Visor"
       }
     },
-    "userManagement": {
-      "title": "Gestión de Usuarios",
-      "subtitle": "Administra estudiantes y personal del sistema."
+    "management": {
+      "title": "Gestión",
+      "subtitle": "Administra campus, estudiantes y personal del sistema."
     },
     "operatorsSection": {
       "title": "Herramientas de Operación",

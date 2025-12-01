@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BookOpen, User, GraduationCap, FileText, UserCog } from "lucide-react";
+import { BookOpen, GraduationCap, FileText, UserCog, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useUser } from "@clerk/nextjs";
 
@@ -31,7 +31,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Configuración de íconos para cada tipo de menú
   const iconMap = {
-    profile: User,
+    management: Wrench,
     student: BookOpen,
     studentDocs: FileText,
     professor: GraduationCap,
@@ -56,13 +56,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     // Admin y SuperAdmin ven todos los enlaces
     if (userRole === "admin" || userRole === "superadmin") {
       // Usuarios con todos los sub-elementos
-      if (menuConfig.users) {
+      if (menuConfig.management) {
         items.push({
-          title: menuConfig.users.title,
-          url: menuConfig.users.url,
-          icon: iconMap.profile,
+          title: menuConfig.management.title,
+          url: menuConfig.management.url,
+          icon: iconMap.management,
           isActive: true,
-          items: menuConfig.users.items.map((i) => ({
+          items: menuConfig.management.items.map((i) => ({
             title: i.title,
             url: i.url,
           })),

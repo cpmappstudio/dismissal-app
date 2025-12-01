@@ -328,6 +328,22 @@ export const getUserById = query({
 });
 
 /**
+ * Get user by Clerk ID (public query)
+ */
+export const getUserByClerkId = query({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    return await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .first();
+  }
+});
+
+/**
  * Internal query to get user by clerkId (for actions)
  */
 export const getUserByClerkIdInternal = internalQuery({

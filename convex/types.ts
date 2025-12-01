@@ -347,16 +347,54 @@ export interface UserFormData {
 }
 
 /**
+ * Grade definition for campus
+ */
+export interface GradeDefinition {
+    name: string; // "1st", "2nd", "3rd", etc.
+    code: string; // "1", "2", "3", etc.
+    order: number; // For sorting
+    isActive: boolean;
+}
+
+/**
+ * Campus address
+ */
+export interface CampusAddress {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+}
+
+/**
+ * Campus metrics
+ */
+export interface CampusMetrics {
+    totalStudents: number;
+    totalStaff: number;
+    activeStudents: number;
+    activeStaff: number;
+    lastUpdated: number;
+}
+
+/**
  * Campus creation form
  */
 export interface CampusFormData {
     campusName: string;
     displayName: string;
+    description?: string;
+    code?: string;
     timezone: string;
     dismissalStartTime?: string;
     dismissalEndTime?: string;
+    logoStorageId?: Id<"_storage">;
+    address?: CampusAddress;
+    availableGrades?: GradeDefinition[];
     allowMultipleStudentsPerCar: boolean;
     requireCarNumber: boolean;
+    createdBy: Id<"users">;
 }
 
 /**
