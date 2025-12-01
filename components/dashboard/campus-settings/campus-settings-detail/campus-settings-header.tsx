@@ -8,10 +8,9 @@ interface CampusSettingsHeaderProps {
     campus: Doc<"campusSettings">;
     locale: string;
     addressLabel?: string | null;
-    backPath?: string;
 }
 
-export function CampusSettingsHeader({ campus, locale, backPath }: CampusSettingsHeaderProps) {
+export function CampusSettingsHeader({ campus, locale }: CampusSettingsHeaderProps) {
     // Default to management/campuses, but allow override
     const defaultBackPath = `/${locale}/management/campuses`;
 

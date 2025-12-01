@@ -33,7 +33,6 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -57,7 +56,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   DndContext,
@@ -784,7 +782,7 @@ export function CampusSettingsDialog({
                     />
                   </div>
                 </div>
-                <div className="grid gap-3">
+                {/* <div className="grid gap-3">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
@@ -793,7 +791,7 @@ export function CampusSettingsDialog({
                     placeholder="Optional campus description"
                     rows={3}
                   />
-                </div>
+                </div> */}
               </div>
 
               {/* Grades Section */}

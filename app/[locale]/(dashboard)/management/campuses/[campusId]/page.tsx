@@ -49,7 +49,6 @@ export default function CampusSettingsDetailPage({
           campus={campus}
           locale={locale}
           addressLabel={addressLabel}
-          backPath={`/${locale}/admin/campus-settings`}
         />
         <div className="grid gap-6 lg:grid-cols-1">
           <CampusSettingsOverviewCard campus={campus} addressLabel={addressLabel} />
