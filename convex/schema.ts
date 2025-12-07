@@ -170,8 +170,29 @@ export default defineSchema({
    * Campus Settings - Basic campus configuration
    */
   campusSettings: defineTable({
-    campusName: v.string(), // Unique identifier
-    displayName: v.string(), // Display name
+    campusName: v.string(), // Unique identifier and display name
+    description: v.optional(v.string()),
+    code: v.optional(v.string()), // Short code for campus
+
+    // Campus logo/image
+    logoStorageId: v.optional(v.id("_storage")),
+
+    // Director information
+    directorId: v.optional(v.id("users")),
+    directorName: v.optional(v.string()),
+    directorEmail: v.optional(v.string()),
+    directorPhone: v.optional(v.string()),
+
+    // Contact information
+    address: v.optional(
+      v.object({
+        street: v.optional(v.string()),
+        city: v.optional(v.string()),
+        state: v.optional(v.string()),
+        zipCode: v.optional(v.string()),
+        country: v.optional(v.string()),
+      }),
+    ),
 
     // Timezone for this campus
     timezone: v.string(), // "America/New_York"
@@ -180,17 +201,51 @@ export default defineSchema({
     dismissalStartTime: v.optional(v.string()), // "14:30"
     dismissalEndTime: v.optional(v.string()), // "15:30"
 
+    // Available grades for this campus
+    availableGrades: v.optional(
+      v.array(
+        v.object({
+          name: v.string(), // "1st", "2nd", "3rd", etc.
+          code: v.string(), // "1", "2", "3", etc.
+          order: v.number(), // For sorting
+          isActive: v.boolean(),
+        }),
+      ),
+    ),
+
     // Features flags
     allowMultipleStudentsPerCar: v.boolean(),
     requireCarNumber: v.boolean(),
 
+    // Metrics (denormalized for performance)
+    metrics: v.optional(
+      v.object({
+        totalStudents: v.number(),
+        totalStaff: v.number(),
+        activeStudents: v.number(),
+        activeStaff: v.number(),
+        lastUpdated: v.number(),
+      }),
+    ),
+
     // Status
     isActive: v.boolean(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("inactive"),
+      v.literal("maintenance"),
+    ),
+
+    // Timestamps
     createdAt: v.number(),
+    createdBy: v.optional(v.id("users")),
     updatedAt: v.optional(v.number()),
+    updatedBy: v.optional(v.id("users")),
   })
     .index("by_name", ["campusName"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"]),
 
   /**
    * Audit Log - Track critical actions

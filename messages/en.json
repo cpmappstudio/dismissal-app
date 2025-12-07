@@ -102,17 +102,21 @@
           }
         ]
       },
-      "users": {
-        "title": "Users",
-        "url": "/users",
+      "management": {
+        "title": "Management",
+        "url": "/management",
         "items": [
           {
+            "title": "Campuses",
+            "url": "/management/campuses"
+          },
+          {
             "title": "Students",
-            "url": "/users/students"
+            "url": "/management/students"
           },
           {
             "title": "Staff",
-            "url": "/users/staff"
+            "url": "/management/staff"
           }
         ]
       },
@@ -269,6 +273,12 @@
       "description": "As an administrator, you can create and manage students, staff, and access all operator functionalities including allocation, dispatch, and viewing."
     },
     "cards": {
+      "campuses": {
+        "badge": "Management",
+        "title": "Manage Campuses",
+        "description": "Create, edit, and manage all campus locations in the system.",
+        "action": "Go to Campuses"
+      },
       "students": {
         "badge": "Management",
         "title": "Manage Students",
@@ -306,9 +316,9 @@
         "action": "Go to Viewer"
       }
     },
-    "userManagement": {
-      "title": "User Management",
-      "subtitle": "Manage students and staff in the system."
+    "management": {
+      "title": "Management",
+      "subtitle": "Manage campuses, students and staff in the system."
     },
     "operatorsSection": {
       "title": "Operator Tools",

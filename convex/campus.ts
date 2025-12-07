@@ -3,11 +3,69 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
-    validateUserAccess,
     getActiveCampuses,
     getCampusSettings,
     getCampusGrades
 } from "./helpers";
+
+/**
+ * Generate upload URL for campus logo
+ */
+export const generateUploadUrl = mutation(async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+});
+
+/**
+ * Get URL for a stored campus logo
+ */
+export const getLogoUrl = query({
+    args: { storageId: v.id("_storage") },
+    handler: async (ctx, args) => {
+        return await ctx.storage.getUrl(args.storageId);
+    },
+});
+
+/**
+ * Get all campuses
+ */
+export const getAll = query({
+    args: {
+        isActive: v.optional(v.boolean()),
+        status: v.optional(
+            v.union(
+                v.literal("active"),
+                v.literal("inactive"),
+                v.literal("maintenance"),
+            ),
+        ),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
+        }
+
+        // Filter by status if provided
+        if (args.status !== undefined) {
+            return await ctx.db
+                .query("campusSettings")
+                .withIndex("by_status", (q) => q.eq("status", args.status!))
+                .collect();
+        }
+
+        // Filter by isActive if provided
+        if (args.isActive !== undefined) {
+            return await ctx.db
+                .query("campusSettings")
+                .withIndex("by_active", (q) => q.eq("isActive", args.isActive!))
+                .collect();
+        }
+
+        // Return all campuses
+        return await ctx.db.query("campusSettings").collect();
+    },
+});
 
 /**
  * List all active campuses
@@ -15,26 +73,12 @@ import {
 export const listActive = query({
     handler: async (ctx) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
-        const campuses = await getActiveCampuses(ctx.db);
-
-        // If not admin/superadmin, filter by assigned campuses
-        if (!['admin', 'superadmin'].includes(role)) {
-            const user = await ctx.db
-                .query("users")
-                .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-                .first();
-
-            if (!user) throw new Error("User not found");
-
-            return campuses.filter(campus =>
-                user.assignedCampuses.includes(campus.campusName)
-            );
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
         }
 
-        return campuses;
+        return await getActiveCampuses(ctx.db);
     }
 });
 
@@ -45,26 +89,28 @@ export const get = query({
     args: { campusName: v.string() },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const settings = await getCampusSettings(ctx.db, args.campusName);
-        if (!settings) return null;
-
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
-
-        // Check access
-        if (!['admin', 'superadmin'].includes(role)) {
-            const user = await ctx.db
-                .query("users")
-                .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-                .first();
-
-            if (!user || !user.assignedCampuses.includes(args.campusName)) {
-                throw new Error("No access to this campus");
-            }
+        if (!identity) {
+            // Return null when not authenticated (graceful degradation)
+            return null;
         }
 
-        return settings;
+        return await getCampusSettings(ctx.db, args.campusName);
+    }
+});
+
+/**
+ * Get campus by ID
+ */
+export const getById = query({
+    args: { campusId: v.id("campusSettings") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            // Return null when not authenticated (graceful degradation)
+            return null;
+        }
+
+        return await ctx.db.get(args.campusId);
     }
 });
 
@@ -75,20 +121,9 @@ export const getAvailableGrades = query({
     args: { campus: v.string() },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
-
-        // Check access
-        if (!['admin', 'superadmin'].includes(role)) {
-            const user = await ctx.db
-                .query("users")
-                .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-                .first();
-
-            if (!user || !user.assignedCampuses.includes(args.campus)) {
-                throw new Error("No access to this campus");
-            }
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
         }
 
         return await getCampusGrades(ctx.db, args.campus);
@@ -96,63 +131,97 @@ export const getAvailableGrades = query({
 });
 
 /**
- * Create new campus (superadmin only)
+ * Create new campus
  */
 export const create = mutation({
     args: {
         campusName: v.string(),
-        displayName: v.string(),
-        timezone: v.string(),
-        dismissalStartTime: v.optional(v.string()),
-        dismissalEndTime: v.optional(v.string()),
-        allowMultipleStudentsPerCar: v.optional(v.boolean()),
-        requireCarNumber: v.optional(v.boolean())
+        description: v.optional(v.string()),
+        code: v.optional(v.string()),
+        logoStorageId: v.optional(v.id("_storage")),
+        directorId: v.optional(v.id("users")),
+        directorName: v.optional(v.string()),
+        directorEmail: v.optional(v.string()),
+        directorPhone: v.optional(v.string()),
+        address: v.optional(
+            v.object({
+                street: v.optional(v.string()),
+                city: v.optional(v.string()),
+                state: v.optional(v.string()),
+                zipCode: v.optional(v.string()),
+                country: v.optional(v.string()),
+            }),
+        ),
+        availableGrades: v.optional(
+            v.array(
+                v.object({
+                    name: v.string(),
+                    code: v.string(),
+                    order: v.number(),
+                    isActive: v.boolean(),
+                }),
+            ),
+        ),
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        // Get user from database
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) throw new Error("User not found");
+        const userId = user._id;
 
         // Validate required fields
         if (!args.campusName.trim()) {
             throw new Error("Campus name is required");
         }
-        if (!args.displayName.trim()) {
-            throw new Error("Display name is required");
-        }
-        if (!args.timezone.trim()) {
-            throw new Error("Timezone is required");
-        }
 
         // Check if campus already exists
-        const existing = await getCampusSettings(ctx.db, args.campusName.trim());
+        const existing = await getCampusSettings(
+            ctx.db,
+            args.campusName.trim(),
+        );
         if (existing) {
             throw new Error("Campus already exists");
-        }
-
-        // Validate timezone
-        try {
-            Intl.DateTimeFormat(undefined, { timeZone: args.timezone });
-        } catch {
-            throw new Error("Invalid timezone");
         }
 
         // Create campus
         const campusId = await ctx.db.insert("campusSettings", {
             campusName: args.campusName.trim(),
-            displayName: args.displayName.trim(),
-            timezone: args.timezone,
-            dismissalStartTime: args.dismissalStartTime,
-            dismissalEndTime: args.dismissalEndTime,
-            allowMultipleStudentsPerCar: args.allowMultipleStudentsPerCar ?? true,
-            requireCarNumber: args.requireCarNumber ?? true,
+            description: args.description,
+            code: args.code,
+            timezone: "America/New_York", // Default timezone
+            dismissalStartTime: undefined,
+            dismissalEndTime: undefined,
+            logoStorageId: args.logoStorageId,
+            directorId: args.directorId,
+            directorName: args.directorName,
+            directorEmail: args.directorEmail,
+            directorPhone: args.directorPhone,
+            address: args.address,
+            availableGrades: args.availableGrades,
+            allowMultipleStudentsPerCar: true, // Always true
+            requireCarNumber: true, // Always true
             isActive: true,
-            createdAt: Date.now()
+            status: "active",
+            createdAt: Date.now(),
+            createdBy: userId,
+            metrics: {
+                totalStudents: 0,
+                totalStaff: 0,
+                activeStudents: 0,
+                activeStaff: 0,
+                lastUpdated: Date.now(),
+            },
         });
 
         return campusId;
-    }
+    },
 });
 
 /**
@@ -160,49 +229,187 @@ export const create = mutation({
  */
 export const update = mutation({
     args: {
-        campusName: v.string(),
-        displayName: v.optional(v.string()),
-        timezone: v.optional(v.string()),
-        dismissalStartTime: v.optional(v.string()),
-        dismissalEndTime: v.optional(v.string()),
-        allowMultipleStudentsPerCar: v.optional(v.boolean()),
-        requireCarNumber: v.optional(v.boolean()),
-        isActive: v.optional(v.boolean())
+        campusId: v.id("campusSettings"),
+        updates: v.object({
+            campusName: v.optional(v.string()),
+            description: v.optional(v.string()),
+            code: v.optional(v.string()),
+            logoStorageId: v.optional(v.union(v.id("_storage"), v.null())),
+            directorId: v.optional(v.union(v.id("users"), v.null())),
+            directorName: v.optional(v.string()),
+            directorEmail: v.optional(v.string()),
+            directorPhone: v.optional(v.string()),
+            address: v.optional(
+                v.object({
+                    street: v.optional(v.string()),
+                    city: v.optional(v.string()),
+                    state: v.optional(v.string()),
+                    zipCode: v.optional(v.string()),
+                    country: v.optional(v.string()),
+                }),
+            ),
+            availableGrades: v.optional(
+                v.array(
+                    v.object({
+                        name: v.string(),
+                        code: v.string(),
+                        order: v.number(),
+                        isActive: v.boolean(),
+                    }),
+                ),
+            ),
+            status: v.optional(
+                v.union(
+                    v.literal("active"),
+                    v.literal("inactive"),
+                    v.literal("maintenance"),
+                ),
+            ),
+        }),
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(
-            ctx,
-            ['superadmin']
-        );
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-        const campus = await getCampusSettings(ctx.db, args.campusName);
+        // Get user from database
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) throw new Error("User not found");
+        const userId = user._id;
+
+        const campus = await ctx.db.get(args.campusId);
         if (!campus) {
             throw new Error("Campus not found");
         }
 
-        // Build updates - remove updatedAt as it doesn't exist in schema
-        const updates: any = {};
+        const updates: any = { ...args.updates };
 
-        if (args.displayName !== undefined) updates.displayName = args.displayName.trim();
-        if (args.timezone !== undefined) {
-            // Validate timezone
-            try {
-                Intl.DateTimeFormat(undefined, { timeZone: args.timezone });
-                updates.timezone = args.timezone;
-            } catch {
-                throw new Error("Invalid timezone");
-            }
+        // Trim string fields
+        if (updates.campusName !== undefined) {
+            updates.campusName = updates.campusName.trim();
         }
-        if (args.dismissalStartTime !== undefined) updates.dismissalStartTime = args.dismissalStartTime;
-        if (args.dismissalEndTime !== undefined) updates.dismissalEndTime = args.dismissalEndTime;
-        if (args.allowMultipleStudentsPerCar !== undefined) updates.allowMultipleStudentsPerCar = args.allowMultipleStudentsPerCar;
-        if (args.requireCarNumber !== undefined) updates.requireCarNumber = args.requireCarNumber;
-        if (args.isActive !== undefined) updates.isActive = args.isActive;
 
-        await ctx.db.patch(campus._id, updates);
+        // Convert null to undefined for optional fields
+        if (updates.logoStorageId === null) {
+            updates.logoStorageId = undefined;
+        }
+        if (updates.directorId === null) {
+            updates.directorId = undefined;
+        }
 
-        return campus._id;
-    }
+        // Handle empty arrays - convert to undefined to clear the field
+        if (
+            updates.availableGrades !== undefined &&
+            updates.availableGrades.length === 0
+        ) {
+            updates.availableGrades = undefined;
+        }
+
+        await ctx.db.patch(args.campusId, {
+            ...updates,
+            updatedAt: Date.now(),
+            updatedBy: userId,
+        });
+
+        return args.campusId;
+    },
+});
+
+/**
+ * Delete campus (superadmin only)
+ * Also deletes associated logo from storage if it exists
+ */
+export const deleteCampus = mutation({
+    args: { campusId: v.id("campusSettings") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        // Get the campus to verify it exists and check for logo
+        const campus = await ctx.db.get(args.campusId);
+
+        if (!campus) {
+            throw new Error("Campus not found");
+        }
+
+        // Delete logo from storage if exists
+        if (campus.logoStorageId) {
+            await ctx.storage.delete(campus.logoStorageId);
+        }
+
+        // Delete the campus
+        await ctx.db.delete(args.campusId);
+    },
+});
+
+/**
+ * Save campus logo
+ */
+export const saveCampusLogo = mutation({
+    args: {
+        campusId: v.id("campusSettings"),
+        storageId: v.id("_storage"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        // Get user from database
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) throw new Error("User not found");
+        const userId = user._id;
+
+        await ctx.db.patch(args.campusId, {
+            logoStorageId: args.storageId,
+            updatedAt: Date.now(),
+            updatedBy: userId,
+        });
+    },
+});
+
+/**
+ * Delete campus logo
+ */
+export const deleteCampusLogo = mutation({
+    args: {
+        campusId: v.id("campusSettings"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        // Get user from database
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+            .first();
+
+        if (!user) throw new Error("User not found");
+        const userId = user._id;
+
+        const campus = await ctx.db.get(args.campusId);
+
+        if (!campus) {
+            throw new Error("Campus not found");
+        }
+
+        if (campus.logoStorageId) {
+            await ctx.storage.delete(campus.logoStorageId);
+        }
+
+        await ctx.db.patch(args.campusId, {
+            logoStorageId: undefined,
+            updatedAt: Date.now(),
+            updatedBy: userId,
+        });
+    },
 });
 
 /**
@@ -212,20 +419,9 @@ export const getStats = query({
     args: { campus: v.string() },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
-
-        // Check access
-        if (!['admin', 'superadmin'].includes(role)) {
-            const user = await ctx.db
-                .query("users")
-                .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-                .first();
-
-            if (!user || !user.assignedCampuses.includes(args.campus)) {
-                throw new Error("No access to this campus");
-            }
+        if (!identity) {
+            // Return null when not authenticated (graceful degradation)
+            return null;
         }
 
         // Get active students count
@@ -286,30 +482,103 @@ export const getStats = query({
 export const getOptions = query({
     handler: async (ctx) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const role = (identity.publicMetadata as any)?.dismissalRole || 'viewer';
-        const campuses = await getActiveCampuses(ctx.db);
-
-        // Filter by user access
-        let accessibleCampuses = campuses;
-        if (!['admin', 'superadmin'].includes(role)) {
-            const user = await ctx.db
-                .query("users")
-                .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-                .first();
-
-            if (user) {
-                accessibleCampuses = campuses.filter(campus =>
-                    user.assignedCampuses.includes(campus.campusName)
-                );
-            }
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
         }
 
-        return accessibleCampuses.map(campus => ({
+        const campuses = await getActiveCampuses(ctx.db);
+
+        return campuses.map(campus => ({
             value: campus.campusName,
-            label: campus.displayName,
+            label: campus.campusName,
             isActive: campus.isActive
         }));
     }
+});
+
+/**
+ * Get students by campus (for metrics)
+ */
+export const getStudentsByCampus = query({
+    args: {
+        campus: v.string(),
+        isActive: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
+        }
+
+        const students = await ctx.db
+            .query("students")
+            .withIndex("by_campus_active", (q) =>
+                q
+                    .eq("campusLocation", args.campus)
+                    .eq("isActive", args.isActive ?? true),
+            )
+            .collect();
+
+        return students;
+    },
+});
+
+/**
+ * Get staff by campus (for metrics)
+ */
+export const getStaffByCampus = query({
+    args: {
+        campus: v.string(),
+        isActive: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
+        }
+
+        // Get all users assigned to this campus
+        const allUsers = await ctx.db.query("users").collect();
+
+        const campusUsers = allUsers.filter((user) =>
+            user.assignedCampuses.includes(args.campus),
+        );
+
+        if (args.isActive !== undefined) {
+            return campusUsers.filter(
+                (user) => user.isActive === args.isActive,
+            );
+        }
+
+        return campusUsers;
+    },
+});
+
+/**
+ * Get all superadmin users (for director selection)
+ */
+export const getSuperadmins = query({
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            // Return empty array when not authenticated (graceful degradation)
+            return [];
+        }
+
+        const superadmins = await ctx.db
+            .query("users")
+            .withIndex("by_role", (q) => q.eq("role", "superadmin"))
+            .filter((q) => q.eq(q.field("isActive"), true))
+            .collect();
+
+        return superadmins.map((user) => ({
+            id: user._id,
+            name: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || "Unknown",
+            email: user.email,
+            phone: user.phone,
+        }));
+    },
 });
