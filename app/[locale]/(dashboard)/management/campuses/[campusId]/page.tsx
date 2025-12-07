@@ -1,14 +1,12 @@
-"use client"
+"use client";
 
 import { use } from "react";
 import { notFound } from "next/navigation";
 import {
-  CampusSettingsHeader,
+  CampusSettingsDetailHeader,
   CampusSettingsOverviewCard,
 } from "@/components/dashboard/campus-settings/campus-settings-detail";
-import {
-  formatAddress,
-} from "@/lib/campus-settings/campus-settings-detail";
+import { formatAddress } from "@/lib/campus-settings/campus-settings-detail";
 import { useCampusById } from "@/hooks/use-campus-data";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -45,13 +43,16 @@ export default function CampusSettingsDetailPage({
   return (
     <div className="relative flex flex-1 flex-col">
       <div className="relative z-10 flex flex-1 flex-col gap-6 pb-8">
-        <CampusSettingsHeader
+        <CampusSettingsDetailHeader
           campus={campus}
           locale={locale}
           addressLabel={addressLabel}
         />
         <div className="grid gap-6 lg:grid-cols-1">
-          <CampusSettingsOverviewCard campus={campus} addressLabel={addressLabel} />
+          <CampusSettingsOverviewCard
+            campus={campus}
+            addressLabel={addressLabel}
+          />
         </div>
       </div>
     </div>

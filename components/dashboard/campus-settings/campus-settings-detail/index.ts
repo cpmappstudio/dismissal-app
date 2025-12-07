@@ -1,2 +1,2 @@
-export { CampusSettingsHeader } from "./campus-settings-header";
+export { CampusSettingsDetailHeader } from "./campus-settings-header";
 export { CampusSettingsOverviewCard } from "./campus-settings-overview-card";
