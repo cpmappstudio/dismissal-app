@@ -30,8 +30,8 @@ export default defineSchema({
       ),
     ),
 
-    // Campus assignment
-    assignedCampuses: v.array(v.string()), // Campuses user can access (required, at least one)
+    // Campus assignment - References to campusSettings documents
+    assignedCampuses: v.array(v.id("campusSettings")),
 
     // Legacy operator permissions (deprecated, use role instead)
     operatorPermissions: v.optional(
@@ -73,6 +73,8 @@ export default defineSchema({
     // Academic info
     grade: v.string(), // "1st", "2nd", "3rd", etc.
     campusLocation: v.string(),
+    // New campus reference (migrated from campusLocation string)
+    campuses: v.optional(v.array(v.id("campusSettings"))),
 
     // Birthday
     birthday: v.string(), // Display format: "July 09"

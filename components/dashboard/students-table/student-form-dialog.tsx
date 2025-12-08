@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select"
 import { Student, Grade } from "../types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
-import { CAMPUS_LOCATIONS as CAMPUS_OPTIONS, GRADES, type CampusLocation } from "@/convex/types"
+import { GRADES } from "@/convex/types"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
@@ -65,6 +65,9 @@ export function StudentFormDialog({
 
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.students.generateAvatarUploadUrl)
+    
+    // Query for campus options (dynamic)
+    const campusOptions = useQuery(api.campus.getOptions, {})
 
     // Avatar upload state
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
@@ -100,7 +103,7 @@ export function StudentFormDialog({
             lastName: "",
             carNumber: "",
             grade: "" as Grade | "",
-            campusLocation: "" as CampusLocation | "",
+            campusLocation: "",
             avatarUrl: "",
             avatarStorageId: null as Id<"_storage"> | null
         }
@@ -294,7 +297,7 @@ export function StudentFormDialog({
                 }),
                 carNumber: formData.carNumber ? parseInt(formData.carNumber) : 0,
                 grade: formData.grade as Grade,
-                campusLocation: formData.campusLocation as CampusLocation,
+                campusLocation: formData.campusLocation,
                 avatarUrl: finalAvatarUrl,
                 avatarStorageId: finalAvatarStorageId
             }
@@ -435,9 +438,9 @@ export function StudentFormDialog({
                                         <SelectValue placeholder={t('createDialog.fields.campus.placeholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CAMPUS_OPTIONS.map((campus) => (
-                                            <SelectItem key={campus} value={campus}>
-                                                {campus}
+                                        {campusOptions?.map((campus) => (
+                                            <SelectItem key={campus.id} value={campus.label}>
+                                                {campus.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

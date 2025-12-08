@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Plus, Upload, X, Loader2, Save, Trash2, TriangleAlert } from "lucide-react";
+import { Plus, Upload, X, Loader2, Save, Trash2, TriangleAlert, ChevronsUpDown, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Staff } from "../types";
-import { CampusLocation } from "@/convex/types";
-import { CAMPUS_LOCATIONS } from "@/convex/types";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -57,7 +61,8 @@ export function StaffFormDialog({
   // Ref for file input to allow resetting
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Convex mutations for avatar handling
+  // Convex queries and mutations
+  const campusOptions = useQuery(api.campus.getOptions, {});
   const generateUploadUrl = useMutation(api.users.generateAvatarUploadUrl);
 
   // Avatar upload state
@@ -87,7 +92,7 @@ export function StaffFormDialog({
         email: staff.email || "",
         phoneNumber: staff.phoneNumber || "",
         role: staff.role || "",
-        campusLocation: staff.campusLocation || "",
+        assignedCampuses: staff.assignedCampuses || [],
         avatarUrl: staff.avatarUrl || "",
         avatarStorageId: staff.avatarStorageId || null,
         status: staff.status || "active",
@@ -99,7 +104,7 @@ export function StaffFormDialog({
       email: "",
       phoneNumber: "",
       role: "",
-      campusLocation: "",
+      assignedCampuses: [] as string[],
       avatarUrl: "",
       avatarStorageId: null,
       status: "active",
@@ -245,7 +250,7 @@ export function StaffFormDialog({
       !formData.lastName ||
       !formData.email ||
       !formData.role ||
-      !formData.campusLocation
+      formData.assignedCampuses.length === 0
     )
       return;
 
@@ -278,7 +283,7 @@ export function StaffFormDialog({
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         role: formData.role,
-        campusLocation: formData.campusLocation as CampusLocation,
+        assignedCampuses: formData.assignedCampuses,
         status: formData.status,
         avatarUrl: finalAvatarUrl,
         avatarStorageId: finalAvatarStorageId,
@@ -410,25 +415,51 @@ export function StaffFormDialog({
                     {t("createDialog.fields.campus.label")}{" "}
                     <span className="text-destructive">*</span>
                   </Label>
-                  <Select
-                    value={formData.campusLocation}
-                    onValueChange={(v) => update("campusLocation", v)}
-                  >
-                    <SelectTrigger className="w-full h-10">
-                      <SelectValue
-                        placeholder={t(
-                          "createDialog.fields.campus.placeholder",
-                        )}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CAMPUS_LOCATIONS.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full h-10 justify-between font-normal"
+                      >
+                        <span className="truncate">
+                          {formData.assignedCampuses.length === 0
+                            ? t("createDialog.fields.campus.placeholder")
+                            : formData.assignedCampuses.length === 1
+                              ? formData.assignedCampuses[0]
+                              : `${formData.assignedCampuses.length} campus selected`}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <div className="max-h-60 overflow-y-auto p-1">
+                        {campusOptions?.map((campus) => {
+                          const isSelected = formData.assignedCampuses.includes(campus.label);
+                          return (
+                            <div
+                              key={campus.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer"
+                              onClick={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  assignedCampuses: isSelected
+                                    ? prev.assignedCampuses.filter((c) => c !== campus.label)
+                                    : [...prev.assignedCampuses, campus.label],
+                                }));
+                              }}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                className="pointer-events-none"
+                              />
+                              <span className="text-sm">{campus.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 

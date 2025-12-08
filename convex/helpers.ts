@@ -62,6 +62,7 @@ export async function getUserByEmail(
 /**
  * Validate user access from Clerk identity
  * Helper completo para validar autenticación y acceso
+ * @param campus - Campus name (will be resolved to ID internally)
  */
 export async function validateUserAccess(
     ctx: QueryCtx | MutationCtx,
@@ -85,8 +86,16 @@ export async function validateUserAccess(
     const user = await getUserByClerkId(ctx.db, identity.subject);
     if (!user || !user.isActive) throw new Error("User not active in system");
 
-    if (campus && role !== 'superadmin' && !user.assignedCampuses.includes(campus)) {
-        throw new Error(`No access to campus: ${campus}`);
+    // Check campus access by resolving name to ID
+    if (campus && role !== 'superadmin') {
+        const campusDoc = await ctx.db
+            .query("campusSettings")
+            .withIndex("by_name", (q) => q.eq("campusName", campus))
+            .unique();
+
+        if (!campusDoc || !user.assignedCampuses.includes(campusDoc._id)) {
+            throw new Error(`No access to campus: ${campus}`);
+        }
     }
 
     return { user, role, identity };
@@ -94,16 +103,45 @@ export async function validateUserAccess(
 
 /**
  * Check if user has access to a specific campus
+ * @param campus - Campus name (will be compared against assigned campus IDs)
+ * @param db - Database reader for campus lookup
  */
-export function userHasAccessToCampus(
+export async function userHasAccessToCampusAsync(
+    db: DbReader,
     user: Doc<"users">,
     campus: string,
+    role: DismissalRole
+): Promise<boolean> {
+    if (role === "admin" || role === "superadmin") {
+        return true;
+    }
+
+    // Find campus by name to get its ID
+    const campusDoc = await db
+        .query("campusSettings")
+        .withIndex("by_name", (q) => q.eq("campusName", campus))
+        .unique();
+
+    if (!campusDoc) {
+        return false; // Campus not found
+    }
+
+    return user.assignedCampuses.includes(campusDoc._id);
+}
+
+/**
+ * Check if user has access to a specific campus by ID (synchronous)
+ * Use this when you already have the campus ID
+ */
+export function userHasAccessToCampusById(
+    user: Doc<"users">,
+    campusId: Id<"campusSettings">,
     role: DismissalRole
 ): boolean {
     if (role === "admin" || role === "superadmin") {
         return true;
     }
-    return user.assignedCampuses.includes(campus);
+    return user.assignedCampuses.includes(campusId);
 }
 
 /**

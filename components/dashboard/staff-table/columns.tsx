@@ -66,7 +66,13 @@ export const useColumns = (): ColumnDef<Staff>[] => {
 							<div className="text-xs text-muted-foreground sm:hidden">
 								<span className="inline-flex items-center">
 									<Badge variant="outline" className="mr-1 text-xs">{staff.role}</Badge>
-									<span className="truncate">{staff.campusLocation}</span>
+									<span className="truncate">
+										{staff.assignedCampuses.length === 0
+											? "Not Assigned"
+											: staff.assignedCampuses.length === 1
+												? staff.assignedCampuses[0]
+												: `${staff.assignedCampuses.length} campuses`}
+									</span>
 								</span>
 							</div>
 						</div>
@@ -158,7 +164,7 @@ export const useColumns = (): ColumnDef<Staff>[] => {
 			},
 		},
 		{
-			accessorKey: "campusLocation",
+			accessorKey: "assignedCampuses",
 			header: ({ column }) => (
 				<Button
 					variant="ghost"
@@ -169,11 +175,23 @@ export const useColumns = (): ColumnDef<Staff>[] => {
 					<ArrowUpDown className="ml-2 h-4 w-4" />
 				</Button>
 			),
-			cell: ({ row }) => (
-				<div className="text-sm hidden lg:block truncate max-w-32">
-					{row.getValue("campusLocation")}
-				</div>
-			),
+			cell: ({ row }) => {
+				const campuses = row.getValue("assignedCampuses") as string[]
+				return (
+					<div className="text-sm hidden lg:block truncate max-w-40" title={campuses.join(", ")}>
+						{campuses.length === 0
+							? "Not Assigned"
+							: campuses.length === 1
+								? campuses[0]
+								: `${campuses[0]} +${campuses.length - 1}`}
+					</div>
+				)
+			},
+			filterFn: (row, id, filterValue) => {
+				if (!filterValue || filterValue === "all") return true
+				const campuses = row.getValue(id) as string[]
+				return campuses.includes(filterValue)
+			},
 			meta: {
 				className: "hidden lg:table-cell"
 			}

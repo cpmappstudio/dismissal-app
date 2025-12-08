@@ -3,6 +3,18 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
+import { Id } from "./_generated/dataModel";
+
+/**
+ * Helper to get campus ID by name
+ */
+async function getCampusIdByName(db: any, campusName: string): Promise<Id<"campusSettings"> | null> {
+    const campus = await db
+        .query("campusSettings")
+        .withIndex("by_name", (q: any) => q.eq("campusName", campusName))
+        .unique();
+    return campus?._id || null;
+}
 
 /**
  * Helper functions
@@ -220,6 +232,10 @@ export const addCar = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID for assignment
+            const campusId = await getCampusIdByName(ctx.db, args.campus);
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -228,7 +244,7 @@ export const addCar = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
@@ -308,6 +324,9 @@ export const removeCar = mutation({
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
+        // Get the entry first to know the campus
+        const entryForCampus = await ctx.db.get(args.queueId);
+
         // Get or create user record
         let user = await ctx.db
             .query("users")
@@ -315,6 +334,12 @@ export const removeCar = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID from the entry's campus location
+            const campusId = entryForCampus 
+                ? await getCampusIdByName(ctx.db, entryForCampus.campusLocation)
+                : null;
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -323,7 +348,7 @@ export const removeCar = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: ["default"], // Default campus
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
@@ -600,6 +625,10 @@ export const clearAllCars = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID for assignment
+            const campusId = await getCampusIdByName(ctx.db, args.campus);
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -608,7 +637,7 @@ export const clearAllCars = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),

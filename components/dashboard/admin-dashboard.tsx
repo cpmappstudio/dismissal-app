@@ -108,7 +108,7 @@ export default function AdminDashboard() {
                   className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
-                    href="/users/students"
+                    href="/management/students"
                     aria-label={t("adminDashboard.cards.students.action")}
                   >
                     <span>{t("adminDashboard.cards.students.action")}</span>
@@ -148,7 +148,7 @@ export default function AdminDashboard() {
                   className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
-                    href="/users/staff"
+                    href="/management/staff"
                     aria-label={t("adminDashboard.cards.staff.action")}
                   >
                     <span>{t("adminDashboard.cards.staff.action")}</span>

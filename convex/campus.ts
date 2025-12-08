@@ -478,6 +478,7 @@ export const getStats = query({
 
 /**
  * Get campus options for dropdowns
+ * Returns both ID and name for proper mapping between UI and database
  */
 export const getOptions = query({
     handler: async (ctx) => {
@@ -490,7 +491,8 @@ export const getOptions = query({
         const campuses = await getActiveCampuses(ctx.db);
 
         return campuses.map(campus => ({
-            value: campus.campusName,
+            id: campus._id, // Campus ID for database operations
+            value: campus.campusName, // For backward compatibility
             label: campus.campusName,
             isActive: campus.isActive
         }));
@@ -540,11 +542,21 @@ export const getStaffByCampus = query({
             return [];
         }
 
-        // Get all users assigned to this campus
+        // First, find the campus by name to get its ID
+        const campusDoc = await ctx.db
+            .query("campusSettings")
+            .withIndex("by_name", (q) => q.eq("campusName", args.campus))
+            .unique();
+
+        if (!campusDoc) {
+            return []; // Campus not found
+        }
+
+        // Get all users assigned to this campus (by ID)
         const allUsers = await ctx.db.query("users").collect();
 
         const campusUsers = allUsers.filter((user) =>
-            user.assignedCampuses.includes(args.campus),
+            user.assignedCampuses.includes(campusDoc._id),
         );
 
         if (args.isActive !== undefined) {

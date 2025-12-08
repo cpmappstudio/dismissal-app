@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   ColumnFiltersState,
@@ -41,10 +41,8 @@ import { DeleteStudentsDialog } from "./delete-students-dialog";
 import { StudentFormDialog } from "./student-form-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import {
-  CAMPUS_LOCATIONS,
   GRADES,
   Grade,
-  CampusLocation,
   Id,
 } from "@/convex/types";
 import { useStudentsData } from "@/hooks/use-students-data";
@@ -105,6 +103,9 @@ export function StudentsTable() {
   const [selectedStudent, setSelectedStudent] = React.useState<
     Student | undefined
   >();
+
+  // Query for campus options (dynamic)
+  const campusOptions = useQuery(api.campus.getOptions, {});
 
   // Hook personalizado para datos de estudiantes - SIN filtros (enfoque estándar)
   const studentsData = useStudentsData({
@@ -169,7 +170,7 @@ export function StudentsTable() {
           birthday: student.birthday,
           carNumber: student.carNumber,
           grade: student.grade as Grade,
-          campusLocation: student.campusLocation as CampusLocation,
+          campusLocation: student.campusLocation,
           avatarUrl: student.avatarUrl || "",
           avatarStorageId: student.avatarStorageId,
         };
@@ -359,16 +360,16 @@ export function StudentsTable() {
           </div>
 
           {/* Campus filter */}
-          <FilterDropdown<(typeof CAMPUS_LOCATIONS)[number]>
+          <FilterDropdown<string>
             value={
               (table
                 .getColumn("campusLocation")
-                ?.getFilterValue() as (typeof CAMPUS_LOCATIONS)[number]) ?? ""
+                ?.getFilterValue() as string) ?? ""
             }
             onChange={(value: string) =>
               table.getColumn("campusLocation")?.setFilterValue(value)
             }
-            options={CAMPUS_LOCATIONS}
+            options={campusOptions?.map((c) => c.label) ?? []}
             icon={MapPin}
             label={t("filters.campus.label")}
             placeholder={t("filters.campus.all")}
