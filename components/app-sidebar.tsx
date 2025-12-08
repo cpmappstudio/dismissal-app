@@ -1,18 +1,12 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import {
-  BookOpen,
-  User,
-  GraduationCap,
-  FileText,
-  Users,
-} from "lucide-react"
-import { useTranslations } from "next-intl"
-import { useUser } from "@clerk/nextjs"
+import * as React from "react";
+import { BookOpen, GraduationCap, FileText, UserCog, Wrench } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useUser } from "@clerk/nextjs";
 
-import { NavMain } from "@/components/nav-main"
-import { UniversityLogo } from "@/components/university-logo"
+import { NavMain } from "@/components/nav-main";
+import { UniversityLogo } from "@/components/university-logo";
 import {
   Sidebar,
   SidebarContent,
@@ -20,45 +14,61 @@ import {
   SidebarHeader,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 // import { LangToggle } from "./lang-toggle"
-import { UserButtonWrapper } from "./user-button-wrapper"
-import { extractRoleFromMetadata } from "@/lib/role-utils"
+import { UserButtonWrapper } from "./user-button-wrapper";
+import { extractRoleFromMetadata } from "@/lib/role-utils";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useSidebar()
-  const { user } = useUser()
-  const t = useTranslations('navigation')
+  const { state } = useSidebar();
+  const { user } = useUser();
+  const t = useTranslations("navigation");
 
   // Get user role from Clerk metadata using centralized extraction
-  const userRole = user ? extractRoleFromMetadata(user.publicMetadata) : undefined
-
-  // Determinar si mostrar el dashboard (Students) basado en el rol
-  const showDashboard = userRole === 'admin' || userRole === 'superadmin'
+  const userRole = user
+    ? extractRoleFromMetadata(user.publicMetadata)
+    : undefined;
 
   // Configuración de íconos para cada tipo de menú
   const iconMap = {
-    profile: User,
+    management: Wrench,
     student: BookOpen,
     studentDocs: FileText,
     professor: GraduationCap,
     professorDocs: FileText,
-    operators: Users,
+    operators: UserCog,
     adminDocs: FileText,
-  } as const
+  } as const;
 
   // Generar estructura de navegación basada en el rol del usuario
   const navItems = React.useMemo(() => {
-    const menuConfig = t.raw('menu') as Record<string, {
-      title: string;
-      url: string;
-      items: Array<{ title: string; url: string }>
-    }>
+    const menuConfig = t.raw("menu") as Record<
+      string,
+      {
+        title: string;
+        url: string;
+        items: Array<{ title: string; url: string }>;
+      }
+    >;
 
-    const items = []
+    const items = [];
 
     // Admin y SuperAdmin ven todos los enlaces
-    if (userRole === 'admin' || userRole === 'superadmin') {
+    if (userRole === "admin" || userRole === "superadmin") {
+      // Usuarios con todos los sub-elementos
+      if (menuConfig.management) {
+        items.push({
+          title: menuConfig.management.title,
+          url: menuConfig.management.url,
+          icon: iconMap.management,
+          isActive: true,
+          items: menuConfig.management.items.map((i) => ({
+            title: i.title,
+            url: i.url,
+          })),
+        });
+      }
+
       // Operadores con todos los sub-elementos
       if (menuConfig.operators) {
         items.push({
@@ -66,12 +76,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: menuConfig.operators.url,
           icon: iconMap.operators,
           isActive: true,
-          items: menuConfig.operators.items.map(item => ({
+          items: menuConfig.operators.items.map((item) => ({
             title: item.title,
             url: item.url,
           })),
-        })
+        });
       }
+      
 
       // Documentación para administradores
       if (menuConfig.adminDocs) {
@@ -80,30 +91,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: menuConfig.adminDocs.url,
           icon: iconMap.adminDocs,
           isActive: false,
-          items: menuConfig.adminDocs.items.map(item => ({
+          items: menuConfig.adminDocs.items.map((item) => ({
             title: item.title,
             url: item.url,
           })),
-        })
+        });
       }
     }
     // Operator ve todos los sub-elementos dentro de operators
-    else if (userRole === 'operator') {
+    else if (userRole === "operator") {
       if (menuConfig.operators) {
         items.push({
           title: menuConfig.operators.title,
           url: menuConfig.operators.url,
           icon: iconMap.operators,
           isActive: true,
-          items: menuConfig.operators.items.map(item => ({
+          items: menuConfig.operators.items.map((item) => ({
             title: item.title,
             url: item.url,
           })),
-        })
+        });
       }
     }
     // Allocator solo ve su enlace específico
-    else if (userRole === 'allocator') {
+    else if (userRole === "allocator") {
       if (menuConfig.operators) {
         items.push({
           title: menuConfig.operators.title,
@@ -111,16 +122,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: iconMap.operators,
           isActive: true,
           items: menuConfig.operators.items
-            .filter(item => item.url === '/operators/allocator')
-            .map(item => ({
+            .filter((item) => item.url === "/operators/allocator")
+            .map((item) => ({
               title: item.title,
               url: item.url,
             })),
-        })
+        });
       }
     }
     // Dispatcher solo ve su enlace específico
-    else if (userRole === 'dispatcher') {
+    else if (userRole === "dispatcher") {
       if (menuConfig.operators) {
         items.push({
           title: menuConfig.operators.title,
@@ -128,16 +139,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: iconMap.operators,
           isActive: true,
           items: menuConfig.operators.items
-            .filter(item => item.url === '/operators/dispatcher')
-            .map(item => ({
+            .filter((item) => item.url === "/operators/dispatcher")
+            .map((item) => ({
               title: item.title,
               url: item.url,
             })),
-        })
+        });
       }
     }
     // Viewer solo ve su enlace específico
-    else if (userRole === 'viewer') {
+    else if (userRole === "viewer") {
       if (menuConfig.operators) {
         items.push({
           title: menuConfig.operators.title,
@@ -145,17 +156,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: iconMap.operators,
           isActive: true,
           items: menuConfig.operators.items
-            .filter(item => item.url === '/operators/viewer')
-            .map(item => ({
+            .filter((item) => item.url === "/operators/viewer")
+            .map((item) => ({
               title: item.title,
               url: item.url,
             })),
-        })
+        });
       }
     }
 
-    return items
-  }, [t, userRole, iconMap.adminDocs, iconMap.operators])
+    return items;
+  }, [t, userRole, iconMap]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -168,9 +179,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain
           items={navItems}
-          dashboardLabel={t('dashboard')}
-          navigationLabel={t('navigation')}
-          showDashboard={showDashboard}
+          dashboardLabel={t("dashboard")}
+          navigationLabel={t("navigation")}
+          showDashboard={userRole === "admin" || userRole === "superadmin"}
         />
       </SidebarContent>
       <SidebarFooter>
@@ -180,5 +191,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

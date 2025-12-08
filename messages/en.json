@@ -1,429 +1,641 @@
 {
-    "common": {
-        "language": "Language",
-        "english": "English",
-        "spanish": "Español",
-        "theme": "Theme",
-        "light": "Light",
-        "dark": "Dark",
-        "system": "System",
-        "enterFullscreen": "Enter fullscreen",
-        "exitFullscreen": "Exit fullscreen",
-        "birthdayMessage": "Happy birthday"
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "spanish": "Español",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "enterFullscreen": "Enter fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "birthdayMessage": "Happy birthday"
+  },
+  "navigation": {
+    "university": "Dismissal App",
+    "dashboard": "Home",
+    "navigation": "Navigation",
+    "playground": "Playground",
+    "models": "Models",
+    "settings": "Settings",
+    "history": "History",
+    "starred": "Starred",
+    "general": "General",
+    "introduction": "Introduction",
+    "getStarted": "Get Started",
+    "tutorials": "Tutorials",
+    "changelog": "Changelog",
+    "profile": "My Account",
+    "myStudy": "My Study",
+    "myClasses": "My Classes",
+    "academicAdmin": "Academic Administration",
+    "personalAdmin": "Personal Administration",
+    "operators": "Operators",
+    "menu": {
+      "profile": {
+        "title": "My Account",
+        "url": "/profile",
+        "items": [
+          {
+            "title": "Personal Information",
+            "url": "/profile"
+          }
+        ]
+      },
+      "student": {
+        "title": "My Study",
+        "url": "/academic",
+        "items": [
+          {
+            "title": "Academic History",
+            "url": "/academic/history"
+          },
+          {
+            "title": "Academic Progress",
+            "url": "/academic/progress"
+          }
+        ]
+      },
+      "professor": {
+        "title": "My Classes",
+        "url": "/teaching",
+        "items": [
+          {
+            "title": "Gradebook",
+            "url": "/teaching/gradebook"
+          },
+          {
+            "title": "Teaching Progress",
+            "url": "/teaching/progress"
+          }
+        ]
+      },
+      "adminAcademic": {
+        "title": "Academic Administration",
+        "url": "/admin",
+        "items": [
+          {
+            "title": "Program Management",
+            "url": "/admin/programs"
+          },
+          {
+            "title": "Course Management",
+            "url": "/admin/courses"
+          },
+          {
+            "title": "Period Management",
+            "url": "/admin/periods"
+          }
+        ]
+      },
+      "adminPersonal": {
+        "title": "Personal Administration",
+        "url": "/admin/users",
+        "items": [
+          {
+            "title": "Professor Management",
+            "url": "/admin/professors"
+          },
+          {
+            "title": "Student Management",
+            "url": "/admin/students"
+          }
+        ]
+      },
+      "management": {
+        "title": "Management",
+        "url": "/management",
+        "items": [
+          {
+            "title": "Campuses",
+            "url": "/management/campuses"
+          },
+          {
+            "title": "Students",
+            "url": "/management/students"
+          },
+          {
+            "title": "Staff",
+            "url": "/management/staff"
+          }
+        ]
+      },
+      "operators": {
+        "title": "Operators",
+        "url": "/operators",
+        "items": [
+          {
+            "title": "Allocator",
+            "url": "/operators/allocator"
+          },
+          {
+            "title": "Dispatcher",
+            "url": "/operators/dispatcher"
+          },
+          {
+            "title": "Viewer",
+            "url": "/operators/viewer"
+          }
+        ]
+      }
+    }
+  },
+  "dismissal": {
+    "title": "Car Queue Management",
+    "subtitle": "Manage student pickup queues",
+    "stats": {
+      "totalCars": "Total Cars",
+      "leftLane": "Left Lane",
+      "rightLane": "Right Lane",
+      "laneBalance": "Lane Balance"
     },
-    "navigation": {
-        "university": "Dismissal App",
-        "dashboard": "Students",
-        "navigation": "Navigation",
-        "playground": "Playground",
-        "models": "Models",
-        "settings": "Settings",
-        "history": "History",
-        "starred": "Starred",
-        "general": "General",
-        "introduction": "Introduction",
-        "getStarted": "Get Started",
-        "tutorials": "Tutorials",
-        "changelog": "Changelog",
-        "profile": "My Account",
-        "myStudy": "My Study",
-        "myClasses": "My Classes",
-        "academicAdmin": "Academic Administration",
-        "personalAdmin": "Personal Administration",
-        "operators": "Operators",
-        "menu": {
-            "profile": {
-                "title": "My Account",
-                "url": "/profile",
-                "items": [
-                    {
-                        "title": "Personal Information",
-                        "url": "/profile"
-                    }
-                ]
-            },
-            "student": {
-                "title": "My Study",
-                "url": "/academic",
-                "items": [
-                    {
-                        "title": "Academic History",
-                        "url": "/academic/history"
-                    },
-                    {
-                        "title": "Academic Progress",
-                        "url": "/academic/progress"
-                    }
-                ]
-            },
-            "professor": {
-                "title": "My Classes",
-                "url": "/teaching",
-                "items": [
-                    {
-                        "title": "Gradebook",
-                        "url": "/teaching/gradebook"
-                    },
-                    {
-                        "title": "Teaching Progress",
-                        "url": "/teaching/progress"
-                    }
-                ]
-            },
-            "adminAcademic": {
-                "title": "Academic Administration",
-                "url": "/admin",
-                "items": [
-                    {
-                        "title": "Program Management",
-                        "url": "/admin/programs"
-                    },
-                    {
-                        "title": "Course Management",
-                        "url": "/admin/courses"
-                    },
-                    {
-                        "title": "Period Management",
-                        "url": "/admin/periods"
-                    }
-                ]
-            },
-            "adminPersonal": {
-                "title": "Personal Administration",
-                "url": "/admin/users",
-                "items": [
-                    {
-                        "title": "Professor Management",
-                        "url": "/admin/professors"
-                    },
-                    {
-                        "title": "Student Management",
-                        "url": "/admin/students"
-                    }
-                ]
-            },
-            "operators": {
-                "title": "Operators",
-                "url": "/operators",
-                "items": [
-                    {
-                        "title": "Allocator",
-                        "url": "/operators/allocator"
-                    },
-                    {
-                        "title": "Dispatcher",
-                        "url": "/operators/dispatcher"
-                    },
-                    {
-                        "title": "Viewer",
-                        "url": "/operators/viewer"
-                    }
-                ]
-            }
-        }
+    "campus": {
+      "select": "Select Campus",
+      "placeholder": "Choose a campus to start",
+      "required": "Please select a campus first"
     },
-    "dismissal": {
-        "title": "Car Queue Management",
-        "subtitle": "Manage student pickup queues",
-        "stats": {
-            "totalCars": "Total Cars",
-            "leftLane": "Left Lane",
-            "rightLane": "Right Lane",
-            "laneBalance": "Lane Balance"
+    "allocator": {
+      "title": "Car Assignment",
+      "description": "Add cars to lanes for student pickup",
+      "addCarPlaceholder": "Car number",
+      "addToLeft": "Add to Left Lane",
+      "addToRight": "Add to Right Lane",
+      "carAdded": "Car #{number} added to {lane} lane"
+    },
+    "dispatcher": {
+      "title": "Car Dispatch",
+      "description": "Remove cars when students are picked up",
+      "noCars": "No cars in queue",
+      "removeCar": "Remove car",
+      "carRemoved": "Car #{number} removed from {lane} lane",
+      "clearAll": "Clear All Queue",
+      "clearAllConfirm": {
+        "title": "Clear All Queue",
+        "description": "Are you sure you want to remove all cars from the queue? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Clear All"
+      },
+      "allCarsCleared": "All cars have been cleared from the queue"
+    },
+    "table": {
+      "carNumber": "Car #",
+      "studentName": "Student",
+      "assignedTime": "Assigned Time",
+      "actions": "Actions",
+      "empty": "No cars in this lane"
+    },
+    "car": {
+      "information": "Car Information",
+      "details": "Vehicle and assigned students details",
+      "arrivalTime": "Arrival Time",
+      "students": "Students",
+      "grade": "Grade",
+      "siblings": "siblings",
+      "close": "Close"
+    }
+  },
+  "university": {
+    "name": "App",
+    "academicRecords": "University Registration System"
+  },
+  "dashboard": {
+    "student": {
+      "metrics": {
+        "completedCredits": "Completed Credits",
+        "cumulativeGPA": "Cumulative GPA",
+        "currentBimester": "Current Bimester",
+        "careerProgress": "Career Progress",
+        "excellentProgress": "Excellent progress",
+        "creditsRemaining": "{count} credits remaining to graduate",
+        "outstandingPerformance": "Outstanding performance",
+        "maintainLevel": "Maintain this level to graduate with honors",
+        "currentlyEnrolled": "Currently enrolled",
+        "creditsInProgress": "{count} credits in progress this bimester",
+        "almostGraduating": "Almost graduating",
+        "bimestersRemaining": "{count} bimester remaining expected",
+        "excellent": "Excellent",
+        "bimesters": "bimesters",
+        "subjects": "subjects"
+      },
+      "program": {
+        "title": "Software Engineering",
+        "subtitle": "Undergraduate Program • Code: IDS-001",
+        "admissionDate": "Admission Date",
+        "estimatedGraduation": "Estimated Graduation",
+        "status": "Status",
+        "active": "Active",
+        "totalCredits": "Total Credits",
+        "duration": "Duration",
+        "languages": "Languages",
+        "modalityPresential": "Presential",
+        "viewDetails": "View Details"
+      },
+      "currentSubjects": {
+        "title": "Bimester Subjects",
+        "subtitle": "{period} • {count} enrolled subjects • {credits} credits",
+        "code": "Code",
+        "subject": "Subject",
+        "credits": "Credits",
+        "grade": "Grade",
+        "status": "Status",
+        "inProgress": "In Progress",
+        "pending": "Pending",
+        "viewHistory": "View History"
+      },
+      "creditDistribution": {
+        "title": "Credit Distribution",
+        "core": "Core",
+        "humanities": "Humanities",
+        "electives": "Electives"
+      },
+      "upcomingDates": {
+        "title": "Upcoming Dates",
+        "gradesDeadline": "Grades deadline",
+        "nextBimesterStart": "Next bimester start",
+        "earlyEnrollment": "Early enrollment"
+      },
+      "documents": {
+        "title": "Documents",
+        "transcriptCertificate": "Transcript Certificate",
+        "academicHistory": "Academic History",
+        "progressAnalysis": "Progress Analysis",
+        "academicCalendar": "Academic Calendar"
+      }
+    }
+  },
+  "adminDashboard": {
+    "welcome": {
+      "title": "Welcome, Administrator",
+      "subtitle": "You have full access to all system functions. Manage users and access all operator tools."
+    },
+    "permissions": {
+      "title": "Your Admin Permissions",
+      "description": "As an administrator, you can create and manage students, staff, and access all operator functionalities including allocation, dispatch, and viewing."
+    },
+    "cards": {
+      "campuses": {
+        "badge": "Management",
+        "title": "Manage Campuses",
+        "description": "Create, edit, and manage all campus locations in the system.",
+        "action": "Go to Campuses"
+      },
+      "students": {
+        "badge": "Management",
+        "title": "Manage Students",
+        "description": "Create, edit, and manage all students in the system.",
+        "action": "Go to Students"
+      },
+      "staff": {
+        "badge": "Management",
+        "title": "Manage Staff",
+        "description": "Administer staff members, assign roles, and manage system access permissions.",
+        "action": "Go to Staff"
+      },
+      "operators": {
+        "badge": "Full Access",
+        "title": "Operator Functions",
+        "description": "Complete access to all operator tools: allocator, dispatcher, and dismissal queue viewer.",
+        "action": "Go to Operators"
+      },
+      "allocator": {
+        "badge": "Allocation",
+        "title": "Allocator",
+        "description": "Assign vehicles to dismissal lanes to organize the student pickup queue.",
+        "action": "Go to Allocator"
+      },
+      "dispatcher": {
+        "badge": "Dispatch",
+        "title": "Dispatcher",
+        "description": "Dispatch vehicles from the queue when students are picked up and manage the exit flow.",
+        "action": "Go to Dispatcher"
+      },
+      "viewer": {
+        "badge": "Viewing",
+        "title": "Viewer",
+        "description": "View real-time status of the dismissal queue and monitor the pickup process.",
+        "action": "Go to Viewer"
+      }
+    },
+    "management": {
+      "title": "Management",
+      "subtitle": "Manage campuses, students and staff in the system."
+    },
+    "operatorsSection": {
+      "title": "Operator Tools",
+      "subtitle": "Access dismissal queue management functions."
+    },
+    "stats": {
+      "totalStudents": "Total Students",
+      "totalStudentsDescription": "Students registered in the system",
+      "totalStaff": "Total Staff",
+      "totalStaffDescription": "Active staff members",
+      "activeCampuses": "Active Campuses",
+      "activeCampusesDescription": "Locations in operation"
+    }
+  },
+  "studentsManagement": {
+    "title": "Students",
+    "subtitle": "Manage and view all students in the system",
+    "search": {
+      "placeholder": "Search students by name or car number..."
+    },
+    "filters": {
+      "campus": {
+        "all": "All Campus",
+        "short": "Campus",
+        "label": "Campus Location"
+      },
+      "grade": {
+        "all": "All Grades",
+        "short": "Grade",
+        "label": "Grade Level"
+      }
+    },
+    "actions": {
+      "add": "Add Student",
+      "addShort": "Add",
+      "delete": "Delete Students",
+      "deleteShort": "Delete"
+    },
+    "table": {
+      "headers": {
+        "name": "Name",
+        "grade": "Grade",
+        "campus": "Campus",
+        "carNumber": "Car #"
+      },
+      "noResults": "No students found.",
+      "pagination": {
+        "selected": "{selected} of {total} row(s) selected.",
+        "selectedShort": "{selected}/{total} selected",
+        "previous": "Previous",
+        "previousShort": "Prev",
+        "next": "Next"
+      }
+    },
+    "createDialog": {
+      "title": "Create New Student",
+      "subtitle": "Add a new student to the system. Fill in all required information below.",
+      "sections": {
+        "personal": "Personal Information",
+        "academic": "Academic Information",
+        "additional": "Additional Information"
+      },
+      "fields": {
+        "firstName": {
+          "label": "First Name",
+          "placeholder": "Enter first name"
+        },
+        "lastName": {
+          "label": "Last Name",
+          "placeholder": "Enter last name"
+        },
+        "birthday": {
+          "label": "Birthday",
+          "placeholder": "Pick a date"
+        },
+        "grade": {
+          "label": "Grade Level",
+          "placeholder": "Select grade"
         },
         "campus": {
-            "select": "Select Campus",
-            "placeholder": "Choose a campus to start",
-            "required": "Please select a campus first"
+          "label": "Campus Location",
+          "placeholder": "Select campus"
         },
-        "allocator": {
-            "title": "Car Assignment",
-            "description": "Add cars to lanes for student pickup",
-            "addCarPlaceholder": "Car number",
-            "addToLeft": "Add to Left Lane",
-            "addToRight": "Add to Right Lane",
-            "carAdded": "Car #{number} added to {lane} lane"
+        "carNumber": {
+          "label": "Car Number"
         },
-        "dispatcher": {
-            "title": "Car Dispatch",
-            "description": "Remove cars when students are picked up",
-            "noCars": "No cars in queue",
-            "removeCar": "Remove car",
-            "carRemoved": "Car #{number} removed from {lane} lane",
-            "clearAll": "Clear All Queue",
-            "clearAllConfirm": {
-                "title": "Clear All Queue",
-                "description": "Are you sure you want to remove all cars from the queue? This action cannot be undone.",
-                "cancel": "Cancel",
-                "confirm": "Clear All"
-            },
-            "allCarsCleared": "All cars have been cleared from the queue"
-        },
-        "table": {
-            "carNumber": "Car #",
-            "studentName": "Student",
-            "assignedTime": "Assigned Time",
-            "actions": "Actions",
-            "empty": "No cars in this lane"
-        },
-        "car": {
-            "information": "Car Information",
-            "details": "Vehicle and assigned students details",
-            "arrivalTime": "Arrival Time",
-            "students": "Students",
-            "grade": "Grade",
-            "siblings": "siblings",
-            "close": "Close"
+        "avatarUrl": {
+          "label": "Avatar URL"
         }
+      },
+      "required": "Required fields",
+      "avatarNote": "If no avatar URL is provided, one will be generated automatically.",
+      "actions": {
+        "cancel": "Cancel",
+        "create": "Create Student"
+      }
     },
-    "university": {
-        "name": "App",
-        "academicRecords": "University Registration System"
+    "editDialog": {
+      "title": "Edit Student",
+      "subtitle": "Update student information. Make your changes and save.",
+      "actions": {
+        "cancel": "Cancel",
+        "save": "Save Changes",
+        "delete": "Delete Student"
+      },
+      "deleteConfirm": {
+        "title": "Delete Student",
+        "description": "Are you sure you want to delete {name}? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
     },
-    "dashboard": {
-        "student": {
-            "metrics": {
-                "completedCredits": "Completed Credits",
-                "cumulativeGPA": "Cumulative GPA",
-                "currentBimester": "Current Bimester",
-                "careerProgress": "Career Progress",
-                "excellentProgress": "Excellent progress",
-                "creditsRemaining": "{count} credits remaining to graduate",
-                "outstandingPerformance": "Outstanding performance",
-                "maintainLevel": "Maintain this level to graduate with honors",
-                "currentlyEnrolled": "Currently enrolled",
-                "creditsInProgress": "{count} credits in progress this bimester",
-                "almostGraduating": "Almost graduating",
-                "bimestersRemaining": "{count} bimester remaining expected",
-                "excellent": "Excellent",
-                "bimesters": "bimesters",
-                "subjects": "subjects"
-            },
-            "program": {
-                "title": "Software Engineering",
-                "subtitle": "Undergraduate Program • Code: IDS-001",
-                "admissionDate": "Admission Date",
-                "estimatedGraduation": "Estimated Graduation",
-                "status": "Status",
-                "active": "Active",
-                "totalCredits": "Total Credits",
-                "duration": "Duration",
-                "languages": "Languages",
-                "modalityPresential": "Presential",
-                "viewDetails": "View Details"
-            },
-            "currentSubjects": {
-                "title": "Bimester Subjects",
-                "subtitle": "{period} • {count} enrolled subjects • {credits} credits",
-                "code": "Code",
-                "subject": "Subject",
-                "credits": "Credits",
-                "grade": "Grade",
-                "status": "Status",
-                "inProgress": "In Progress",
-                "pending": "Pending",
-                "viewHistory": "View History"
-            },
-            "creditDistribution": {
-                "title": "Credit Distribution",
-                "core": "Core",
-                "humanities": "Humanities",
-                "electives": "Electives"
-            },
-            "upcomingDates": {
-                "title": "Upcoming Dates",
-                "gradesDeadline": "Grades deadline",
-                "nextBimesterStart": "Next bimester start",
-                "earlyEnrollment": "Early enrollment"
-            },
-            "documents": {
-                "title": "Documents",
-                "transcriptCertificate": "Transcript Certificate",
-                "academicHistory": "Academic History",
-                "progressAnalysis": "Progress Analysis",
-                "academicCalendar": "Academic Calendar"
-            }
-        }
-    },
-    "studentsManagement": {
-        "title": "Students",
-        "subtitle": "Manage and view all students in the system",
-        "search": {
-            "placeholder": "Search students by name or car number..."
-        },
-        "filters": {
-            "campus": {
-                "all": "All Campus",
-                "short": "Campus",
-                "label": "Campus Location"
-            },
-            "grade": {
-                "all": "All Grades",
-                "short": "Grade",
-                "label": "Grade Level"
-            }
-        },
-        "actions": {
-            "add": "Add Student",
-            "addShort": "Add",
-            "delete": "Delete Students",
-            "deleteShort": "Delete"
-        },
-        "table": {
-            "headers": {
-                "name": "Name",
-                "grade": "Grade",
-                "campus": "Campus",
-                "carNumber": "Car #"
-            },
-            "noResults": "No students found.",
-            "pagination": {
-                "selected": "{selected} of {total} row(s) selected.",
-                "selectedShort": "{selected}/{total} selected",
-                "previous": "Previous",
-                "previousShort": "Prev",
-                "next": "Next"
-            }
-        },
-        "createDialog": {
-            "title": "Create New Student",
-            "subtitle": "Add a new student to the system. Fill in all required information below.",
-            "sections": {
-                "personal": "Personal Information",
-                "academic": "Academic Information",
-                "additional": "Additional Information"
-            },
-            "fields": {
-                "firstName": {
-                    "label": "First Name",
-                    "placeholder": "Enter first name"
-                },
-                "lastName": {
-                    "label": "Last Name",
-                    "placeholder": "Enter last name"
-                },
-                "birthday": {
-                    "label": "Birthday",
-                    "placeholder": "Pick a date"
-                },
-                "grade": {
-                    "label": "Grade Level",
-                    "placeholder": "Select grade"
-                },
-                "campus": {
-                    "label": "Campus Location",
-                    "placeholder": "Select campus"
-                },
-                "carNumber": {
-                    "label": "Car Number"
-                },
-                "avatarUrl": {
-                    "label": "Avatar URL"
-                }
-            },
-            "required": "Required fields",
-            "avatarNote": "If no avatar URL is provided, one will be generated automatically.",
-            "actions": {
-                "cancel": "Cancel",
-                "create": "Create Student"
-            }
-        },
-        "editDialog": {
-            "title": "Edit Student",
-            "subtitle": "Update student information. Make your changes and save.",
-            "actions": {
-                "cancel": "Cancel",
-                "save": "Save Changes",
-                "delete": "Delete Student"
-            },
-            "deleteConfirm": {
-                "title": "Delete Student",
-                "description": "Are you sure you want to delete {name}? This action cannot be undone.",
-                "cancel": "Cancel",
-                "confirm": "Delete"
-            }
-        },
-        "deleteDialog": {
-            "title": "Delete Student",
-            "titlePlural": "Delete Students",
-            "description": "Are you sure you want to delete {count, plural, one {this student} other {these # students}}? This action cannot be undone.",
-            "listTitle": "Students to be deleted:",
-            "actions": {
-                "cancel": "Cancel",
-                "delete": "Delete Student",
-                "deletePlural": "Delete Students"
-            }
-        }
-    },
-    "academicHistory": {
-        "title": "Academic History",
-        "subtitle": "Complete record of academic performance",
-        "printTranscript": "Print Transcript",
-        "printPeriod": "Print Period",
-        "filters": {
-            "searchSubject": "Search subject...",
-            "filterByPeriod": "Filter by period",
-            "allPeriods": "All periods",
-            "columns": "Columns"
-        },
-        "table": {
-            "code": "Code",
-            "group": "Group",
-            "subject": "Subject",
-            "credits": "Credits",
-            "category": "Category",
-            "letterGrade": "Letter Grade",
-            "percentGrade": "Percent",
-            "gpaScale": "GPA Scale",
-            "status": "Status",
-            "professor": "Professor",
-            "actions": "Actions"
-        },
-        "status": {
-            "passed": "Passed",
-            "failed": "Failed",
-            "inProgress": "In Progress",
-            "withdrawn": "Withdrawn",
-            "incomplete": "Incomplete"
-        },
-        "categories": {
-            "core": "Core",
-            "humanities": "Humanities",
-            "electives": "Electives",
-            "prerequisite": "Prerequisite"
-        },
-        "periodSummary": {
-            "title": "Period Completion Summary",
-            "creditsEnrolled": "Credits Enrolled",
-            "creditsApproved": "Credits Approved",
-            "percentApproved": "% Credits Approved",
-            "cumulativeCredits": "Cumulative Credits",
-            "cumulativeApproved": "Cumulative Credits Approved",
-            "periodGPA": "Period GPA",
-            "cumulativeGPA": "Cumulative GPA"
-        },
-        "overallSummary": {
-            "title": "Overall Academic Summary",
-            "totalCreditsCompleted": "Total Credits Completed",
-            "totalCreditsRequired": "Total Credits Required",
-            "overallGPA": "Overall GPA",
-            "academicStanding": "Academic Standing",
-            "expectedGraduation": "Expected Graduation"
-        },
-        "standing": {
-            "excellent": "Excellent",
-            "good": "Good Standing",
-            "probation": "Academic Probation",
-            "warning": "Academic Warning"
-        },
-        "subjectDetails": {
-            "title": "Subject Details",
-            "description": "Description",
-            "prerequisites": "Prerequisites",
-            "schedule": "Schedule",
-            "notes": "Notes",
-            "none": "None"
-        },
-        "noResults": "No subjects found matching your criteria"
+    "deleteDialog": {
+      "title": "Delete Student",
+      "titlePlural": "Delete Students",
+      "description": "Are you sure you want to delete {count, plural, one {this student} other {these # students}}? This action cannot be undone.",
+      "listTitle": "Students to be deleted:",
+      "actions": {
+        "cancel": "Cancel",
+        "delete": "Delete Student",
+        "deletePlural": "Delete Students"
+      }
     }
+  },
+  "staffManagement": {
+    "title": "Staff",
+    "subtitle": "Manage and view all staff members in the system",
+    "search": {
+      "placeholder": "Search staff by name"
+    },
+
+    "filters": {
+      "campus": {
+        "all": "All Campus",
+        "short": "Campus",
+        "label": "Campus Location"
+      },
+      "role": {
+        "all": "All Roles",
+        "short": "Role",
+        "label": "Role"
+      }
+    },
+    "actions": {
+      "add": "Add Staff",
+      "addShort": "Add",
+      "delete": "Delete Staff",
+      "deleteShort": "Delete"
+    },
+    "table": {
+      "headers": {
+        "name": "Name",
+        "role": "Role",
+        "campus": "Campus",
+        "email": "Email",
+        "phone": "Phone",
+        "status": "Status"
+      },
+      "noResults": "No staff found.",
+      "pagination": {
+        "selected": "{selected} of {total} row(s) selected.",
+        "selectedShort": "{selected}/{total} selected",
+        "previous": "Previous",
+        "previousShort": "Prev",
+        "next": "Next"
+      }
+    },
+    "createDialog": {
+      "title": "Create New Staff",
+      "subtitle": "Add a new staff member to the system. Fill in all required information below.",
+      "sections": {
+        "personal": "Personal Information",
+        "work": "Work Information",
+        "additional": "Additional Information"
+      },
+      "fields": {
+        "firstName": {
+          "label": "First Name",
+          "placeholder": "Enter first name"
+        },
+        "lastName": {
+          "label": "Last Name",
+          "placeholder": "Enter last name"
+        },
+        "email": {
+          "label": "Email",
+          "placeholder": "Enter email address"
+        },
+        "phone": {
+          "label": "Phone Number",
+          "placeholder": "Enter phone number"
+        },
+        "role": {
+          "label": "Role",
+          "placeholder": "Select role"
+        },
+        "campus": {
+          "label": "Campus Location",
+          "placeholder": "Select campus"
+        },
+        "avatarUrl": {
+          "label": "Avatar URL"
+        }
+      },
+      "required": "Required fields",
+      "avatarNote": "If no avatar URL is provided, one will be generated automatically.",
+      "actions": {
+        "cancel": "Cancel",
+        "create": "Create Staff"
+      }
+    },
+    "editDialog": {
+      "title": "Edit Staff",
+      "subtitle": "Update staff member information. Make your changes and save.",
+      "protectedAccount": {
+        "title": "Protected Account",
+        "description": "Superadmin users can't be deleted or have their role changed."
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "save": "Save Changes",
+        "delete": "Delete Staff"
+      },
+      "deleteConfirm": {
+        "title": "Delete Staff",
+        "description": "Are you sure you want to delete {name}? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    },
+    "deleteDialog": {
+      "title": "Delete Staff",
+      "titlePlural": "Delete Staff Members",
+      "description": "Are you sure you want to delete {count, plural, one {this staff member} other {these # staff members}}? This action cannot be undone.",
+      "listTitle": "Staff to be deleted:",
+      "noDeletableStaff": "None of the selected users can be deleted.",
+      "protectedListTitle": "Protected staff (will not be deleted):",
+      "superadminWarning": {
+        "title": "Protected Accounts",
+        "description": "{count, plural, =1 {1 superadmin user} other {# superadmin users}} cannot be deleted and will be excluded from this operation."
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "delete": "Delete Staff",
+        "deletePlural": "Delete Staff"
+      }
+    }
+  },
+  "academicHistory": {
+    "title": "Academic History",
+    "subtitle": "Complete record of academic performance",
+    "printTranscript": "Print Transcript",
+    "printPeriod": "Print Period",
+    "filters": {
+      "searchSubject": "Search subject...",
+      "filterByPeriod": "Filter by period",
+      "allPeriods": "All periods",
+      "columns": "Columns"
+    },
+    "table": {
+      "code": "Code",
+      "group": "Group",
+      "subject": "Subject",
+      "credits": "Credits",
+      "category": "Category",
+      "letterGrade": "Letter Grade",
+      "percentGrade": "Percent",
+      "gpaScale": "GPA Scale",
+      "status": "Status",
+      "professor": "Professor",
+      "actions": "Actions"
+    },
+    "status": {
+      "passed": "Passed",
+      "failed": "Failed",
+      "inProgress": "In Progress",
+      "withdrawn": "Withdrawn",
+      "incomplete": "Incomplete"
+    },
+    "categories": {
+      "core": "Core",
+      "humanities": "Humanities",
+      "electives": "Electives",
+      "prerequisite": "Prerequisite"
+    },
+    "periodSummary": {
+      "title": "Period Completion Summary",
+      "creditsEnrolled": "Credits Enrolled",
+      "creditsApproved": "Credits Approved",
+      "percentApproved": "% Credits Approved",
+      "cumulativeCredits": "Cumulative Credits",
+      "cumulativeApproved": "Cumulative Credits Approved",
+      "periodGPA": "Period GPA",
+      "cumulativeGPA": "Cumulative GPA"
+    },
+    "overallSummary": {
+      "title": "Overall Academic Summary",
+      "totalCreditsCompleted": "Total Credits Completed",
+      "totalCreditsRequired": "Total Credits Required",
+      "overallGPA": "Overall GPA",
+      "academicStanding": "Academic Standing",
+      "expectedGraduation": "Expected Graduation"
+    },
+    "standing": {
+      "excellent": "Excellent",
+      "good": "Good Standing",
+      "probation": "Academic Probation",
+      "warning": "Academic Warning"
+    },
+    "subjectDetails": {
+      "title": "Subject Details",
+      "description": "Description",
+      "prerequisites": "Prerequisites",
+      "schedule": "Schedule",
+      "notes": "Notes",
+      "none": "None"
+    },
+    "noResults": "No subjects found matching your criteria"
+  }
 }

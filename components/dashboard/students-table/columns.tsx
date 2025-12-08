@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 import { useTranslations } from 'next-intl'
-import { Student } from "./types"
+import { Student } from "../types"
 import { StudentAvatar } from "./student-avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
