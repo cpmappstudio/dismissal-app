@@ -30,6 +30,14 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+
+type DirectorOption = {
+  id: Id<"users">;
+  name: string;
+  email: string | undefined;
+  phone: string | undefined;
+};
+
 import {
   Dialog,
   DialogContent,
@@ -224,7 +232,7 @@ export function CampusSettingsDialog({
   );
 
   const selectedDirector = potentialDirectors?.find(
-    (director) => director.id === selectedDirectorId,
+    (director: DirectorOption) => director.id === selectedDirectorId,
   );
   const [selectedCountry, setSelectedCountry] = useState<string>(
     campus?.address?.country || "US",
@@ -468,7 +476,7 @@ export function CampusSettingsDialog({
           updates.directorId = selectedDirectorId || null;
           if (selectedDirectorId) {
             const director = potentialDirectors?.find(
-              (d) => d.id === selectedDirectorId,
+              (d: DirectorOption) => d.id === selectedDirectorId,
             );
             if (director) {
               updates.directorName = director.name;
@@ -571,7 +579,7 @@ export function CampusSettingsDialog({
         // Director fields
         if (selectedDirectorId) {
           const director = potentialDirectors?.find(
-            (d) => d.id === selectedDirectorId,
+            (d: DirectorOption) => d.id === selectedDirectorId,
           );
           campusData.directorId = selectedDirectorId;
           if (director) {
