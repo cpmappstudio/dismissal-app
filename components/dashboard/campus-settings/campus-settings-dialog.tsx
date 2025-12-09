@@ -778,7 +778,7 @@ export function CampusSettingsDialog({
                               </div>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {potentialDirectors?.map((director) => (
+                            {potentialDirectors?.map((director: DirectorOption) => (
                               <DropdownMenuItem
                                 key={director.id}
                                 onClick={() =>
