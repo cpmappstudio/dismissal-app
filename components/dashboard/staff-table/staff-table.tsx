@@ -34,6 +34,13 @@ import { StaffFormDialog } from "./staff-form-dialog";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 
+
+type CampusOption = {
+  id: Id<"campusSettings">;
+  value: string;
+  label: string;
+};
+
 // Simple skeleton placeholder
 function StaffTableSkeleton() {
   return (
@@ -100,7 +107,7 @@ export function StaffTable() {
   const getCampusNameById = React.useCallback(
     (campusId: string) => {
       if (!campusOptions) return "Not Assigned";
-      const campus = campusOptions.find((c) => c.id === campusId);
+      const campus = campusOptions.find((c: CampusOption) => c.id === campusId);
       return campus?.label || "Not Assigned";
     },
     [campusOptions],
@@ -110,7 +117,7 @@ export function StaffTable() {
   const getCampusIdByName = React.useCallback(
     (campusName: string) => {
       if (!campusOptions) return null;
-      const campus = campusOptions.find((c) => c.label === campusName);
+      const campus = campusOptions.find((c: CampusOption) => c.label === campusName);
       return campus?.id || null;
     },
     [campusOptions],
