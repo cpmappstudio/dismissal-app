@@ -244,7 +244,7 @@ export function StaffTable() {
         lastName: staffData.lastName,
         role: staffData.role as Role,
         assignedCampuses: campusIds,
-        phone: staffData.phoneNumber || undefined,
+        phone: staffData.phoneNumber || "",
         status: staffData.status as "active" | "inactive",
         avatarStorageId: staffData.avatarStorageId || null, // Sync avatar to Clerk metadata
       });

@@ -111,12 +111,12 @@
             "url": "/management/campuses"
           },
           {
-            "title": "Students",
-            "url": "/management/students"
-          },
-          {
             "title": "Staff",
             "url": "/management/staff"
+          },
+                    {
+            "title": "Students",
+            "url": "/management/students"
           }
         ]
       },

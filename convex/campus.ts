@@ -118,7 +118,7 @@ export const getById = query({
  * Get available grades for a campus
  */
 export const getAvailableGrades = query({
-    args: { campus: v.string() },
+    args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) {
@@ -126,7 +126,7 @@ export const getAvailableGrades = query({
             return [];
         }
 
-        return await getCampusGrades(ctx.db, args.campus);
+        return await getCampusGrades(ctx.db, args.campusId);
     }
 });
 
@@ -416,7 +416,7 @@ export const deleteCampusLogo = mutation({
  * Get campus statistics
  */
 export const getStats = query({
-    args: { campus: v.string() },
+    args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) {
@@ -424,28 +424,32 @@ export const getStats = query({
             return null;
         }
 
-        // Get active students count
-        const activeStudents = await ctx.db
+        // Get campus to find name for queue queries
+        const campus = await ctx.db.get(args.campusId);
+        if (!campus) return null;
+
+        // Get active students count (filter by campuses array)
+        const allActiveStudents = await ctx.db
             .query("students")
-            .withIndex("by_campus_active", q =>
-                q.eq("campusLocation", args.campus).eq("isActive", true)
-            )
+            .withIndex("by_active", q => q.eq("isActive", true))
             .collect();
 
-        // Get current queue count
+        const activeStudents = allActiveStudents.filter(s => s.campuses.includes(args.campusId));
+
+        // Get current queue count (uses campusName as string)
         const currentQueue = await ctx.db
             .query("dismissalQueue")
             .withIndex("by_campus_status", q =>
-                q.eq("campusLocation", args.campus).eq("status", "waiting")
+                q.eq("campusLocation", campus.campusName).eq("status", "waiting")
             )
             .collect();
 
-        // Get today's completed pickups
+        // Get today's completed pickups (uses campusName as string)
         const today = new Date().toISOString().split('T')[0];
         const todayPickups = await ctx.db
             .query("dismissalHistory")
             .withIndex("by_campus_date", q =>
-                q.eq("campusLocation", args.campus).eq("date", today)
+                q.eq("campusLocation", campus.campusName).eq("date", today)
             )
             .collect();
 
@@ -462,7 +466,7 @@ export const getStats = query({
         }, {} as Record<string, number>);
 
         return {
-            campus: args.campus,
+            campus: campus.campusName,
             totalStudents: activeStudents.length,
             studentsWithCars: studentsWithCars.length,
             uniqueCarCount: uniqueCarNumbers.size,
@@ -504,7 +508,7 @@ export const getOptions = query({
  */
 export const getStudentsByCampus = query({
     args: {
-        campus: v.string(),
+        campusId: v.id("campusSettings"),
         isActive: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
@@ -514,14 +518,14 @@ export const getStudentsByCampus = query({
             return [];
         }
 
-        const students = await ctx.db
+        const isActiveFilter = args.isActive ?? true;
+        const allStudents = await ctx.db
             .query("students")
-            .withIndex("by_campus_active", (q) =>
-                q
-                    .eq("campusLocation", args.campus)
-                    .eq("isActive", args.isActive ?? true),
-            )
+            .withIndex("by_active", (q) => q.eq("isActive", isActiveFilter))
             .collect();
+
+        // Filter by campus
+        const students = allStudents.filter(s => s.campuses.includes(args.campusId));
 
         return students;
     },
@@ -532,7 +536,7 @@ export const getStudentsByCampus = query({
  */
 export const getStaffByCampus = query({
     args: {
-        campus: v.string(),
+        campusId: v.id("campusSettings"),
         isActive: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
@@ -542,21 +546,11 @@ export const getStaffByCampus = query({
             return [];
         }
 
-        // First, find the campus by name to get its ID
-        const campusDoc = await ctx.db
-            .query("campusSettings")
-            .withIndex("by_name", (q) => q.eq("campusName", args.campus))
-            .unique();
-
-        if (!campusDoc) {
-            return []; // Campus not found
-        }
-
         // Get all users assigned to this campus (by ID)
         const allUsers = await ctx.db.query("users").collect();
 
         const campusUsers = allUsers.filter((user) =>
-            user.assignedCampuses.includes(campusDoc._id),
+            user.assignedCampuses.includes(args.campusId),
         );
 
         if (args.isActive !== undefined) {

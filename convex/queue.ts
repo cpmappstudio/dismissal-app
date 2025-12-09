@@ -19,37 +19,29 @@ async function getCampusIdByName(db: any, campusName: string): Promise<Id<"campu
 /**
  * Helper functions
  */
-async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+async function getStudentsByCarNumber(db: any, carNumber: number, campusId: Id<"campusSettings">) {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
+    // Get all students with this car number using by_car_number index
+    const allStudentsWithCar = await db
         .query("students")
-        .withIndex("by_car_campus", (q: any) =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-                .eq("isActive", true)
-        )
+        .withIndex("by_car_number", (q: any) => q.eq("carNumber", carNumber))
+        .filter((q: any) => q.eq(q.field("isActive"), true))
         .collect();
+
+    // First, try to find in the current campus
+    const studentsInCampus = allStudentsWithCar.filter((s: any) =>
+        s.campuses?.includes(campusId)
+    );
 
     // If found in current campus, return immediately
     if (studentsInCampus.length > 0) {
         return studentsInCampus;
     }
 
-    // If not found in current campus, search across ALL campuses
+    // If not found in current campus, return all students with this car number
     // This allows calling cars from any campus to any campus
-    const allStudents = await db
-        .query("students")
-        .filter((q: any) =>
-            q.and(
-                q.eq(q.field("carNumber"), carNumber),
-                q.eq(q.field("isActive"), true)
-            )
-        )
-        .collect();
-
-    return allStudents;
+    return allStudentsWithCar;
 }
 
 async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
@@ -280,8 +272,18 @@ export const addCar = mutation({
             };
         }
 
+        // Get campus ID for student lookup
+        const campusId = await getCampusIdByName(ctx.db, args.campus);
+        if (!campusId) {
+            return {
+                success: false,
+                error: "INVALID_CAMPUS",
+                message: "Campus not found"
+            };
+        }
+
         // Get students for this car (searches across all campuses)
-        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
+        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, campusId);
         if (students.length === 0) {
             return {
                 success: false,

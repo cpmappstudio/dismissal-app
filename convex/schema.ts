@@ -72,9 +72,11 @@ export default defineSchema({
 
     // Academic info
     grade: v.string(), // "1st", "2nd", "3rd", etc.
-    campusLocation: v.string(),
-    // New campus reference (migrated from campusLocation string)
-    campuses: v.optional(v.array(v.id("campusSettings"))),
+    // Campus assignment - References to campusSettings documents
+    // Optional during migration - new students will have this, old students use campusLocation
+    campuses: v.array(v.id("campusSettings")),
+    // Legacy field - kept for migration, will be removed after migration
+    campusLocation: v.optional(v.string()),
 
     // Birthday
     birthday: v.string(), // Display format: "July 09"
@@ -94,10 +96,9 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   })
-    .index("by_campus_active", ["campusLocation", "isActive"])
-    .index("by_car_campus", ["carNumber", "campusLocation", "isActive"])
-    .index("by_campus_grade", ["campusLocation", "grade", "isActive"])
-    .index("by_full_name", ["fullName"]),
+    .index("by_car_number", ["carNumber"])
+    .index("by_full_name", ["fullName"])
+    .index("by_active", ["isActive"]),
 
   /**
    * Dismissal Queue - Current cars in lanes

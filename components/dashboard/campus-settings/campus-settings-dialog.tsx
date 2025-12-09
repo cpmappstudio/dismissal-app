@@ -955,7 +955,6 @@ export function CampusSettingsDialog({
                   </div>
 
                   {/* State and City - Second row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-3">
                       <Label htmlFor="state">
                         {selectedCountry === "HN"
@@ -983,7 +982,7 @@ export function CampusSettingsDialog({
                         disabled={availableStates.length === 0}
                       />
                     </div>
-                    <div className="grid gap-3">
+                    {/* <div className="grid gap-3">
                       <Label htmlFor="city">City</Label>
                       <SelectDropdown
                         options={availableCities}
@@ -1006,8 +1005,7 @@ export function CampusSettingsDialog({
                           No major cities available for selected state
                         </p>
                       )}
-                    </div>
-                  </div>
+                    </div> */}
 
                   {/* Street - Third row */}
                   <div className="grid gap-3">
@@ -1117,27 +1115,19 @@ export function CampusSettingsDialog({
             </div>
 
             <DialogFooter className="flex justify-between">
-              {isEditing && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setShowDeleteAlert(true)}
-                  className="gap-2 mr-auto"
-                  disabled={isSubmitting}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Campus
-                </Button>
-              )}
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setShowDeleteAlert(true)}
+                    className="gap-2 mr-auto"
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Campus
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={isSubmitting || !isClerkLoaded || !clerkUser}

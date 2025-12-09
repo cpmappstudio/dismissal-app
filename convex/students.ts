@@ -155,31 +155,26 @@ export const getBatchAvatarUrls = query({
  * Helper function to get students by car number
  * Searches across ALL campuses since car numbers are unique globally
  */
-async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+async function getStudentsByCarNumber(db: any, carNumber: number, campusId?: Id<"campusSettings">) {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
-        .query("students")
-        .withIndex("by_car_campus", (q: any) =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-        )
-        .collect();
-
-    // If found in current campus, return immediately
-    if (studentsInCampus.length > 0) {
-        return studentsInCampus;
-    }
-
-    // If not found in current campus, search across ALL campuses
-    // This allows calling cars from any campus to any campus
+    // Get all students with this car number
     const allStudents = await db
         .query("students")
-        .filter((q: any) =>
-            q.eq(q.field("carNumber"), carNumber)
+        .withIndex("by_car_number", (q: any) =>
+            q.eq("carNumber", carNumber)
         )
         .collect();
+
+    // If campusId provided, filter to that campus first
+    if (campusId) {
+        const studentsInCampus = allStudents.filter((s: any) => 
+            s.campuses?.includes(campusId)
+        );
+        if (studentsInCampus.length > 0) {
+            return studentsInCampus;
+        }
+    }
 
     return allStudents;
 }
@@ -213,17 +208,26 @@ export const list = query({
         try {
             let students: any[];
 
-            // Since we're doing hard delete now, we don't need isActive filter
-            // Optimize query - use indexes when possible
+            // Get all students first
+            students = await ctx.db
+                .query("students")
+                .collect();
+
+            // Filter by campus if provided (campus arg is the campus name)
             if (args.campus) {
-                students = await ctx.db
-                    .query("students")
-                    .filter((q: any) => q.eq(q.field("campusLocation"), args.campus!))
-                    .collect();
-            } else {
-                students = await ctx.db
-                    .query("students")
-                    .collect();
+                // First, find the campus ID by name
+                const campusDoc = await ctx.db
+                    .query("campusSettings")
+                    .filter((q: any) => q.eq(q.field("campusName"), args.campus))
+                    .first();
+                
+                if (campusDoc) {
+                    students = students.filter((s: any) => 
+                        s.campuses?.includes(campusDoc._id)
+                    );
+                } else {
+                    students = [];
+                }
             }
 
             // Additional filtering in memory
@@ -291,7 +295,7 @@ export const get = query({
 
         // Get siblings (other students with same car number)
         const siblings = student.carNumber > 0 ?
-            await getStudentsByCarNumber(ctx.db, student.carNumber, student.campusLocation)
+            await getStudentsByCarNumber(ctx.db, student.carNumber, student.campuses?.[0])
                 .then((students: any[]) => students.filter((s: any) => s._id !== student._id)) :
             [];
 
@@ -311,7 +315,7 @@ export const create = mutation({
         lastName: v.string(),
         birthday: v.string(),
         grade: gradeValidator,
-        campusLocation: v.string(),
+        campuses: v.array(v.id("campusSettings")),
         carNumber: v.optional(v.number()),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
@@ -327,8 +331,8 @@ export const create = mutation({
         if (!args.lastName.trim()) {
             throw new Error("Last name is required");
         }
-        if (!args.campusLocation.trim()) {
-            throw new Error("Campus location is required");
+        if (args.campuses.length === 0) {
+            throw new Error("At least one campus is required");
         }
 
         // Validate car number
@@ -347,7 +351,7 @@ export const create = mutation({
             fullName,
             birthday: args.birthday,
             grade: args.grade,
-            campusLocation: args.campusLocation,
+            campuses: args.campuses,
             carNumber,
             avatarUrl: args.avatarUrl,
             avatarStorageId: args.avatarStorageId,
@@ -369,7 +373,7 @@ export const update = mutation({
         lastName: v.optional(v.string()),
         birthday: v.optional(v.string()),
         grade: v.optional(gradeValidator),
-        campusLocation: v.optional(v.string()),
+        campuses: v.optional(v.array(v.id("campusSettings"))),
         carNumber: v.optional(v.number()),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
@@ -401,7 +405,7 @@ export const update = mutation({
         if (args.lastName !== undefined) updates.lastName = args.lastName.trim();
         if (args.birthday !== undefined) updates.birthday = args.birthday;
         if (args.grade !== undefined) updates.grade = args.grade;
-        if (args.campusLocation !== undefined) updates.campusLocation = args.campusLocation;
+        if (args.campuses !== undefined) updates.campuses = args.campuses;
         if (args.carNumber !== undefined) {
             if (args.carNumber < 0) throw new Error("Car number cannot be negative");
             updates.carNumber = args.carNumber;
@@ -449,25 +453,31 @@ export const deleteStudent = mutation({
         }
 
         // Check if this student's car is currently in any queue
-        if (student.carNumber > 0) {
-            const queueEntry = await ctx.db
-                .query("dismissalQueue")
-                .withIndex("by_car_campus", (q: any) =>
-                    q.eq("carNumber", student.carNumber)
-                        .eq("campusLocation", student.campusLocation)
-                )
-                .filter((q: any) => q.eq(q.field("status"), "waiting"))
-                .first();
+        const studentCampusId = student.campuses[0];
+        if (student.carNumber > 0 && studentCampusId) {
+            // Get campus name for dismissalQueue lookup (queue uses campusName as string)
+            const campusSettings = await ctx.db.get(studentCampusId);
+            const campusName = campusSettings?.campusName;
 
-            if (queueEntry) {
-                // Get remaining students with the same car number (siblings)
-                const remainingStudents = await getStudentsByCarNumber(
-                    ctx.db,
-                    student.carNumber,
-                    student.campusLocation
-                ).then((students: any[]) =>
-                    students.filter((s: any) => s._id !== student._id)
-                );
+            if (campusName) {
+                const queueEntry = await ctx.db
+                    .query("dismissalQueue")
+                    .withIndex("by_car_campus", (q: any) =>
+                        q.eq("carNumber", student.carNumber)
+                            .eq("campusLocation", campusName)
+                    )
+                    .filter((q: any) => q.eq(q.field("status"), "waiting"))
+                    .first();
+
+                if (queueEntry) {
+                    // Get remaining students with the same car number (siblings)
+                    const remainingStudents = await getStudentsByCarNumber(
+                        ctx.db,
+                        student.carNumber,
+                        studentCampusId
+                    ).then((students: any[]) =>
+                        students.filter((s: any) => s._id !== student._id)
+                    );
 
                 if (remainingStudents.length === 0) {
                     // No other students with this car number, remove from queue entirely
@@ -523,6 +533,7 @@ export const deleteStudent = mutation({
                         students: updatedStudents
                     });
                 }
+                }
             }
         }
 
@@ -565,32 +576,38 @@ export const deleteMultipleStudents = mutation({
             }
 
             let carRemovedFromQueue = false;
-            const carKey = `${student.carNumber}-${student.campusLocation}`;
+            const studentCampusId = student.campuses[0];
+            const carKey = `${student.carNumber}-${studentCampusId}`;
 
             // Check if this student's car is currently in any queue (only once per car)
-            if (student.carNumber > 0 && !processedCars.has(carKey)) {
+            if (student.carNumber > 0 && studentCampusId && !processedCars.has(carKey)) {
                 processedCars.add(carKey);
 
-                const queueEntry = await ctx.db
-                    .query("dismissalQueue")
-                    .withIndex("by_car_campus", (q: any) =>
-                        q.eq("carNumber", student.carNumber)
-                            .eq("campusLocation", student.campusLocation)
-                    )
-                    .filter((q: any) => q.eq(q.field("status"), "waiting"))
-                    .first();
+                // Get campus name for dismissalQueue lookup (queue uses campusName as string)
+                const campusSettings = await ctx.db.get(studentCampusId);
+                const campusName = campusSettings?.campusName;
 
-                if (queueEntry) {
-                    // Get remaining students with the same car number after all deletions
-                    const remainingStudents = await getStudentsByCarNumber(
-                        ctx.db,
-                        student.carNumber,
-                        student.campusLocation
-                    ).then((students: any[]) =>
-                        students.filter((s: any) =>
-                            !args.studentIds.includes(s._id)
+                if (campusName) {
+                    const queueEntry = await ctx.db
+                        .query("dismissalQueue")
+                        .withIndex("by_car_campus", (q: any) =>
+                            q.eq("carNumber", student.carNumber)
+                                .eq("campusLocation", campusName)
                         )
-                    );
+                        .filter((q: any) => q.eq(q.field("status"), "waiting"))
+                        .first();
+
+                    if (queueEntry) {
+                        // Get remaining students with the same car number after all deletions
+                        const remainingStudents = await getStudentsByCarNumber(
+                            ctx.db,
+                            student.carNumber,
+                            studentCampusId
+                        ).then((students: any[]) =>
+                            students.filter((s: any) =>
+                                !args.studentIds.includes(s._id)
+                            )
+                        );
 
                     if (remainingStudents.length === 0) {
                         // No students will remain with this car number, remove from queue entirely
@@ -642,6 +659,7 @@ export const deleteMultipleStudents = mutation({
                         await ctx.db.patch(queueEntry._id, {
                             students: updatedStudents
                         });
+                    }
                     }
                 }
             }
@@ -724,12 +742,12 @@ export const removeCarNumber = mutation({
 export const getByCarNumber = query({
     args: {
         carNumber: v.number(),
-        campus: v.string()
+        campusId: v.id("campusSettings")
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
-        return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
+        return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campusId);
     }
 });

@@ -9,7 +9,8 @@ export type Student = {
     birthday: string
     carNumber: number
     grade: Grade
-    campusLocation: string
+    campusId: Id<"campusSettings"> // Campus ID for database operations
+    campusLocation: string // Campus name for display (derived from campusId)
     avatarUrl?: string
     avatarStorageId?: Id<"_storage">
 }

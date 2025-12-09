@@ -175,43 +175,35 @@ export function userCanDispatch(
 /**
  * Get students by car number - searches across ALL campuses
  * Car numbers are unique across all campuses, so we search globally
- * First tries the current campus (faster with index), then searches all campuses if needed
+ * First tries the current campus, then searches all campuses if needed
  */
 export async function getStudentsByCarNumber(
     db: DbReader,
     carNumber: number,
-    campus: string
+    campusId: Id<"campusSettings">
 ): Promise<Doc<"students">[]> {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
+    // Query by car number and filter by campus
+    const allStudentsWithCar = await db
         .query("students")
-        .withIndex("by_car_campus", q =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-                .eq("isActive", true)
-        )
+        .withIndex("by_car_number", q => q.eq("carNumber", carNumber))
+        .filter(q => q.eq(q.field("isActive"), true))
         .collect();
+
+    // First, try to find in the current campus
+    const studentsInCampus = allStudentsWithCar.filter(s =>
+        s.campuses.includes(campusId)
+    );
 
     // If found in current campus, return immediately
     if (studentsInCampus.length > 0) {
         return studentsInCampus;
     }
 
-    // If not found in current campus, search across ALL campuses
+    // If not found in current campus, return all students with this car number
     // This allows calling cars from any campus to any campus
-    const allStudents = await db
-        .query("students")
-        .filter(q =>
-            q.and(
-                q.eq(q.field("carNumber"), carNumber),
-                q.eq(q.field("isActive"), true)
-            )
-        )
-        .collect();
-
-    return allStudents;
+    return allStudentsWithCar;
 }
 
 /**
@@ -219,16 +211,17 @@ export async function getStudentsByCarNumber(
  */
 export async function getCampusGrades(
     db: DbReader,
-    campus: string
+    campusId: Id<"campusSettings">
 ): Promise<string[]> {
     const students = await db
         .query("students")
-        .withIndex("by_campus_active", q =>
-            q.eq("campusLocation", campus).eq("isActive", true)
-        )
+        .withIndex("by_active", q => q.eq("isActive", true))
         .collect();
 
-    const grades = new Set(students.map(s => s.grade));
+    // Filter students by campus
+    const campusStudents = students.filter(s => s.campuses.includes(campusId));
+
+    const grades = new Set(campusStudents.map(s => s.grade));
     return Array.from(grades).sort();
 }
 
@@ -242,8 +235,9 @@ export async function getStudentWithCarInfo(
     const student = await db.get(studentId);
     if (!student) return null;
 
-    const siblings = student.carNumber > 0
-        ? await getStudentsByCarNumber(db, student.carNumber, student.campusLocation)
+    const studentCampusId = student.campuses[0];
+    const siblings = student.carNumber > 0 && studentCampusId
+        ? await getStudentsByCarNumber(db, student.carNumber, studentCampusId)
             .then(students => students.filter(s => s._id !== studentId))
         : [];
 

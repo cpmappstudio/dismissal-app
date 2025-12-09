@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Grade } from "@/convex/types"
+import type { Id } from "@/convex/_generated/dataModel"
 
 interface StudentFilters {
     search?: string
@@ -33,10 +34,10 @@ export function useStudentsData(filters: StudentFilters) {
 /**
  * Hook para obtener estudiantes por número de carro
  */
-export function useStudentsByCarNumber(carNumber: number, campus: string) {
+export function useStudentsByCarNumber(carNumber: number, campusId: Id<"campusSettings">) {
     return useQuery(api.students.getByCarNumber, {
         carNumber,
-        campus
+        campusId
     })
 }
 

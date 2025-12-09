@@ -145,7 +145,12 @@ export function StudentsTable() {
 
   // Transform Convex data con memoización mejorada
   const data: Student[] = React.useMemo(() => {
-    if (!studentsData?.students) return [];
+    if (!studentsData?.students || !campusOptions) return [];
+
+    // Create a map of campus IDs to names for quick lookup
+    const campusMap = new Map(
+      campusOptions.map((c: { id: Id<"campusSettings">; label: string }) => [c.id, c.label])
+    );
 
     return studentsData.students.map(
       (student: {
@@ -156,12 +161,15 @@ export function StudentsTable() {
         birthday: string;
         carNumber: number;
         grade: string;
-        campusLocation: string;
+        campuses: Id<"campusSettings">[];
         avatarUrl?: string;
         avatarStorageId?: Id<"_storage">;
         isActive: boolean;
         createdAt: number;
       }) => {
+        const campusId = student.campuses[0];
+        const campusName = campusId ? campusMap.get(campusId) : undefined;
+
         return {
           id: student._id,
           fullName: student.fullName,
@@ -170,13 +178,14 @@ export function StudentsTable() {
           birthday: student.birthday,
           carNumber: student.carNumber,
           grade: student.grade as Grade,
-          campusLocation: student.campusLocation,
+          campusId: campusId,
+          campusLocation: campusName || "Unknown",
           avatarUrl: student.avatarUrl || "",
           avatarStorageId: student.avatarStorageId,
         };
       },
     );
-  }, [studentsData?.students]); // Más específico que studentsData completo
+  }, [studentsData?.students, campusOptions]); // Más específico que studentsData completo
 
   // Loading state - Convex retorna undefined mientras carga
   const isLoading = studentsData === undefined;
@@ -257,7 +266,7 @@ export function StudentsTable() {
           firstName: studentData.firstName,
           lastName: studentData.lastName,
           grade: studentData.grade,
-          campusLocation: studentData.campusLocation,
+          campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
           avatarUrl: studentData.avatarUrl,
@@ -286,7 +295,7 @@ export function StudentsTable() {
           firstName: studentData.firstName,
           lastName: studentData.lastName,
           grade: studentData.grade,
-          campusLocation: studentData.campusLocation,
+          campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
           avatarUrl: studentData.avatarUrl,

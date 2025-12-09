@@ -112,12 +112,12 @@
             "url": "/management/campuses"
           },
           {
-            "title": "Estudiantes",
-            "url": "/management/students"
-          },
-          {
             "title": "Personal",
             "url": "/management/staff"
+          },
+          {
+            "title": "Estudiantes",
+            "url": "/management/students"
           }
         ]
       },

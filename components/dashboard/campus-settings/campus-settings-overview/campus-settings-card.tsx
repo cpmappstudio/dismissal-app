@@ -48,14 +48,14 @@ export function CampusSettingsCard({ campus }: CampusSettingsCardProps) {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="px-5 pt-0">
+                {/* <CardContent className="px-5 pt-0">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                             <Users className="h-4 w-4" aria-hidden />
                             {formatItemCount(campus.itemCount)}
                         </div>
                     </div>
-                </CardContent>
+                </CardContent> */}
             </Card>
         </Link>
     );
