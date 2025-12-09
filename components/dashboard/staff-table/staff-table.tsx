@@ -15,7 +15,7 @@ import {
 import { Search, MapPin, Plus, UserSearch } from "lucide-react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id, Doc } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
@@ -127,7 +127,7 @@ export function StaffTable() {
   const data = React.useMemo<Staff[]>(() => {
     if (!usersData) return [];
 
-    return usersData.map((user) => ({
+    return usersData.map((user: Doc<"users">) => ({
       id: user.clerkId,
       convexId: user._id,
       fullName:
