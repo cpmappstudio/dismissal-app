@@ -39,20 +39,20 @@ export function CampusSettingsOverviewCard({
   );
 
   // Dynamic queries for students and staff counts
-  const activeStudents = useQuery(api.campus.getStudentsByCampus, {
-    campusId: campus._id,
-    isActive: true,
-  });
-  const allStudents = useQuery(api.campus.getStudentsByCampus, {
-    campusId: campus._id,
-  });
-  const activeStaff = useQuery(api.campus.getStaffByCampus, {
-    campusId: campus._id,
-    isActive: true,
-  });
-  const allStaff = useQuery(api.campus.getStaffByCampus, {
-    campusId: campus._id,
-  });
+  // const activeStudents = useQuery(api.campus.getStudentsByCampus, {
+  //   campusId: campus._id,
+  //   isActive: true,
+  // });
+  // const allStudents = useQuery(api.campus.getStudentsByCampus, {
+  //   campusId: campus._id,
+  // });
+  // const activeStaff = useQuery(api.campus.getStaffByCampus, {
+  //   campusId: campus._id,
+  //   isActive: true,
+  // });
+  // const allStaff = useQuery(api.campus.getStaffByCampus, {
+  //   campusId: campus._id,
+  // });
 
   const [isImageExpanded, setIsImageExpanded] = useState(false);
 
@@ -143,7 +143,7 @@ export function CampusSettingsOverviewCard({
                     </div> */}
 
           {/* Dynamic Student and Staff Counts */}
-          <div className="flex items-start gap-3">
+          {/* <div className="flex items-start gap-3">
             <GraduationCap className="h-4 w-4 text-primary mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
@@ -165,7 +165,7 @@ export function CampusSettingsOverviewCard({
                 {allStaff?.length ?? 0} total
               </p>
             </div>
-          </div>
+          </div> */}
 
           {campus.availableGrades && campus.availableGrades.length > 0 && (
             <div className="flex items-start gap-3">
