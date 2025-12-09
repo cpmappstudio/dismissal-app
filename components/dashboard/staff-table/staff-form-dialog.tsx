@@ -36,6 +36,12 @@ import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
+type CampusOption = {
+  id: Id<"campusSettings">;
+  value: string;
+  label: string;
+};
+
 interface StaffFormDialogProps {
   mode: "create" | "edit";
   staff?: Staff;
@@ -434,7 +440,7 @@ export function StaffFormDialog({
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <div className="max-h-60 overflow-y-auto p-1">
-                        {campusOptions?.map((campus) => {
+                        {campusOptions?.map((campus: CampusOption) => {
                           const isSelected = formData.assignedCampuses.includes(campus.label);
                           return (
                             <div

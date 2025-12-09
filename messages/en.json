@@ -31,6 +31,7 @@
     "academicAdmin": "Academic Administration",
     "personalAdmin": "Personal Administration",
     "operators": "Operators",
+    "studentDocs": "Documentation",
     "menu": {
       "profile": {
         "title": "My Account",
@@ -135,6 +136,16 @@
           {
             "title": "Viewer",
             "url": "/operators/viewer"
+          }
+        ]
+      },
+      "studentDocs": {
+        "title": "Documentation",
+        "url": "/docs",
+        "items": [
+          {
+            "title": "Certificates & Transcripts",
+            "url": "/docs/transcripts"
           }
         ]
       }
