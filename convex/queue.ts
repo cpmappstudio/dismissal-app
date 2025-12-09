@@ -3,41 +3,45 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
+import { Id } from "./_generated/dataModel";
+
+/**
+ * Helper to get campus ID by name
+ */
+async function getCampusIdByName(db: any, campusName: string): Promise<Id<"campusSettings"> | null> {
+    const campus = await db
+        .query("campusSettings")
+        .withIndex("by_name", (q: any) => q.eq("campusName", campusName))
+        .unique();
+    return campus?._id || null;
+}
 
 /**
  * Helper functions
  */
-async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+async function getStudentsByCarNumber(db: any, carNumber: number, campusId: Id<"campusSettings">) {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
+    // Get all students with this car number using by_car_number index
+    const allStudentsWithCar = await db
         .query("students")
-        .withIndex("by_car_campus", (q: any) =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-                .eq("isActive", true)
-        )
+        .withIndex("by_car_number", (q: any) => q.eq("carNumber", carNumber))
+        .filter((q: any) => q.eq(q.field("isActive"), true))
         .collect();
+
+    // First, try to find in the current campus
+    const studentsInCampus = allStudentsWithCar.filter((s: any) =>
+        s.campuses?.includes(campusId)
+    );
 
     // If found in current campus, return immediately
     if (studentsInCampus.length > 0) {
         return studentsInCampus;
     }
 
-    // If not found in current campus, search across ALL campuses
+    // If not found in current campus, return all students with this car number
     // This allows calling cars from any campus to any campus
-    const allStudents = await db
-        .query("students")
-        .filter((q: any) =>
-            q.and(
-                q.eq(q.field("carNumber"), carNumber),
-                q.eq(q.field("isActive"), true)
-            )
-        )
-        .collect();
-
-    return allStudents;
+    return allStudentsWithCar;
 }
 
 async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
@@ -220,6 +224,10 @@ export const addCar = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID for assignment
+            const campusId = await getCampusIdByName(ctx.db, args.campus);
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -228,7 +236,7 @@ export const addCar = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
@@ -264,8 +272,18 @@ export const addCar = mutation({
             };
         }
 
+        // Get campus ID for student lookup
+        const campusId = await getCampusIdByName(ctx.db, args.campus);
+        if (!campusId) {
+            return {
+                success: false,
+                error: "INVALID_CAMPUS",
+                message: "Campus not found"
+            };
+        }
+
         // Get students for this car (searches across all campuses)
-        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
+        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, campusId);
         if (students.length === 0) {
             return {
                 success: false,
@@ -308,6 +326,9 @@ export const removeCar = mutation({
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Not authenticated");
 
+        // Get the entry first to know the campus
+        const entryForCampus = await ctx.db.get(args.queueId);
+
         // Get or create user record
         let user = await ctx.db
             .query("users")
@@ -315,6 +336,12 @@ export const removeCar = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID from the entry's campus location
+            const campusId = entryForCampus 
+                ? await getCampusIdByName(ctx.db, entryForCampus.campusLocation)
+                : null;
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -323,7 +350,7 @@ export const removeCar = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: ["default"], // Default campus
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),
@@ -600,6 +627,10 @@ export const clearAllCars = mutation({
             .first();
 
         if (!user) {
+            // Get campus ID for assignment
+            const campusId = await getCampusIdByName(ctx.db, args.campus);
+            const assignedCampuses = campusId ? [campusId] : [];
+
             // Create user record if it doesn't exist
             const userId = await ctx.db.insert("users", {
                 clerkId: identity.subject,
@@ -608,7 +639,7 @@ export const clearAllCars = mutation({
                 firstName: (identity.firstName as string) || (identity.givenName as string),
                 lastName: (identity.lastName as string) || (identity.familyName as string),
                 imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
+                assignedCampuses,
                 role: "viewer", // Default role
                 isActive: true,
                 createdAt: Date.now(),

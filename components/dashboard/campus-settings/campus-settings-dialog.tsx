@@ -30,6 +30,14 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+
+type DirectorOption = {
+  id: Id<"users">;
+  name: string;
+  email: string | undefined;
+  phone: string | undefined;
+};
+
 import {
   Dialog,
   DialogContent,
@@ -224,7 +232,7 @@ export function CampusSettingsDialog({
   );
 
   const selectedDirector = potentialDirectors?.find(
-    (director) => director.id === selectedDirectorId,
+    (director: DirectorOption) => director.id === selectedDirectorId,
   );
   const [selectedCountry, setSelectedCountry] = useState<string>(
     campus?.address?.country || "US",
@@ -468,7 +476,7 @@ export function CampusSettingsDialog({
           updates.directorId = selectedDirectorId || null;
           if (selectedDirectorId) {
             const director = potentialDirectors?.find(
-              (d) => d.id === selectedDirectorId,
+              (d: DirectorOption) => d.id === selectedDirectorId,
             );
             if (director) {
               updates.directorName = director.name;
@@ -571,7 +579,7 @@ export function CampusSettingsDialog({
         // Director fields
         if (selectedDirectorId) {
           const director = potentialDirectors?.find(
-            (d) => d.id === selectedDirectorId,
+            (d: DirectorOption) => d.id === selectedDirectorId,
           );
           campusData.directorId = selectedDirectorId;
           if (director) {
@@ -770,7 +778,7 @@ export function CampusSettingsDialog({
                               </div>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {potentialDirectors?.map((director) => (
+                            {potentialDirectors?.map((director: DirectorOption) => (
                               <DropdownMenuItem
                                 key={director.id}
                                 onClick={() =>
@@ -955,7 +963,6 @@ export function CampusSettingsDialog({
                   </div>
 
                   {/* State and City - Second row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-3">
                       <Label htmlFor="state">
                         {selectedCountry === "HN"
@@ -983,7 +990,7 @@ export function CampusSettingsDialog({
                         disabled={availableStates.length === 0}
                       />
                     </div>
-                    <div className="grid gap-3">
+                    {/* <div className="grid gap-3">
                       <Label htmlFor="city">City</Label>
                       <SelectDropdown
                         options={availableCities}
@@ -1006,8 +1013,7 @@ export function CampusSettingsDialog({
                           No major cities available for selected state
                         </p>
                       )}
-                    </div>
-                  </div>
+                    </div> */}
 
                   {/* Street - Third row */}
                   <div className="grid gap-3">
@@ -1117,27 +1123,19 @@ export function CampusSettingsDialog({
             </div>
 
             <DialogFooter className="flex justify-between">
-              {isEditing && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setShowDeleteAlert(true)}
-                  className="gap-2 mr-auto"
-                  disabled={isSubmitting}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Campus
-                </Button>
-              )}
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setShowDeleteAlert(true)}
+                    className="gap-2 mr-auto"
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Campus
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={isSubmitting || !isClerkLoaded || !clerkUser}

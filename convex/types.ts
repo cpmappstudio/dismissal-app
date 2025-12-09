@@ -82,19 +82,9 @@ export const gradeValidator = v.union(
 );
 export type Grade = Infer<typeof gradeValidator>;
 
-/**
- * Campus locations available in the system
- */
-export const CAMPUS_LOCATIONS = [
-    "Poinciana Campus",
-    "Simpson Campus",
-    "Neptune Campus",
-    "Downtown Middle",
-    "Learning Center",
-    "Honduras",
-    "Puerto Rico"
-] as const;
-export type CampusLocation = typeof CAMPUS_LOCATIONS[number];
+// NOTE: Campus locations are now dynamic and stored in the campusSettings table.
+// Use the api.campus.getOptions query to get available campuses.
+// CampusLocation type has been replaced with string for flexibility.
 
 /**
  * Academic grades supported by the system (for forms and UI)
@@ -566,14 +556,18 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 
 /**
- * Check if user has access to a campus
+ * Check if user has access to a campus by campus ID
  * Campus-specific logic that belongs in types rather than role-utils
+ * @param user - The user profile
+ * @param campusId - The campus ID (from campusSettings table)
+ * @param role - The user's role
  */
-export function hasAccessToCampus(user: UserProfile, campus: string, role: UserRole): boolean {
+export function hasAccessToCampus(user: UserProfile, campusId: string, role: UserRole): boolean {
     if (role === "admin" || role === "superadmin") {
         return true; // Admins have access to all campuses
     }
-    return user.assignedCampuses.includes(campus);
+    // Compare against campus IDs in assignedCampuses
+    return user.assignedCampuses.some((id) => id === campusId);
 }
 
 /**

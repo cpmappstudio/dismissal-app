@@ -32,6 +32,7 @@
     "academicAdmin": "Administración Académica",
     "personalAdmin": "Administración Personal",
     "operators": "Operadores",
+    "studentDocs": "Documentación",
     "menu": {
       "profile": {
         "title": "Mi Cuenta",
@@ -112,12 +113,12 @@
             "url": "/management/campuses"
           },
           {
-            "title": "Estudiantes",
-            "url": "/management/students"
-          },
-          {
             "title": "Personal",
             "url": "/management/staff"
+          },
+          {
+            "title": "Estudiantes",
+            "url": "/management/students"
           }
         ]
       },
@@ -136,6 +137,16 @@
           {
             "title": "Visor",
             "url": "/operators/viewer"
+          }
+        ]
+      },
+      "studentDocs": {
+        "title": "Documentación",
+        "url": "/docs",
+        "items": [
+          {
+            "title": "Certificados y Transcripciones",
+            "url": "/docs/transcripts"
           }
         ]
       }

@@ -38,6 +38,22 @@ export function CampusSettingsOverviewCard({
     campus.logoStorageId ? { storageId: campus.logoStorageId } : "skip",
   );
 
+  // Dynamic queries for students and staff counts
+  const activeStudents = useQuery(api.campus.getStudentsByCampus, {
+    campusId: campus._id,
+    isActive: true,
+  });
+  const allStudents = useQuery(api.campus.getStudentsByCampus, {
+    campusId: campus._id,
+  });
+  const activeStaff = useQuery(api.campus.getStaffByCampus, {
+    campusId: campus._id,
+    isActive: true,
+  });
+  const allStaff = useQuery(api.campus.getStaffByCampus, {
+    campusId: campus._id,
+  });
+
   const [isImageExpanded, setIsImageExpanded] = useState(false);
 
   // const dismissalSchedule = campus.dismissalStartTime && campus.dismissalEndTime
@@ -126,33 +142,30 @@ export function CampusSettingsOverviewCard({
                         </div>
                     </div> */}
 
-          {campus.metrics && (
-            <>
-              <div className="flex items-start gap-3">
-                <GraduationCap className="h-4 w-4 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    Students
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {campus.metrics.activeStudents} active /{" "}
-                    {campus.metrics.totalStudents} total
-                  </p>
-                </div>
-              </div>
+          {/* Dynamic Student and Staff Counts */}
+          <div className="flex items-start gap-3">
+            <GraduationCap className="h-4 w-4 text-primary mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                Students
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {activeStudents?.length ?? 0} active /{" "}
+                {allStudents?.length ?? 0} total
+              </p>
+            </div>
+          </div>
 
-              <div className="flex items-start gap-3">
-                <Users className="h-4 w-4 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">Staff</p>
-                  <p className="text-sm text-muted-foreground">
-                    {campus.metrics.activeStaff} active /{" "}
-                    {campus.metrics.totalStaff} total
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
+          <div className="flex items-start gap-3">
+            <Users className="h-4 w-4 text-primary mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">Staff</p>
+              <p className="text-sm text-muted-foreground">
+                {activeStaff?.length ?? 0} active /{" "}
+                {allStaff?.length ?? 0} total
+              </p>
+            </div>
+          </div>
 
           {campus.availableGrades && campus.availableGrades.length > 0 && (
             <div className="flex items-start gap-3">

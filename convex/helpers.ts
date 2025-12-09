@@ -62,6 +62,7 @@ export async function getUserByEmail(
 /**
  * Validate user access from Clerk identity
  * Helper completo para validar autenticación y acceso
+ * @param campus - Campus name (will be resolved to ID internally)
  */
 export async function validateUserAccess(
     ctx: QueryCtx | MutationCtx,
@@ -85,8 +86,16 @@ export async function validateUserAccess(
     const user = await getUserByClerkId(ctx.db, identity.subject);
     if (!user || !user.isActive) throw new Error("User not active in system");
 
-    if (campus && role !== 'superadmin' && !user.assignedCampuses.includes(campus)) {
-        throw new Error(`No access to campus: ${campus}`);
+    // Check campus access by resolving name to ID
+    if (campus && role !== 'superadmin') {
+        const campusDoc = await ctx.db
+            .query("campusSettings")
+            .withIndex("by_name", (q) => q.eq("campusName", campus))
+            .unique();
+
+        if (!campusDoc || !user.assignedCampuses.includes(campusDoc._id)) {
+            throw new Error(`No access to campus: ${campus}`);
+        }
     }
 
     return { user, role, identity };
@@ -94,16 +103,45 @@ export async function validateUserAccess(
 
 /**
  * Check if user has access to a specific campus
+ * @param campus - Campus name (will be compared against assigned campus IDs)
+ * @param db - Database reader for campus lookup
  */
-export function userHasAccessToCampus(
+export async function userHasAccessToCampusAsync(
+    db: DbReader,
     user: Doc<"users">,
     campus: string,
+    role: DismissalRole
+): Promise<boolean> {
+    if (role === "admin" || role === "superadmin") {
+        return true;
+    }
+
+    // Find campus by name to get its ID
+    const campusDoc = await db
+        .query("campusSettings")
+        .withIndex("by_name", (q) => q.eq("campusName", campus))
+        .unique();
+
+    if (!campusDoc) {
+        return false; // Campus not found
+    }
+
+    return user.assignedCampuses.includes(campusDoc._id);
+}
+
+/**
+ * Check if user has access to a specific campus by ID (synchronous)
+ * Use this when you already have the campus ID
+ */
+export function userHasAccessToCampusById(
+    user: Doc<"users">,
+    campusId: Id<"campusSettings">,
     role: DismissalRole
 ): boolean {
     if (role === "admin" || role === "superadmin") {
         return true;
     }
-    return user.assignedCampuses.includes(campus);
+    return user.assignedCampuses.includes(campusId);
 }
 
 /**
@@ -137,43 +175,35 @@ export function userCanDispatch(
 /**
  * Get students by car number - searches across ALL campuses
  * Car numbers are unique across all campuses, so we search globally
- * First tries the current campus (faster with index), then searches all campuses if needed
+ * First tries the current campus, then searches all campuses if needed
  */
 export async function getStudentsByCarNumber(
     db: DbReader,
     carNumber: number,
-    campus: string
+    campusId: Id<"campusSettings">
 ): Promise<Doc<"students">[]> {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
+    // Query by car number and filter by campus
+    const allStudentsWithCar = await db
         .query("students")
-        .withIndex("by_car_campus", q =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-                .eq("isActive", true)
-        )
+        .withIndex("by_car_number", q => q.eq("carNumber", carNumber))
+        .filter(q => q.eq(q.field("isActive"), true))
         .collect();
+
+    // First, try to find in the current campus
+    const studentsInCampus = allStudentsWithCar.filter(s =>
+        s.campuses.includes(campusId)
+    );
 
     // If found in current campus, return immediately
     if (studentsInCampus.length > 0) {
         return studentsInCampus;
     }
 
-    // If not found in current campus, search across ALL campuses
+    // If not found in current campus, return all students with this car number
     // This allows calling cars from any campus to any campus
-    const allStudents = await db
-        .query("students")
-        .filter(q =>
-            q.and(
-                q.eq(q.field("carNumber"), carNumber),
-                q.eq(q.field("isActive"), true)
-            )
-        )
-        .collect();
-
-    return allStudents;
+    return allStudentsWithCar;
 }
 
 /**
@@ -181,16 +211,17 @@ export async function getStudentsByCarNumber(
  */
 export async function getCampusGrades(
     db: DbReader,
-    campus: string
+    campusId: Id<"campusSettings">
 ): Promise<string[]> {
     const students = await db
         .query("students")
-        .withIndex("by_campus_active", q =>
-            q.eq("campusLocation", campus).eq("isActive", true)
-        )
+        .withIndex("by_active", q => q.eq("isActive", true))
         .collect();
 
-    const grades = new Set(students.map(s => s.grade));
+    // Filter students by campus
+    const campusStudents = students.filter(s => s.campuses.includes(campusId));
+
+    const grades = new Set(campusStudents.map(s => s.grade));
     return Array.from(grades).sort();
 }
 
@@ -204,8 +235,9 @@ export async function getStudentWithCarInfo(
     const student = await db.get(studentId);
     if (!student) return null;
 
-    const siblings = student.carNumber > 0
-        ? await getStudentsByCarNumber(db, student.carNumber, student.campusLocation)
+    const studentCampusId = student.campuses[0];
+    const siblings = student.carNumber > 0 && studentCampusId
+        ? await getStudentsByCarNumber(db, student.carNumber, studentCampusId)
             .then(students => students.filter(s => s._id !== studentId))
         : [];
 

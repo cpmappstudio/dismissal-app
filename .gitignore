@@ -46,3 +46,5 @@ package-lock.json
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+convex/_generated/api.d.ts

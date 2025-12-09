@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select"
 import { Student, Grade } from "../types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
-import { CAMPUS_LOCATIONS as CAMPUS_OPTIONS, GRADES, type CampusLocation } from "@/convex/types"
+import { GRADES } from "@/convex/types"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
@@ -65,6 +65,9 @@ export function StudentFormDialog({
 
     // Convex mutations for avatar handling
     const generateUploadUrl = useMutation(api.students.generateAvatarUploadUrl)
+    
+    // Query for campus options (dynamic)
+    const campusOptions = useQuery(api.campus.getOptions, {})
 
     // Avatar upload state
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
@@ -90,7 +93,7 @@ export function StudentFormDialog({
                 lastName: student.lastName,
                 carNumber: student.carNumber?.toString() || "",
                 grade: student.grade,
-                campusLocation: student.campusLocation,
+                campusId: student.campusId,
                 avatarUrl: student.avatarUrl || "",
                 avatarStorageId: student.avatarStorageId || null
             }
@@ -100,7 +103,7 @@ export function StudentFormDialog({
             lastName: "",
             carNumber: "",
             grade: "" as Grade | "",
-            campusLocation: "" as CampusLocation | "",
+            campusId: "" as Id<"campusSettings"> | "",
             avatarUrl: "",
             avatarStorageId: null as Id<"_storage"> | null
         }
@@ -254,7 +257,7 @@ export function StudentFormDialog({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!formData.firstName || !formData.lastName || !date || !formData.grade || !formData.campusLocation) {
+        if (!formData.firstName || !formData.lastName || !date || !formData.grade || !formData.campusId) {
             return // Basic validation
         }
 
@@ -283,6 +286,9 @@ export function StudentFormDialog({
 
             // No automatic avatar generation - let component show initials as fallback
 
+            // Get campus name for display
+            const campusName = campusOptions?.find(c => c.id === formData.campusId)?.label || "Unknown"
+
             const studentData = {
                 firstName: formData.firstName,
                 lastName: formData.lastName,
@@ -294,7 +300,8 @@ export function StudentFormDialog({
                 }),
                 carNumber: formData.carNumber ? parseInt(formData.carNumber) : 0,
                 grade: formData.grade as Grade,
-                campusLocation: formData.campusLocation as CampusLocation,
+                campusId: formData.campusId as Id<"campusSettings">,
+                campusLocation: campusName,
                 avatarUrl: finalAvatarUrl,
                 avatarStorageId: finalAvatarStorageId
             }
@@ -430,14 +437,14 @@ export function StudentFormDialog({
                                 <Label htmlFor="campus" className="text-sm font-medium">
                                     {t('createDialog.fields.campus.label')} <span className="text-destructive">*</span>
                                 </Label>
-                                <Select value={formData.campusLocation} onValueChange={(value) => updateFormData("campusLocation", value)}>
+                                <Select value={formData.campusId as string} onValueChange={(value) => updateFormData("campusId", value as Id<"campusSettings">)}>
                                     <SelectTrigger className="w-full h-10">
                                         <SelectValue placeholder={t('createDialog.fields.campus.placeholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CAMPUS_OPTIONS.map((campus) => (
-                                            <SelectItem key={campus} value={campus}>
-                                                {campus}
+                                        {campusOptions?.map((campus) => (
+                                            <SelectItem key={campus.id} value={campus.id}>
+                                                {campus.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

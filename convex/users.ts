@@ -274,7 +274,7 @@ export const getCurrentProfile = query({
  */
 export const listUsers = query({
   args: {
-    assignedCampus: v.optional(v.string()), // Filter by assigned campus
+    assignedCampus: v.optional(v.id("campusSettings")), // Filter by assigned campus ID
     role: v.optional(roleValidator),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
@@ -573,7 +573,7 @@ export const createUserWithClerk = action({
     firstName: v.string(),
     lastName: v.string(),
     role: roleValidator,
-    assignedCampuses: v.array(v.string()), // Required: at least one campus
+    assignedCampuses: v.array(v.id("campusSettings")), // Required: at least one campus
     phone: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
   },
@@ -681,7 +681,7 @@ export const updateUserWithClerk = action({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     role: v.optional(roleValidator),
-    assignedCampuses: v.optional(v.array(v.string())),
+    assignedCampuses: v.optional(v.array(v.id("campusSettings"))),
     phone: v.optional(v.string()),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     avatarStorageId: v.optional(v.union(v.id("_storage"), v.null())), // Allow null to remove avatar
@@ -1034,7 +1034,7 @@ export const createTempUser = mutation({
     firstName: v.string(),
     lastName: v.string(),
     role: roleValidator,
-    assignedCampuses: v.array(v.string()), // Required: at least one campus
+    assignedCampuses: v.array(v.id("campusSettings")), // Required: at least one campus
   },
   handler: async (ctx, args) => {
     // Check permissions
