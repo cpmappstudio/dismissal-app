@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectDropdown } from "@/components/ui/select-dropdown";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Plus,
   Edit,
@@ -21,13 +22,15 @@ import {
   X,
   GraduationCap,
   GripVertical,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
@@ -168,9 +171,64 @@ export function CampusSettingsDialog({
   const isEditing = !!campus;
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations("campusManagement");
 
   // Clerk user (for authentication check)
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+
+  // Alert state
+  const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Queries
   const potentialDirectors = useQuery(api.campus.getSuperadmins);
@@ -528,11 +586,19 @@ export function CampusSettingsDialog({
             });
           }
 
-          console.log("Campus updated successfully");
+          showAlert(
+            "success",
+            t("alerts.updateSuccess.title"),
+            t("alerts.updateSuccess.message", { name: campusName }),
+          );
           setIsOpen(false);
           router.refresh();
         } else {
-          console.log("No changes detected");
+          showAlert(
+            "success",
+            t("alerts.noChanges.title"),
+            t("alerts.noChanges.message"),
+          );
         }
       } else {
         // Create new campus
@@ -612,7 +678,11 @@ export function CampusSettingsDialog({
 
         await createCampusMutation(campusData);
 
-        console.log("Campus created successfully");
+        showAlert(
+          "success",
+          t("alerts.createSuccess.title"),
+          t("alerts.createSuccess.message", { name: campusName }),
+        );
         form.reset();
         setSelectedDirectorId(undefined);
         setSelectedImage(null);
@@ -626,8 +696,12 @@ export function CampusSettingsDialog({
       }
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to save campus";
-      console.error("Error saving campus:", errorMessage);
+        error instanceof Error ? error.message : t("alerts.saveError.message");
+      showAlert(
+        "error",
+        isEditing ? t("alerts.updateError.title") : t("alerts.createError.title"),
+        errorMessage,
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -638,18 +712,31 @@ export function CampusSettingsDialog({
 
     try {
       setIsSubmitting(true);
-      await deleteCampusMutation({ campusId: campus._id });
-
-      console.log("Campus deleted successfully");
+      
+      // 1. Cerrar los diálogos primero
       setIsOpen(false);
       setShowDeleteAlert(false);
-
-      router.push(`/${locale}/management/campuses`);
-      router.refresh();
+      
+      // 2. Navegar ANTES de eliminar con query param para mostrar alerta en destino
+      const deletedName = encodeURIComponent(campus.campusName);
+      router.push(`/${locale}/management/campuses?deleted=${deletedName}`);
+      
+      // 3. Pequeño delay para asegurar que la navegación inicie
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 4. Ahora sí eliminar el campus
+      await deleteCampusMutation({ campusId: campus._id });
+      
     } catch (error) {
+      // Si falla, el usuario ya está en la página de listado
+      // pero el campus sigue existiendo
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete campus";
-      console.error("Error deleting campus:", errorMessage);
+        error instanceof Error ? error.message : t("alerts.deleteError.message");
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        errorMessage,
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1176,6 +1263,30 @@ export function CampusSettingsDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
     </>
   );
 }

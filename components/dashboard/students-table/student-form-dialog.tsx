@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select"
 import { Student, Grade } from "../types"
 import { DeleteStudentsDialog } from "./delete-students-dialog"
-import { GRADES } from "@/convex/types"
+import { CampusOption, GRADES } from "@/convex/types"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
@@ -287,7 +287,7 @@ export function StudentFormDialog({
             // No automatic avatar generation - let component show initials as fallback
 
             // Get campus name for display
-            const campusName = campusOptions?.find(c => c.id === formData.campusId)?.label || "Unknown"
+            const campusName = campusOptions?.find((c: CampusOption) => c.id === formData.campusId)?.label || "Unknown"
 
             const studentData = {
                 firstName: formData.firstName,
@@ -442,7 +442,7 @@ export function StudentFormDialog({
                                         <SelectValue placeholder={t('createDialog.fields.campus.placeholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {campusOptions?.map((campus) => (
+                                        {campusOptions?.map((campus: CampusOption) => (
                                             <SelectItem key={campus.id} value={campus.id}>
                                                 {campus.label}
                                             </SelectItem>

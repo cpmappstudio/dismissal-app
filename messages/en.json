@@ -452,6 +452,33 @@
         "delete": "Delete Student",
         "deletePlural": "Delete Students"
       }
+    },
+    "alerts": {
+      "tapToDismiss": "Tap to dismiss",
+      "createSuccess": {
+        "title": "Student Created",
+        "message": "{name} has been added successfully"
+      },
+      "createError": {
+        "title": "Error Creating Student",
+        "message": "Failed to create student. Please try again."
+      },
+      "updateSuccess": {
+        "title": "Student Updated",
+        "message": "{name} has been updated successfully"
+      },
+      "updateError": {
+        "title": "Error Updating Student",
+        "message": "Failed to update student. Please try again."
+      },
+      "deleteSuccess": {
+        "title": "Student Deleted",
+        "message": "{count, plural, one {1 student has} other {# students have}} been deleted successfully"
+      },
+      "deleteError": {
+        "title": "Error Deleting Student",
+        "message": "Failed to delete student(s). Please try again."
+      }
     }
   },
   "staffManagement": {
@@ -575,6 +602,70 @@
         "cancel": "Cancel",
         "delete": "Delete Staff",
         "deletePlural": "Delete Staff"
+      }
+    },
+    "alerts": {
+      "tapToDismiss": "Tap to dismiss",
+      "campusRequired": "At least one valid campus must be selected",
+      "createSuccess": {
+        "title": "Staff Created",
+        "message": "{name} has been added successfully"
+      },
+      "createError": {
+        "title": "Error Creating Staff",
+        "message": "Failed to create staff member. Please try again."
+      },
+      "updateSuccess": {
+        "title": "Staff Updated",
+        "message": "{name} has been updated successfully"
+      },
+      "updateError": {
+        "title": "Error Updating Staff",
+        "message": "Failed to update staff member. Please try again."
+      },
+      "deleteSuccess": {
+        "title": "Staff Deleted",
+        "message": "{count, plural, one {1 staff member has} other {# staff members have}} been deleted successfully"
+      },
+      "deleteError": {
+        "title": "Error Deleting Staff",
+        "message": "Failed to delete staff member(s). Please try again."
+      }
+    }
+  },
+  "campusManagement": {
+    "alerts": {
+      "tapToDismiss": "Tap to dismiss",
+      "createSuccess": {
+        "title": "Campus Created",
+        "message": "{name} has been created successfully"
+      },
+      "createError": {
+        "title": "Error Creating Campus",
+        "message": "Failed to create campus. Please try again."
+      },
+      "updateSuccess": {
+        "title": "Campus Updated",
+        "message": "{name} has been updated successfully"
+      },
+      "updateError": {
+        "title": "Error Updating Campus",
+        "message": "Failed to update campus. Please try again."
+      },
+      "deleteSuccess": {
+        "title": "Campus Deleted",
+        "message": "{name} has been deleted successfully"
+      },
+      "deleteError": {
+        "title": "Error Deleting Campus",
+        "message": "Failed to delete campus. Please try again."
+      },
+      "noChanges": {
+        "title": "No Changes",
+        "message": "No changes were detected"
+      },
+      "saveError": {
+        "message": "Failed to save campus"
       }
     }
   },

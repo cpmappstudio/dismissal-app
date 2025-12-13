@@ -260,6 +260,7 @@ export interface CampusState {
  * Campus list item for dropdowns
  */
 export interface CampusOption {
+    id: Doc<"campusSettings">["_id"];
     value: string;
     label: string;
     isActive: boolean;

@@ -262,7 +262,7 @@ export function StaffFormDialog({
 
     try {
       // Determine final avatar values
-      let finalAvatarStorageId: Id<"_storage"> | undefined;
+      let finalAvatarStorageId: Id<"_storage"> | undefined | null;
       let finalAvatarUrl = formData.avatarUrl;
 
       if (avatarFile) {

@@ -453,6 +453,33 @@
         "delete": "Eliminar Estudiante",
         "deletePlural": "Eliminar Estudiantes"
       }
+    },
+    "alerts": {
+      "tapToDismiss": "Toca para cerrar",
+      "createSuccess": {
+        "title": "Estudiante Creado",
+        "message": "{name} ha sido agregado exitosamente"
+      },
+      "createError": {
+        "title": "Error al Crear Estudiante",
+        "message": "No se pudo crear el estudiante. Por favor, intenta de nuevo."
+      },
+      "updateSuccess": {
+        "title": "Estudiante Actualizado",
+        "message": "{name} ha sido actualizado exitosamente"
+      },
+      "updateError": {
+        "title": "Error al Actualizar Estudiante",
+        "message": "No se pudo actualizar el estudiante. Por favor, intenta de nuevo."
+      },
+      "deleteSuccess": {
+        "title": "Estudiante Eliminado",
+        "message": "{count, plural, one {1 estudiante ha} other {# estudiantes han}} sido eliminado(s) exitosamente"
+      },
+      "deleteError": {
+        "title": "Error al Eliminar Estudiante",
+        "message": "No se pudo eliminar el/los estudiante(s). Por favor, intenta de nuevo."
+      }
     }
   },
   "staffManagement": {
@@ -575,6 +602,70 @@
         "cancel": "Cancelar",
         "delete": "Eliminar Personal",
         "deletePlural": "Eliminar Personal"
+      }
+    },
+    "alerts": {
+      "tapToDismiss": "Toca para cerrar",
+      "campusRequired": "Debes seleccionar al menos un campus válido",
+      "createSuccess": {
+        "title": "Personal Creado",
+        "message": "{name} ha sido agregado exitosamente"
+      },
+      "createError": {
+        "title": "Error al Crear Personal",
+        "message": "No se pudo crear el miembro del personal. Por favor, intenta de nuevo."
+      },
+      "updateSuccess": {
+        "title": "Personal Actualizado",
+        "message": "{name} ha sido actualizado exitosamente"
+      },
+      "updateError": {
+        "title": "Error al Actualizar Personal",
+        "message": "No se pudo actualizar el miembro del personal. Por favor, intenta de nuevo."
+      },
+      "deleteSuccess": {
+        "title": "Personal Eliminado",
+        "message": "{count, plural, one {1 miembro del personal ha} other {# miembros del personal han}} sido eliminado(s) exitosamente"
+      },
+      "deleteError": {
+        "title": "Error al Eliminar Personal",
+        "message": "No se pudo eliminar el/los miembro(s) del personal. Por favor, intenta de nuevo."
+      }
+    }
+  },
+  "campusManagement": {
+    "alerts": {
+      "tapToDismiss": "Toca para cerrar",
+      "createSuccess": {
+        "title": "Campus Creado",
+        "message": "{name} ha sido creado exitosamente"
+      },
+      "createError": {
+        "title": "Error al Crear Campus",
+        "message": "No se pudo crear el campus. Por favor, intenta de nuevo."
+      },
+      "updateSuccess": {
+        "title": "Campus Actualizado",
+        "message": "{name} ha sido actualizado exitosamente"
+      },
+      "updateError": {
+        "title": "Error al Actualizar Campus",
+        "message": "No se pudo actualizar el campus. Por favor, intenta de nuevo."
+      },
+      "deleteSuccess": {
+        "title": "Campus Eliminado",
+        "message": "{name} ha sido eliminado exitosamente"
+      },
+      "deleteError": {
+        "title": "Error al Eliminar Campus",
+        "message": "No se pudo eliminar el campus. Por favor, intenta de nuevo."
+      },
+      "noChanges": {
+        "title": "Sin Cambios",
+        "message": "No se detectaron cambios"
+      },
+      "saveError": {
+        "message": "No se pudo guardar el campus"
       }
     }
   },
