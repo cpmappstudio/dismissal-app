@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { CampusSettingsOverview } from "@/components/dashboard/campus-settings/campus-settings-overview";
@@ -12,14 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2 } from "lucide-react";
 
-export default function CampusSettingsPage() {
-    const campusSettings = useCampusData({ isActive: true });
-    const [hasLoaded, setHasLoaded] = useState(false);
+function DeletedCampusAlert() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const t = useTranslations("campusManagement");
 
-    // Alert state for deleted campus notification
     const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [alert, setAlert] = useState<{
         show: boolean;
@@ -31,7 +28,6 @@ export default function CampusSettingsPage() {
         message: "",
     });
 
-    // Function to hide alert
     const hideAlert = useCallback(() => {
         if (alertTimeoutRef.current) {
             clearTimeout(alertTimeoutRef.current);
@@ -40,21 +36,17 @@ export default function CampusSettingsPage() {
         setAlert((prev) => ({ ...prev, show: false }));
     }, []);
 
-    // Check for deleted campus query param and show alert
     useEffect(() => {
         const deletedCampusName = searchParams.get("deleted");
         if (deletedCampusName) {
-            // Show the alert
             setAlert({
                 show: true,
                 title: t("alerts.deleteSuccess.title"),
                 message: t("alerts.deleteSuccess.message", { name: decodeURIComponent(deletedCampusName) }),
             });
 
-            // Remove the query param from URL (clean URL)
             router.replace("/management/campuses", { scroll: false });
 
-            // Auto-hide after 5 seconds
             alertTimeoutRef.current = setTimeout(() => {
                 setAlert((prev) => ({ ...prev, show: false }));
                 alertTimeoutRef.current = null;
@@ -67,6 +59,32 @@ export default function CampusSettingsPage() {
             }
         };
     }, [searchParams, router, t]);
+
+    if (!alert.show) return null;
+
+    return (
+        <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
+            <Alert
+                variant="default"
+                className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+                onClick={hideAlert}
+            >
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+                <AlertDescription className="text-sm mt-1">
+                    {alert.message}
+                    <div className="text-xs text-muted-foreground mt-1">
+                        {t("alerts.tapToDismiss")}
+                    </div>
+                </AlertDescription>
+            </Alert>
+        </div>
+    );
+}
+
+export default function CampusSettingsPage() {
+    const campusSettings = useCampusData({ isActive: true });
+    const [hasLoaded, setHasLoaded] = useState(false);
 
     // Track when data has actually loaded to prevent showing empty state prematurely
     useEffect(() => {
@@ -127,25 +145,9 @@ export default function CampusSettingsPage() {
                 <CampusSettingsOverview campusSettings={mappedSettings} />
             </div>
 
-            {/* Alert Component - Fixed at top right */}
-            {alert.show && (
-                <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
-                    <Alert
-                        variant="default"
-                        className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
-                        onClick={hideAlert}
-                    >
-                        <CheckCircle2 className="h-4 w-4" />
-                        <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
-                        <AlertDescription className="text-sm mt-1">
-                            {alert.message}
-                            <div className="text-xs text-muted-foreground mt-1">
-                                {t("alerts.tapToDismiss")}
-                            </div>
-                        </AlertDescription>
-                    </Alert>
-                </div>
-            )}
+            <Suspense fallback={null}>
+                <DeletedCampusAlert />
+            </Suspense>
         </>
     );
 }
