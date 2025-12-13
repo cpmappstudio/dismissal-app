@@ -12,13 +12,14 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { Search, MapPin, Plus, UserSearch } from "lucide-react";
+import { Search, MapPin, Plus, UserSearch, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id, Doc } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -93,6 +94,60 @@ export function StaffTable() {
     }));
   }, [columnFilters]);
 
+  // Alert state
+  const alertTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = React.useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = React.useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = React.useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  React.useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Convex queries and actions
   const usersData = useQuery(api.users.listUsers, {});
   const campusOptions = useQuery(api.campus.getOptions, {});
@@ -163,7 +218,11 @@ export function StaffTable() {
         .filter((id): id is Id<"campusSettings"> => id !== null);
       
       if (campusIds.length === 0) {
-        alert("Error: At least one valid campus must be selected");
+        showAlert(
+          "error",
+          t("alerts.createError.title"),
+          t("alerts.campusRequired"),
+        );
         return;
       }
 
@@ -178,13 +237,19 @@ export function StaffTable() {
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
 
-      // Note: The avatar sync to Clerk's profile_image_url happens after webhook
-      // creates the user in Convex. For now, the avatar is stored in public_metadata
-      // and will be synced when the user is first edited or manually synced.
+      showAlert(
+        "success",
+        t("alerts.createSuccess.title"),
+        t("alerts.createSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
+      );
     } catch (error) {
       const err = error as Error;
       console.error("Error creating user:", err);
-      alert(`Error: ${err.message || "Failed to create user"}`);
+      showAlert(
+        "error",
+        t("alerts.createError.title"),
+        err.message || t("alerts.createError.message"),
+      );
     }
   };
 
@@ -195,10 +260,19 @@ export function StaffTable() {
         await deleteUser({ clerkUserId: clerkId });
       }
       setRowSelection({});
+      showAlert(
+        "success",
+        t("alerts.deleteSuccess.title"),
+        t("alerts.deleteSuccess.message", { count: staffIds.length }),
+      );
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Error deleting users:", err);
-      alert(`Error: ${err.message || "Failed to delete users"}`);
+      console.error("Error deleting users:", err);
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        err.message || t("alerts.deleteError.message"),
+      );
     }
   };
 
@@ -212,7 +286,11 @@ export function StaffTable() {
         .filter((id): id is Id<"campusSettings"> => id !== null);
       
       if (campusIds.length === 0) {
-        alert("Error: At least one valid campus must be selected");
+        showAlert(
+          "error",
+          t("alerts.updateError.title"),
+          t("alerts.campusRequired"),
+        );
         return;
       }
 
@@ -292,10 +370,19 @@ export function StaffTable() {
 
       setEditDialogOpen(false);
       setSelectedStaff(undefined);
+      showAlert(
+        "success",
+        t("alerts.updateSuccess.title"),
+        t("alerts.updateSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
+      );
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Error updating user:", err);
-      alert(`Error: ${err.message || "Failed to update user"}`);
+      console.error("Error updating user:", err);
+      showAlert(
+        "error",
+        t("alerts.updateError.title"),
+        err.message || t("alerts.updateError.message"),
+      );
     }
   };
 
@@ -547,6 +634,30 @@ export function StaffTable() {
             setSelectedStaff(undefined);
           }}
         />
+      )}
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
     </div>
   );

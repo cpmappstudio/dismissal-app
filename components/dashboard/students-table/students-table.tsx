@@ -14,9 +14,10 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { Search, GraduationCap, Plus, MapPin } from "lucide-react";
+import { Search, GraduationCap, Plus, MapPin, AlertCircle, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 // import {
 //     DropdownMenu,
 //     DropdownMenuContent,
@@ -41,6 +42,7 @@ import { DeleteStudentsDialog } from "./delete-students-dialog";
 import { StudentFormDialog } from "./student-form-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import {
+  CampusOption,
   GRADES,
   Grade,
   Id,
@@ -103,6 +105,60 @@ export function StudentsTable() {
   const [selectedStudent, setSelectedStudent] = React.useState<
     Student | undefined
   >();
+
+  // Alert state
+  const alertTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = React.useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = React.useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = React.useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  React.useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Query for campus options (dynamic)
   const campusOptions = useQuery(api.campus.getOptions, {});
@@ -250,13 +306,20 @@ export function StudentsTable() {
           });
         }
         setRowSelection({});
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.deleteSuccess.title"),
+          t("alerts.deleteSuccess.message", { count: studentIds.length }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.deleteError.title"),
+          t("alerts.deleteError.message"),
+        );
       }
     },
-    [deleteStudent, deleteMultipleStudents],
+    [deleteStudent, deleteMultipleStudents, showAlert, t],
   );
 
   const handleCreateStudent = React.useCallback(
@@ -272,13 +335,20 @@ export function StudentsTable() {
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: studentData.avatarStorageId,
         });
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.createSuccess.title"),
+          t("alerts.createSuccess.message", { name: `${studentData.firstName} ${studentData.lastName}` }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.createError.title"),
+          t("alerts.createError.message"),
+        );
       }
     },
-    [createStudent],
+    [createStudent, showAlert, t],
   );
 
   const handleUpdateStudent = React.useCallback(
@@ -312,13 +382,20 @@ export function StudentsTable() {
 
         setEditDialogOpen(false);
         setSelectedStudent(undefined);
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.updateSuccess.title"),
+          t("alerts.updateSuccess.message", { name: `${studentData.firstName} ${studentData.lastName}` }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.updateError.title"),
+          t("alerts.updateError.message"),
+        );
       }
     },
-    [selectedStudent, updateStudent, deleteAvatar],
+    [selectedStudent, updateStudent, deleteAvatar, showAlert, t],
   );
 
   const handleDeleteStudent = React.useCallback(
@@ -327,13 +404,20 @@ export function StudentsTable() {
         await deleteStudent({ studentId: studentId as Id<"students"> });
         setEditDialogOpen(false);
         setSelectedStudent(undefined);
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.deleteSuccess.title"),
+          t("alerts.deleteSuccess.message", { count: 1 }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.deleteError.title"),
+          t("alerts.deleteError.message"),
+        );
       }
     },
-    [deleteStudent],
+    [deleteStudent, showAlert, t],
   );
 
   const handleRowClick = React.useCallback(
@@ -378,7 +462,7 @@ export function StudentsTable() {
             onChange={(value: string) =>
               table.getColumn("campusLocation")?.setFilterValue(value)
             }
-            options={campusOptions?.map((c) => c.label) ?? []}
+            options={campusOptions?.map((c: CampusOption) => c.label) ?? []}
             icon={MapPin}
             label={t("filters.campus.label")}
             placeholder={t("filters.campus.all")}
@@ -541,6 +625,30 @@ export function StudentsTable() {
         onSubmit={handleUpdateStudent}
         onDelete={handleDeleteStudent}
       />
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
     </div>
   );
 }
