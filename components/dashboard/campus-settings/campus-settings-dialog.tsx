@@ -822,7 +822,7 @@ export function CampusSettingsDialog({
                     />
                   </div>
                   <div className="grid gap-3">
-                    <Label>Director</Label>
+                    <Label>Principal</Label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -838,7 +838,7 @@ export function CampusSettingsDialog({
                             </div>
                           ) : (
                             <span className="text-muted-foreground">
-                              Select a director
+                              Select a Principal
                             </span>
                           )}
                           <ChevronDown className="h-4 w-4" />
@@ -846,12 +846,12 @@ export function CampusSettingsDialog({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-80" align="start">
                         <DropdownMenuLabel>
-                          Available Directors
+                          Available Principals
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {potentialDirectors?.length === 0 ? (
                           <DropdownMenuItem disabled>
-                            No directors available
+                            No Principals available
                           </DropdownMenuItem>
                         ) : (
                           <>
@@ -861,7 +861,7 @@ export function CampusSettingsDialog({
                             >
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4" />
-                                <span>No director assigned</span>
+                                <span>No Principal assigned</span>
                               </div>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -899,7 +899,7 @@ export function CampusSettingsDialog({
                     </DropdownMenu>
                     {potentialDirectors === undefined && (
                       <div className="text-sm text-muted-foreground">
-                        Loading available directors...
+                        Loading available Principals...
                       </div>
                     )}
                   </div>
