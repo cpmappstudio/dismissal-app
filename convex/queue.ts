@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 /**
  * Helper to get campus ID by name
@@ -734,6 +735,9 @@ export const scheduledClearAllQueues = internalMutation({
         const campuses = [...new Set(allEntries.map(entry => entry.campusLocation))];
 
         const now = Date.now();
+        const currentDate = new Date(now);
+        const dateString = currentDate.toISOString().split('T')[0];
+        const monthString = dateString.substring(0, 7);
         let totalCleared = 0;
 
         // Process each campus
@@ -747,6 +751,11 @@ export const scheduledClearAllQueues = internalMutation({
                 totalCleared++;
             }
         }
+
+        await ctx.scheduler.runAfter(0, internal.dashboard.updateDashboardMetrics, {
+            date: dateString,
+            month: monthString
+        });
 
         return {
             success: true,
