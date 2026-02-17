@@ -33,18 +33,60 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
 
   if (data === undefined) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-20 w-full" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card className="bg-card">
+        <CardHeader className="flex flex-col justify-center items-center">
+          <Skeleton className="bg-american-blue/40 h-8 w-64 rounded-md mb-2" />
+          <Skeleton className="bg-american-blue/40 h-4 w-48 rounded-md" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Podio Top 3 */}
+          <div className="flex items-end justify-center gap-4 pb-6">
+            {[
+              { height: "h-32", order: 0 },
+              { height: "h-40", order: 1 },
+              { height: "h-24", order: 2 },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="flex flex-col items-center gap-2"
+                style={{ order: item.order }}
+              >
+                <div className="relative">
+                  <Skeleton className="bg-american-blue/40 h-16 w-16 rounded-full" />
+                </div>
+
+                <div className="flex flex-col items-center gap-1">
+                  <Skeleton className="bg-american-blue/40 h-3 w-16 rounded-md" />
+                  <Skeleton className="bg-american-blue/40 h-6 w-10 rounded-md" />
+                </div>
+
+                <Skeleton
+                  className={`bg-american-blue/40 ${item.height} w-20 rounded-t-lg`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Lista resto de campuses */}
+          <div className="space-y-3">
+            <div className="space-y-2 px-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <Skeleton className="bg-american-blue/40 h-6 w-8 rounded-md" />
+                    <Skeleton className="bg-american-blue/40 h-8 w-8 rounded-md" />
+                    <Skeleton className="bg-american-blue/40 h-4 w-32 rounded-md" />
+                  </div>
+                  <Skeleton className="bg-american-blue/40 h-6 w-12 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -106,7 +148,8 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
           Top 5 Most Frequent Early Arrivals
         </CardTitle>
         <CardDescription>
-          Based on the number of appearances in the top 5 early arrivals in the current month
+          Based on the number of appearances in the top 5 early arrivals in the
+          current month
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
