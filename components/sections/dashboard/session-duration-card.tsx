@@ -21,15 +21,22 @@ export function SessionDurationCard({ filters }: SessionDurationCardProps) {
 
   if (metric === undefined) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Session Duration</CardTitle>
-          <CardDescription>
-            Average daily dismissal session time
-          </CardDescription>
+      <Card className="bg-american-blue/40">
+        <CardHeader className="flex flex-col justify-center items-center">
+          {/* Título */}
+          <Skeleton className="bg-muted h-7 w-48 sm:h-8 rounded-md mb-2" />
+          {/* Descripción */}
+          <Skeleton className="bg-muted h-4 w-64 rounded-md" />
         </CardHeader>
-        <CardContent>
-          <Skeleton className="w-full" />
+        <CardContent className="flex items-center justify-center gap-2">
+          {/* Ícono del reloj */}
+          <Skeleton className="bg-muted h-14 w-14 sm:h-18 sm:w-18 rounded-full" />
+          <div className="grid grid-rows-2 items-center justify-center gap-1">
+            {/* Número de minutos */}
+            <Skeleton className="bg-muted h-10 w-20 sm:h-12 rounded-md" />
+            {/* Texto "minutes" */}
+            <Skeleton className="bg-muted h-6 w-20 sm:h-7 rounded-md" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -66,7 +73,9 @@ export function SessionDurationCard({ filters }: SessionDurationCardProps) {
       <CardContent className="flex items-center justify-center gap-2">
         <Clock className="h-14 w-14 sm:h-18 sm:w-18 text-secondary" />
         <div className="grid grid-rows-2 items-center justify-center">
-          <p className="text-4xl sm:text-5xl text-accent font-bold">{avgMinutes}</p>
+          <p className="text-4xl sm:text-5xl text-accent font-bold">
+            {avgMinutes}
+          </p>
           <span className="text-xl sm:text-2xl text-accent">minutes</span>
         </div>
       </CardContent>
