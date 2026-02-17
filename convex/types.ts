@@ -13,6 +13,7 @@ import type { DismissalRole } from "../lib/role-utils";
 
 export const roleValidator = v.union(
     v.literal("superadmin"),
+    v.literal("principal"),
     v.literal("admin"),
     v.literal("allocator"),
     v.literal("dispatcher"),
@@ -564,8 +565,8 @@ export interface PaginatedResponse<T> {
  * @param role - The user's role
  */
 export function hasAccessToCampus(user: UserProfile, campusId: string, role: UserRole): boolean {
-    if (role === "admin" || role === "superadmin") {
-        return true; // Admins have access to all campuses
+    if (role === "superadmin") {
+        return true; // Superadmins have access to all campuses
     }
     // Compare against campus IDs in assignedCampuses
     return user.assignedCampuses.some((id) => id === campusId);

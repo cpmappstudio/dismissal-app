@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { gradeValidator } from "./types";
 import { Id } from "./_generated/dataModel";
+import { userHasAccessToCampusById, validateUserAccess } from "./helpers";
 
 // ============================================================================
 // AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
@@ -206,6 +207,7 @@ export const list = query({
         }
 
         try {
+            const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
             let students: any[];
 
             // Get all students first
@@ -222,12 +224,24 @@ export const list = query({
                     .first();
                 
                 if (campusDoc) {
+                    if (!userHasAccessToCampusById(user, campusDoc._id, role)) {
+                        return {
+                            students: [],
+                            total: 0,
+                            hasMore: false,
+                            authState: "forbidden"
+                        };
+                    }
                     students = students.filter((s: any) => 
                         s.campuses?.includes(campusDoc._id)
                     );
                 } else {
                     students = [];
                 }
+            } else if (role !== "superadmin") {
+                students = students.filter((s: any) =>
+                    (s.campuses || []).some((campusId: Id<"campusSettings">) => user.assignedCampuses.includes(campusId))
+                );
             }
 
             // Additional filtering in memory
@@ -273,7 +287,7 @@ export const list = query({
                 students: [],
                 total: 0,
                 hasMore: false,
-                authState: "error"
+                authState: "forbidden"
             };
         }
     }
@@ -285,12 +299,18 @@ export const list = query({
 export const get = query({
     args: { id: v.id("students") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const student = await ctx.db.get(args.id);
         if (!student) {
             return null;
+        }
+
+        const hasAccess = (student.campuses || []).some((campusId) =>
+            userHasAccessToCampusById(user, campusId, role)
+        );
+        if (!hasAccess) {
+            throw new Error("No access to this student");
         }
 
         // Get siblings (other students with same car number)
@@ -321,8 +341,7 @@ export const create = mutation({
         avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         // Validate required fields are not empty
         if (!args.firstName.trim()) {
@@ -333,6 +352,15 @@ export const create = mutation({
         }
         if (args.campuses.length === 0) {
             throw new Error("At least one campus is required");
+        }
+
+        if (role !== "superadmin") {
+            const hasUnauthorizedCampus = args.campuses.some(
+                (campusId) => !user.assignedCampuses.includes(campusId)
+            );
+            if (hasUnauthorizedCampus) {
+                throw new Error("Cannot create students outside your assigned campuses");
+            }
         }
 
         // Validate car number
@@ -379,12 +407,27 @@ export const update = mutation({
         avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const student = await ctx.db.get(args.studentId);
         if (!student) {
             throw new Error("Student not found");
+        }
+
+        const hasAccessToCurrentStudent = (student.campuses || []).some((campusId) =>
+            userHasAccessToCampusById(user, campusId, role)
+        );
+        if (!hasAccessToCurrentStudent) {
+            throw new Error("No access to this student");
+        }
+
+        if (args.campuses !== undefined && role !== "superadmin") {
+            const hasUnauthorizedCampus = args.campuses.some(
+                (campusId) => !user.assignedCampuses.includes(campusId)
+            );
+            if (hasUnauthorizedCampus) {
+                throw new Error("Cannot move student to campuses outside your scope");
+            }
         }
 
         // If updating avatar storage, delete the old one first
@@ -433,12 +476,18 @@ export const update = mutation({
 export const deleteStudent = mutation({
     args: { studentId: v.id("students") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const student = await ctx.db.get(args.studentId);
         if (!student) {
             throw new Error("Student not found");
+        }
+
+        const hasAccess = (student.campuses || []).some((campusId) =>
+            userHasAccessToCampusById(user, campusId, role)
+        );
+        if (!hasAccess) {
+            throw new Error("No access to this student");
         }
 
         let carRemovedFromQueue = false;
@@ -553,8 +602,7 @@ export const deleteStudent = mutation({
 export const deleteMultipleStudents = mutation({
     args: { studentIds: v.array(v.id("students")) },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const results = [];
         const processedCars = new Set<string>(); // To avoid processing the same car multiple times
@@ -563,6 +611,14 @@ export const deleteMultipleStudents = mutation({
             const student = await ctx.db.get(studentId);
             if (!student) {
                 results.push({ studentId, success: false, error: "Student not found" });
+                continue;
+            }
+
+            const hasAccess = (student.campuses || []).some((campusId) =>
+                userHasAccessToCampusById(user, campusId, role)
+            );
+            if (!hasAccess) {
+                results.push({ studentId, success: false, error: "No access to this student" });
                 continue;
             }
 
@@ -691,12 +747,18 @@ export const assignCarNumber = mutation({
         carNumber: v.number()
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const student = await ctx.db.get(args.studentId);
         if (!student) {
             throw new Error("Student not found");
+        }
+
+        const hasAccess = (student.campuses || []).some((campusId) =>
+            userHasAccessToCampusById(user, campusId, role)
+        );
+        if (!hasAccess) {
+            throw new Error("No access to this student");
         }
 
         if (args.carNumber < 0) {
@@ -718,12 +780,18 @@ export const assignCarNumber = mutation({
 export const removeCarNumber = mutation({
     args: { studentId: v.id("students") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
 
         const student = await ctx.db.get(args.studentId);
         if (!student) {
             throw new Error("Student not found");
+        }
+
+        const hasAccess = (student.campuses || []).some((campusId) =>
+            userHasAccessToCampusById(user, campusId, role)
+        );
+        if (!hasAccess) {
+            throw new Error("No access to this student");
         }
 
         // Remove car assignment
@@ -745,8 +813,10 @@ export const getByCarNumber = query({
         campusId: v.id("campusSettings")
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
+        if (!userHasAccessToCampusById(user, args.campusId, role)) {
+            throw new Error("No access to this campus");
+        }
 
         return await getStudentsByCarNumber(ctx.db, args.carNumber, args.campusId);
     }

@@ -19,7 +19,6 @@ import {
     OperatorPermissions,
     extractRoleFromMetadata,
     extractOperatorPermissions,
-    canAccessAdmin,
     canAllocate,
     canDispatch
 } from "../lib/role-utils";
@@ -76,15 +75,15 @@ export async function validateUserAccess(
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    // Use centralized role extraction from shared utilities
-    const role = extractRoleFromMetadata(identity as any);
+    const user = await getUserByClerkId(ctx.db, identity.subject);
+    if (!user || !user.isActive) throw new Error("User not active in system");
+
+    // Prefer DB role as source of truth, fall back to token metadata during transition.
+    const role = (user.role as DismissalRole | undefined) || extractRoleFromMetadata(identity as any);
 
     if (requiredRoles && !requiredRoles.includes(role)) {
         throw new Error(`Requires role: ${requiredRoles.join(' or ')}`);
     }
-
-    const user = await getUserByClerkId(ctx.db, identity.subject);
-    if (!user || !user.isActive) throw new Error("User not active in system");
 
     // Check campus access by resolving name to ID
     if (campus && role !== 'superadmin') {
@@ -112,7 +111,7 @@ export async function userHasAccessToCampusAsync(
     campus: string,
     role: DismissalRole
 ): Promise<boolean> {
-    if (role === "admin" || role === "superadmin") {
+    if (role === "superadmin") {
         return true;
     }
 
@@ -138,7 +137,7 @@ export function userHasAccessToCampusById(
     campusId: Id<"campusSettings">,
     role: DismissalRole
 ): boolean {
-    if (role === "admin" || role === "superadmin") {
+    if (role === "superadmin") {
         return true;
     }
     return user.assignedCampuses.includes(campusId);

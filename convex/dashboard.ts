@@ -5,6 +5,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import {
   calculateDailyMetrics,
   calculateSessionDuration,
@@ -15,7 +16,7 @@ import {
   upsertTopArrivals,
 } from "./lib/dashboard_utils";
 
-const DASHBOARD_ALLOWED_ROLES = new Set(["admin", "superadmin"]);
+const DASHBOARD_ALLOWED_ROLES = new Set(["principal", "admin", "superadmin"]);
 
 type DashboardAccessCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 
@@ -31,10 +32,32 @@ interface DashboardTopArrivalRecord {
 type DailyMetrics = ReturnType<typeof calculateDailyMetrics>;
 type DashboardDb = MutationCtx["db"];
 
-async function hasDashboardAccess(ctx: DashboardAccessCtx): Promise<boolean> {
+type DashboardAccess = {
+  user: Doc<"users">;
+  role: string;
+  isGlobal: boolean;
+  allowedCampuses: Set<string>;
+};
+
+async function resolveAllowedCampusNames(
+  ctx: DashboardAccessCtx,
+  user: Doc<"users">
+): Promise<Set<string>> {
+  const campusDocs = await Promise.all(
+    (user.assignedCampuses || []).map((campusId) => ctx.db.get(campusId))
+  );
+
+  return new Set(
+    campusDocs
+      .filter((campus): campus is NonNullable<typeof campus> => campus !== null)
+      .map((campus) => campus.campusName)
+  );
+}
+
+async function getDashboardAccess(ctx: DashboardAccessCtx): Promise<DashboardAccess | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
-    return false;
+    return null;
   }
 
   const user = await ctx.db
@@ -43,10 +66,121 @@ async function hasDashboardAccess(ctx: DashboardAccessCtx): Promise<boolean> {
     .first();
 
   if (!user || !user.isActive || !user.role) {
-    return false;
+    return null;
   }
 
-  return DASHBOARD_ALLOWED_ROLES.has(user.role);
+  if (!DASHBOARD_ALLOWED_ROLES.has(user.role)) {
+    return null;
+  }
+
+  const isGlobal = user.role === "superadmin";
+  const allowedCampuses = isGlobal
+    ? new Set<string>()
+    : await resolveAllowedCampusNames(ctx, user);
+
+  return {
+    user,
+    role: user.role,
+    isGlobal,
+    allowedCampuses,
+  };
+}
+
+function isCampusAllowed(access: DashboardAccess, campus: string): boolean {
+  return access.isGlobal || access.allowedCampuses.has(campus);
+}
+
+function filterByCampusScope<T extends { campusLocation?: string }>(
+  access: DashboardAccess,
+  rows: T[]
+): T[] {
+  if (access.isGlobal) return rows;
+  if (access.allowedCampuses.size === 0) return [];
+  return rows.filter(
+    (row) => !!row.campusLocation && access.allowedCampuses.has(row.campusLocation)
+  );
+}
+
+function getLastUpdatedAt(rows: Array<{ lastUpdatedAt?: number }>): number {
+  if (rows.length === 0) return Date.now();
+  return Math.max(...rows.map((row) => row.lastUpdatedAt || 0));
+}
+
+function aggregateCampusActivityMetrics(
+  rows: Array<{
+    totalEvents?: number;
+    recordCount: number;
+    lastUpdatedAt?: number;
+  }>,
+  month?: string
+) {
+  if (rows.length === 0) return null;
+
+  const totalEvents = rows.reduce((sum, row) => sum + (row.totalEvents || 0), 0);
+  const recordCount = rows.reduce((sum, row) => sum + row.recordCount, 0);
+
+  return {
+    metricType: "campus_activity" as const,
+    month,
+    totalEvents,
+    recordCount,
+    lastUpdatedAt: getLastUpdatedAt(rows),
+  };
+}
+
+function aggregateWaitTimeMetrics(
+  rows: Array<{
+    totalWaitSeconds?: number;
+    recordCount: number;
+    lastUpdatedAt?: number;
+  }>,
+  month?: string
+) {
+  if (rows.length === 0) return null;
+
+  const totalWaitSeconds = rows.reduce(
+    (sum, row) => sum + (row.totalWaitSeconds || 0),
+    0
+  );
+  const recordCount = rows.reduce((sum, row) => sum + row.recordCount, 0);
+
+  return {
+    metricType: "avg_wait_time" as const,
+    month,
+    totalWaitSeconds,
+    recordCount,
+    avgWaitSeconds: calculateAverage(totalWaitSeconds, recordCount),
+    lastUpdatedAt: getLastUpdatedAt(rows),
+  };
+}
+
+function aggregateSessionDurationMetrics(
+  rows: Array<{
+    totalSessionSeconds?: number;
+    daysCount?: number;
+    recordCount: number;
+    lastUpdatedAt?: number;
+  }>,
+  month?: string
+) {
+  if (rows.length === 0) return null;
+
+  const totalSessionSeconds = rows.reduce(
+    (sum, row) => sum + (row.totalSessionSeconds || 0),
+    0
+  );
+  const daysCount = rows.reduce((sum, row) => sum + (row.daysCount || 0), 0);
+  const recordCount = rows.reduce((sum, row) => sum + row.recordCount, 0);
+
+  return {
+    metricType: "session_duration" as const,
+    month,
+    totalSessionSeconds,
+    daysCount,
+    recordCount,
+    avgSessionSeconds: calculateAverage(totalSessionSeconds, daysCount),
+    lastUpdatedAt: getLastUpdatedAt(rows),
+  };
 }
 
 function getCurrentMonthKey(): string {
@@ -409,52 +543,92 @@ export const getCampusActivity = query({
     month: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!(await hasDashboardAccess(ctx))) {
+    const access = await getDashboardAccess(ctx);
+    if (!access) {
       return null;
     }
 
-    let metric;
-
-    if (args.campus && args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus_month", (q) =>
-          q
-            .eq("metricType", "campus_activity")
-            .eq("campusLocation", args.campus!)
-            .eq("month", args.month!)
-        )
-        .unique();
-    } else if (args.campus) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus", (q) =>
-          q.eq("metricType", "campus_activity").eq("campusLocation", args.campus!)
-        )
-        .filter((q) => q.eq(q.field("month"), undefined))
-        .unique();
-    } else if (args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_month", (q) =>
-          q.eq("metricType", "campus_activity").eq("month", args.month!)
-        )
-        .filter((q) => q.eq(q.field("campusLocation"), undefined))
-        .unique();
-    } else {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type", (q) => q.eq("metricType", "campus_activity"))
-        .filter((q) => 
-          q.and(
-            q.eq(q.field("campusLocation"), undefined),
-            q.eq(q.field("month"), undefined)
-          )
-        )
-        .unique();
+    if (args.campus && !isCampusAllowed(access, args.campus)) {
+      return null;
     }
 
-    return metric ?? null;
+    // Campus-specific metric
+    if (args.campus && args.month) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus_month", (q) =>
+            q
+              .eq("metricType", "campus_activity")
+              .eq("campusLocation", args.campus!)
+              .eq("month", args.month!)
+          )
+          .unique()) ?? null
+      );
+    }
+
+    if (args.campus) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus", (q) =>
+            q.eq("metricType", "campus_activity").eq("campusLocation", args.campus!)
+          )
+          .filter((q) => q.eq(q.field("month"), undefined))
+          .unique()) ?? null
+      );
+    }
+
+    // Global behavior for superadmin
+    if (access.isGlobal) {
+      if (args.month) {
+        return (
+          (await ctx.db
+            .query("dashboardMetrics")
+            .withIndex("by_type_month", (q) =>
+              q.eq("metricType", "campus_activity").eq("month", args.month!)
+            )
+            .filter((q) => q.eq(q.field("campusLocation"), undefined))
+            .unique()) ?? null
+        );
+      }
+
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "campus_activity"))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .unique()) ?? null
+      );
+    }
+
+    // Scoped aggregate for principal/admin
+    const campusMetrics = args.month
+      ? await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_month", (q) =>
+            q.eq("metricType", "campus_activity").eq("month", args.month!)
+          )
+          .filter((q) => q.neq(q.field("campusLocation"), undefined))
+          .collect()
+      : await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "campus_activity"))
+          .filter((q) =>
+            q.and(
+              q.neq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .collect();
+
+    const scoped = filterByCampusScope(access, campusMetrics);
+    return aggregateCampusActivityMetrics(scoped, args.month);
   },
 });
 
@@ -464,52 +638,89 @@ export const getAverageWaitTime = query({
     month: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!(await hasDashboardAccess(ctx))) {
+    const access = await getDashboardAccess(ctx);
+    if (!access) {
       return null;
     }
 
-    let metric;
-
-    if (args.campus && args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus_month", (q) =>
-          q
-            .eq("metricType", "avg_wait_time")
-            .eq("campusLocation", args.campus!)
-            .eq("month", args.month!)
-        )
-        .unique();
-    } else if (args.campus) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus", (q) =>
-          q.eq("metricType", "avg_wait_time").eq("campusLocation", args.campus!)
-        )
-        .filter((q) => q.eq(q.field("month"), undefined))
-        .unique();
-    } else if (args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_month", (q) =>
-          q.eq("metricType", "avg_wait_time").eq("month", args.month!)
-        )
-        .filter((q) => q.eq(q.field("campusLocation"), undefined))
-        .unique();
-    } else {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type", (q) => q.eq("metricType", "avg_wait_time"))
-        .filter((q) => 
-          q.and(
-            q.eq(q.field("campusLocation"), undefined),
-            q.eq(q.field("month"), undefined)
-          )
-        )
-        .unique();
+    if (args.campus && !isCampusAllowed(access, args.campus)) {
+      return null;
     }
 
-    return metric ?? null;
+    if (args.campus && args.month) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus_month", (q) =>
+            q
+              .eq("metricType", "avg_wait_time")
+              .eq("campusLocation", args.campus!)
+              .eq("month", args.month!)
+          )
+          .unique()) ?? null
+      );
+    }
+
+    if (args.campus) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus", (q) =>
+            q.eq("metricType", "avg_wait_time").eq("campusLocation", args.campus!)
+          )
+          .filter((q) => q.eq(q.field("month"), undefined))
+          .unique()) ?? null
+      );
+    }
+
+    if (access.isGlobal) {
+      if (args.month) {
+        return (
+          (await ctx.db
+            .query("dashboardMetrics")
+            .withIndex("by_type_month", (q) =>
+              q.eq("metricType", "avg_wait_time").eq("month", args.month!)
+            )
+            .filter((q) => q.eq(q.field("campusLocation"), undefined))
+            .unique()) ?? null
+        );
+      }
+
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "avg_wait_time"))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .unique()) ?? null
+      );
+    }
+
+    const campusMetrics = args.month
+      ? await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_month", (q) =>
+            q.eq("metricType", "avg_wait_time").eq("month", args.month!)
+          )
+          .filter((q) => q.neq(q.field("campusLocation"), undefined))
+          .collect()
+      : await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "avg_wait_time"))
+          .filter((q) =>
+            q.and(
+              q.neq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .collect();
+
+    const scoped = filterByCampusScope(access, campusMetrics);
+    return aggregateWaitTimeMetrics(scoped, args.month);
   },
 });
 
@@ -519,52 +730,89 @@ export const getSessionDuration = query({
     month: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!(await hasDashboardAccess(ctx))) {
+    const access = await getDashboardAccess(ctx);
+    if (!access) {
       return null;
     }
 
-    let metric;
-
-    if (args.campus && args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus_month", (q) =>
-          q
-            .eq("metricType", "session_duration")
-            .eq("campusLocation", args.campus!)
-            .eq("month", args.month!)
-        )
-        .unique();
-    } else if (args.campus) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_campus", (q) =>
-          q.eq("metricType", "session_duration").eq("campusLocation", args.campus!)
-        )
-        .filter((q) => q.eq(q.field("month"), undefined))
-        .unique();
-    } else if (args.month) {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type_month", (q) =>
-          q.eq("metricType", "session_duration").eq("month", args.month!)
-        )
-        .filter((q) => q.eq(q.field("campusLocation"), undefined))
-        .unique();
-    } else {
-      metric = await ctx.db
-        .query("dashboardMetrics")
-        .withIndex("by_type", (q) => q.eq("metricType", "session_duration"))
-        .filter((q) => 
-          q.and(
-            q.eq(q.field("campusLocation"), undefined),
-            q.eq(q.field("month"), undefined)
-          )
-        )
-        .unique();
+    if (args.campus && !isCampusAllowed(access, args.campus)) {
+      return null;
     }
 
-    return metric ?? null;
+    if (args.campus && args.month) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus_month", (q) =>
+            q
+              .eq("metricType", "session_duration")
+              .eq("campusLocation", args.campus!)
+              .eq("month", args.month!)
+          )
+          .unique()) ?? null
+      );
+    }
+
+    if (args.campus) {
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_campus", (q) =>
+            q.eq("metricType", "session_duration").eq("campusLocation", args.campus!)
+          )
+          .filter((q) => q.eq(q.field("month"), undefined))
+          .unique()) ?? null
+      );
+    }
+
+    if (access.isGlobal) {
+      if (args.month) {
+        return (
+          (await ctx.db
+            .query("dashboardMetrics")
+            .withIndex("by_type_month", (q) =>
+              q.eq("metricType", "session_duration").eq("month", args.month!)
+            )
+            .filter((q) => q.eq(q.field("campusLocation"), undefined))
+            .unique()) ?? null
+        );
+      }
+
+      return (
+        (await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "session_duration"))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .unique()) ?? null
+      );
+    }
+
+    const campusMetrics = args.month
+      ? await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type_month", (q) =>
+            q.eq("metricType", "session_duration").eq("month", args.month!)
+          )
+          .filter((q) => q.neq(q.field("campusLocation"), undefined))
+          .collect()
+      : await ctx.db
+          .query("dashboardMetrics")
+          .withIndex("by_type", (q) => q.eq("metricType", "session_duration"))
+          .filter((q) =>
+            q.and(
+              q.neq(q.field("campusLocation"), undefined),
+              q.eq(q.field("month"), undefined)
+            )
+          )
+          .collect();
+
+    const scoped = filterByCampusScope(access, campusMetrics);
+    return aggregateSessionDurationMetrics(scoped, args.month);
   },
 });
 
@@ -574,7 +822,8 @@ export const getTopArrivals = query({
     month: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!(await hasDashboardAccess(ctx))) {
+    const access = await getDashboardAccess(ctx);
+    if (!access) {
       return [];
     }
 
@@ -583,6 +832,9 @@ export const getTopArrivals = query({
 
     // Both campus and month provided - return single record
     if (campus && month) {
+      if (!isCampusAllowed(access, campus)) {
+        return [];
+      }
       const topArrivals = await ctx.db
         .query("dashboardTopArrivals")
         .withIndex("by_campus_month", (q) =>
@@ -594,6 +846,9 @@ export const getTopArrivals = query({
 
     // Campus provided without month - use current month by default
     if (campus) {
+      if (!isCampusAllowed(access, campus)) {
+        return [];
+      }
       const topArrivals = await ctx.db
         .query("dashboardTopArrivals")
         .withIndex("by_campus_month", (q) =>
@@ -610,17 +865,19 @@ export const getTopArrivals = query({
       .withIndex("by_month", (q) => q.eq("month", targetMonth))
       .collect();
 
-    if (recordsForMonth.length === 0) {
+    const scopedRecords = filterByCampusScope(access, recordsForMonth);
+
+    if (scopedRecords.length === 0) {
       return [];
     }
 
-    const aggregatedTopArrivals = aggregateGlobalTopArrivals(recordsForMonth);
+    const aggregatedTopArrivals = aggregateGlobalTopArrivals(scopedRecords);
     if (aggregatedTopArrivals.length === 0) {
       return [];
     }
 
     const lastUpdatedAt = Math.max(
-      ...recordsForMonth.map((record) => record.lastUpdatedAt || 0)
+      ...scopedRecords.map((record) => record.lastUpdatedAt || 0)
     );
 
     return [
@@ -639,7 +896,8 @@ export const getAllCampusActivity = query({
     month: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!(await hasDashboardAccess(ctx))) {
+    const access = await getDashboardAccess(ctx);
+    if (!access) {
       return [];
     }
 
@@ -667,6 +925,6 @@ export const getAllCampusActivity = query({
         .collect();
     }
 
-    return metrics;
+    return filterByCampusScope(access, metrics);
   },
 });

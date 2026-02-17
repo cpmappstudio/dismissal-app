@@ -2,11 +2,41 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { DismissalRole } from "../lib/role-utils";
 import {
     getActiveCampuses,
     getCampusSettings,
-    getCampusGrades
+    getCampusGrades,
+    validateUserAccess,
+    userHasAccessToCampusById,
 } from "./helpers";
+
+type CampusUser = Doc<"users">;
+
+function isSuperadmin(role: string): boolean {
+    return role === "superadmin";
+}
+
+function filterCampusesForUser(
+    campuses: Doc<"campusSettings">[],
+    user: CampusUser,
+    role: DismissalRole
+) {
+    if (isSuperadmin(role)) return campuses;
+    const assigned = new Set(user.assignedCampuses);
+    return campuses.filter((campus) => assigned.has(campus._id));
+}
+
+function assertCampusAccess(
+    user: CampusUser,
+    role: DismissalRole,
+    campusId: Id<"campusSettings">
+) {
+    if (!userHasAccessToCampusById(user, campusId, role)) {
+        throw new Error("No access to this campus");
+    }
+}
 
 /**
  * Generate upload URL for campus logo
@@ -40,30 +70,33 @@ export const getAll = query({
         ),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            let campuses: Doc<"campusSettings">[];
+
+            // Filter by status if provided
+            if (args.status !== undefined) {
+                campuses = await ctx.db
+                    .query("campusSettings")
+                    .withIndex("by_status", (q) => q.eq("status", args.status!))
+                    .collect();
+            }
+            // Filter by isActive if provided
+            else if (args.isActive !== undefined) {
+                campuses = await ctx.db
+                    .query("campusSettings")
+                    .withIndex("by_active", (q) => q.eq("isActive", args.isActive!))
+                    .collect();
+            }
+            // Return all campuses
+            else {
+                campuses = await ctx.db.query("campusSettings").collect();
+            }
+
+            return filterCampusesForUser(campuses, user, role);
+        } catch {
             return [];
         }
-
-        // Filter by status if provided
-        if (args.status !== undefined) {
-            return await ctx.db
-                .query("campusSettings")
-                .withIndex("by_status", (q) => q.eq("status", args.status!))
-                .collect();
-        }
-
-        // Filter by isActive if provided
-        if (args.isActive !== undefined) {
-            return await ctx.db
-                .query("campusSettings")
-                .withIndex("by_active", (q) => q.eq("isActive", args.isActive!))
-                .collect();
-        }
-
-        // Return all campuses
-        return await ctx.db.query("campusSettings").collect();
     },
 });
 
@@ -72,13 +105,13 @@ export const getAll = query({
  */
 export const listActive = query({
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            const campuses = await getActiveCampuses(ctx.db);
+            return filterCampusesForUser(campuses, user, role);
+        } catch {
             return [];
         }
-
-        return await getActiveCampuses(ctx.db);
     }
 });
 
@@ -88,13 +121,15 @@ export const listActive = query({
 export const get = query({
     args: { campusName: v.string() },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return null when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            const campus = await getCampusSettings(ctx.db, args.campusName);
+            if (!campus) return null;
+            if (isSuperadmin(role)) return campus;
+            return user.assignedCampuses.includes(campus._id) ? campus : null;
+        } catch {
             return null;
         }
-
-        return await getCampusSettings(ctx.db, args.campusName);
     }
 });
 
@@ -104,13 +139,15 @@ export const get = query({
 export const getById = query({
     args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return null when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            const campus = await ctx.db.get(args.campusId);
+            if (!campus) return null;
+            if (isSuperadmin(role)) return campus;
+            return user.assignedCampuses.includes(args.campusId) ? campus : null;
+        } catch {
             return null;
         }
-
-        return await ctx.db.get(args.campusId);
     }
 });
 
@@ -120,13 +157,13 @@ export const getById = query({
 export const getAvailableGrades = query({
     args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            assertCampusAccess(user, role, args.campusId);
+            return await getCampusGrades(ctx.db, args.campusId);
+        } catch {
             return [];
         }
-
-        return await getCampusGrades(ctx.db, args.campusId);
     }
 });
 
@@ -164,16 +201,7 @@ export const create = mutation({
         ),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get user from database
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        const { user } = await validateUserAccess(ctx, ["superadmin"]);
         const userId = user._id;
 
         // Validate required fields
@@ -268,17 +296,12 @@ export const update = mutation({
         }),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get user from database
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
         const userId = user._id;
+
+        if (!isSuperadmin(role) && !user.assignedCampuses.includes(args.campusId)) {
+            throw new Error("No access to this campus");
+        }
 
         const campus = await ctx.db.get(args.campusId);
         if (!campus) {
@@ -325,8 +348,7 @@ export const update = mutation({
 export const deleteCampus = mutation({
     args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        await validateUserAccess(ctx, ["superadmin"]);
 
         // Get the campus to verify it exists and check for logo
         const campus = await ctx.db.get(args.campusId);
@@ -354,16 +376,10 @@ export const saveCampusLogo = mutation({
         storageId: v.id("_storage"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get user from database
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
+        if (!isSuperadmin(role) && !user.assignedCampuses.includes(args.campusId)) {
+            throw new Error("No access to this campus");
+        }
         const userId = user._id;
 
         await ctx.db.patch(args.campusId, {
@@ -382,16 +398,10 @@ export const deleteCampusLogo = mutation({
         campusId: v.id("campusSettings"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get user from database
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
+        if (!isSuperadmin(role) && !user.assignedCampuses.includes(args.campusId)) {
+            throw new Error("No access to this campus");
+        }
         const userId = user._id;
 
         const campus = await ctx.db.get(args.campusId);
@@ -418,65 +428,66 @@ export const deleteCampusLogo = mutation({
 export const getStats = query({
     args: { campusId: v.id("campusSettings") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return null when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            assertCampusAccess(user, role, args.campusId);
+
+            // Get campus to find name for queue queries
+            const campus = await ctx.db.get(args.campusId);
+            if (!campus) return null;
+
+            // Get active students count (filter by campuses array)
+            const allActiveStudents = await ctx.db
+                .query("students")
+                .withIndex("by_active", q => q.eq("isActive", true))
+                .collect();
+
+            const activeStudents = allActiveStudents.filter(s => s.campuses.includes(args.campusId));
+
+            // Get current queue count (uses campusName as string)
+            const currentQueue = await ctx.db
+                .query("dismissalQueue")
+                .withIndex("by_campus_status", q =>
+                    q.eq("campusLocation", campus.campusName).eq("status", "waiting")
+                )
+                .collect();
+
+            // Get today's completed pickups (uses campusName as string)
+            const today = new Date().toISOString().split('T')[0];
+            const todayPickups = await ctx.db
+                .query("dismissalHistory")
+                .withIndex("by_campus_date", q =>
+                    q.eq("campusLocation", campus.campusName).eq("date", today)
+                )
+                .collect();
+
+            // Students with assigned cars
+            const studentsWithCars = activeStudents.filter(s => s.carNumber > 0);
+
+            // Unique car numbers
+            const uniqueCarNumbers = new Set(studentsWithCars.map(s => s.carNumber));
+
+            // Grade distribution
+            const gradeDistribution = activeStudents.reduce((acc, student) => {
+                acc[student.grade] = (acc[student.grade] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+
+            return {
+                campus: campus.campusName,
+                totalStudents: activeStudents.length,
+                studentsWithCars: studentsWithCars.length,
+                uniqueCarCount: uniqueCarNumbers.size,
+                currentQueueSize: currentQueue.length,
+                todayPickups: todayPickups.length,
+                todayStudentsPickedUp: todayPickups.reduce((sum, p) => sum + p.studentIds.length, 0),
+                gradeDistribution,
+                averageStudentsPerCar: uniqueCarNumbers.size > 0 ?
+                    Math.round((studentsWithCars.length / uniqueCarNumbers.size) * 10) / 10 : 0
+            };
+        } catch {
             return null;
         }
-
-        // Get campus to find name for queue queries
-        const campus = await ctx.db.get(args.campusId);
-        if (!campus) return null;
-
-        // Get active students count (filter by campuses array)
-        const allActiveStudents = await ctx.db
-            .query("students")
-            .withIndex("by_active", q => q.eq("isActive", true))
-            .collect();
-
-        const activeStudents = allActiveStudents.filter(s => s.campuses.includes(args.campusId));
-
-        // Get current queue count (uses campusName as string)
-        const currentQueue = await ctx.db
-            .query("dismissalQueue")
-            .withIndex("by_campus_status", q =>
-                q.eq("campusLocation", campus.campusName).eq("status", "waiting")
-            )
-            .collect();
-
-        // Get today's completed pickups (uses campusName as string)
-        const today = new Date().toISOString().split('T')[0];
-        const todayPickups = await ctx.db
-            .query("dismissalHistory")
-            .withIndex("by_campus_date", q =>
-                q.eq("campusLocation", campus.campusName).eq("date", today)
-            )
-            .collect();
-
-        // Students with assigned cars
-        const studentsWithCars = activeStudents.filter(s => s.carNumber > 0);
-
-        // Unique car numbers
-        const uniqueCarNumbers = new Set(studentsWithCars.map(s => s.carNumber));
-
-        // Grade distribution
-        const gradeDistribution = activeStudents.reduce((acc, student) => {
-            acc[student.grade] = (acc[student.grade] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        return {
-            campus: campus.campusName,
-            totalStudents: activeStudents.length,
-            studentsWithCars: studentsWithCars.length,
-            uniqueCarCount: uniqueCarNumbers.size,
-            currentQueueSize: currentQueue.length,
-            todayPickups: todayPickups.length,
-            todayStudentsPickedUp: todayPickups.reduce((sum, p) => sum + p.studentIds.length, 0),
-            gradeDistribution,
-            averageStudentsPerCar: uniqueCarNumbers.size > 0 ?
-                Math.round((studentsWithCars.length / uniqueCarNumbers.size) * 10) / 10 : 0
-        };
     }
 });
 
@@ -486,20 +497,20 @@ export const getStats = query({
  */
 export const getOptions = query({
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            const campuses = await getActiveCampuses(ctx.db);
+            const scopedCampuses = filterCampusesForUser(campuses, user, role);
+
+            return scopedCampuses.map(campus => ({
+                id: campus._id, // Campus ID for database operations
+                value: campus.campusName, // For backward compatibility
+                label: campus.campusName,
+                isActive: campus.isActive
+            }));
+        } catch {
             return [];
         }
-
-        const campuses = await getActiveCampuses(ctx.db);
-
-        return campuses.map(campus => ({
-            id: campus._id, // Campus ID for database operations
-            value: campus.campusName, // For backward compatibility
-            label: campus.campusName,
-            isActive: campus.isActive
-        }));
     }
 });
 
@@ -512,22 +523,23 @@ export const getStudentsByCampus = query({
         isActive: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx);
+            assertCampusAccess(user, role, args.campusId);
+
+            const isActiveFilter = args.isActive ?? true;
+            const allStudents = await ctx.db
+                .query("students")
+                .withIndex("by_active", (q) => q.eq("isActive", isActiveFilter))
+                .collect();
+
+            // Filter by campus
+            const students = allStudents.filter(s => s.campuses.includes(args.campusId));
+
+            return students;
+        } catch {
             return [];
         }
-
-        const isActiveFilter = args.isActive ?? true;
-        const allStudents = await ctx.db
-            .query("students")
-            .withIndex("by_active", (q) => q.eq("isActive", isActiveFilter))
-            .collect();
-
-        // Filter by campus
-        const students = allStudents.filter(s => s.campuses.includes(args.campusId));
-
-        return students;
     },
 });
 
@@ -540,51 +552,63 @@ export const getStaffByCampus = query({
         isActive: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
+            assertCampusAccess(user, role, args.campusId);
+
+            // Get all users assigned to this campus (by ID)
+            const allUsers = await ctx.db.query("users").collect();
+
+            const campusUsers = allUsers.filter((candidate) =>
+                candidate.assignedCampuses.includes(args.campusId),
+            );
+
+            if (args.isActive !== undefined) {
+                return campusUsers.filter(
+                    (candidate) => candidate.isActive === args.isActive,
+                );
+            }
+
+            return campusUsers;
+        } catch {
             return [];
         }
-
-        // Get all users assigned to this campus (by ID)
-        const allUsers = await ctx.db.query("users").collect();
-
-        const campusUsers = allUsers.filter((user) =>
-            user.assignedCampuses.includes(args.campusId),
-        );
-
-        if (args.isActive !== undefined) {
-            return campusUsers.filter(
-                (user) => user.isActive === args.isActive,
-            );
-        }
-
-        return campusUsers;
     },
 });
 
 /**
- * Get all superadmin users (for director selection)
+ * Get principal/superadmin users for director selection.
+ * Keeps original function name for backward compatibility with current frontend.
  */
 export const getSuperadmins = query({
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // Return empty array when not authenticated (graceful degradation)
+        try {
+            const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
+            const allUsers = await ctx.db
+                .query("users")
+                .filter((q) => q.eq(q.field("isActive"), true))
+                .collect();
+
+            const eligible = allUsers.filter((candidate) =>
+                candidate.role === "superadmin" ||
+                candidate.role === "principal" ||
+                candidate.role === "admin"
+            );
+
+            const scoped = isSuperadmin(role)
+                ? eligible
+                : eligible.filter((candidate) =>
+                    user.assignedCampuses.some((campusId) => candidate.assignedCampuses.includes(campusId))
+                );
+
+            return scoped.map((candidate) => ({
+                id: candidate._id,
+                name: candidate.fullName || `${candidate.firstName || ""} ${candidate.lastName || ""}`.trim() || candidate.username || "Unknown",
+                email: candidate.email,
+                phone: candidate.phone,
+            }));
+        } catch {
             return [];
         }
-
-        const superadmins = await ctx.db
-            .query("users")
-            .withIndex("by_role", (q) => q.eq("role", "superadmin"))
-            .filter((q) => q.eq(q.field("isActive"), true))
-            .collect();
-
-        return superadmins.map((user) => ({
-            id: user._id,
-            name: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || "Unknown",
-            email: user.email,
-            phone: user.phone,
-        }));
     },
 });

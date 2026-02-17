@@ -5,6 +5,12 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import {
+    userCanAllocate,
+    userCanDispatch,
+    validateUserAccess,
+} from "./helpers";
+import { extractOperatorPermissions } from "../lib/role-utils";
 
 /**
  * Helper to get campus ID by name
@@ -15,6 +21,20 @@ async function getCampusIdByName(db: any, campusName: string): Promise<Id<"campu
         .withIndex("by_name", (q: any) => q.eq("campusName", campusName))
         .unique();
     return campus?._id || null;
+}
+
+async function getAccessibleCampusNames(db: any, user: any, role: string): Promise<Set<string>> {
+    if (role === "superadmin") return new Set<string>();
+
+    const campusDocs = await Promise.all(
+        (user.assignedCampuses || []).map((campusId: Id<"campusSettings">) => db.get(campusId))
+    );
+
+    return new Set(
+        campusDocs
+            .filter((campus: any) => campus !== null)
+            .map((campus: any) => campus.campusName)
+    );
 }
 
 /**
@@ -169,6 +189,8 @@ export const getCurrentQueue = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
+
             const entries = await ctx.db
                 .query("dismissalQueue")
                 .withIndex("by_campus_status", q =>
@@ -192,7 +214,19 @@ export const getCurrentQueue = query({
                 lastUpdated: Date.now(),
                 authState: "authenticated"
             };
-        } catch {
+        } catch (error) {
+            const err = error as Error;
+            if (err.message === "Not authenticated") {
+                return {
+                    campus: args.campus,
+                    leftLane: [],
+                    rightLane: [],
+                    totalCars: 0,
+                    lastUpdated: Date.now(),
+                    authState: "unauthenticated"
+                };
+            }
+
             // Return empty state on database errors too
             return {
                 campus: args.campus,
@@ -200,7 +234,7 @@ export const getCurrentQueue = query({
                 rightLane: [],
                 totalCars: 0,
                 lastUpdated: Date.now(),
-                authState: "error"
+                authState: "forbidden"
             };
         }
     }
@@ -216,38 +250,11 @@ export const addCar = mutation({
         lane: laneValidator
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Get campus ID for assignment
-            const campusId = await getCampusIdByName(ctx.db, args.campus);
-            const assignedCampuses = campusId ? [campusId] : [];
-
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses,
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
+        const { user, role, identity } = await validateUserAccess(ctx, undefined, args.campus);
+        const operatorPermissions = extractOperatorPermissions(identity as any, role);
+        if (!userCanAllocate(role, operatorPermissions)) {
+            throw new Error("Insufficient permissions to add cars");
         }
-
-        if (!user) throw new Error("Failed to create user record");
 
         // Validate inputs
         if (!args.campus.trim()) {
@@ -325,43 +332,18 @@ export const removeCar = mutation({
         queueId: v.id("dismissalQueue")
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
         // Get the entry first to know the campus
         const entryForCampus = await ctx.db.get(args.queueId);
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Get campus ID from the entry's campus location
-            const campusId = entryForCampus 
-                ? await getCampusIdByName(ctx.db, entryForCampus.campusLocation)
-                : null;
-            const assignedCampuses = campusId ? [campusId] : [];
-
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses,
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
+        if (!entryForCampus) throw new Error("Queue entry not found");
+        const { user, role, identity } = await validateUserAccess(
+            ctx,
+            undefined,
+            entryForCampus.campusLocation
+        );
+        const operatorPermissions = extractOperatorPermissions(identity as any, role);
+        if (!userCanDispatch(role, operatorPermissions)) {
+            throw new Error("Insufficient permissions to remove cars");
         }
-
-        if (!user) throw new Error("Failed to create user record");
 
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
@@ -418,6 +400,7 @@ export const checkCarInQueue = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             const inQueue = await isCarInQueue(ctx.db, args.carNumber, args.campus);
 
             if (inQueue) {
@@ -447,7 +430,7 @@ export const checkCarInQueue = query({
 
             return { inQueue: false, entry: null, authState: "authenticated" };
         } catch {
-            return { inQueue: false, entry: null, authState: "error" };
+            return { inQueue: false, entry: null, authState: "forbidden" };
         }
     }
 });
@@ -461,11 +444,17 @@ export const moveCar = mutation({
         newLane: laneValidator
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
+        const { role, identity } = await validateUserAccess(
+            ctx,
+            undefined,
+            entry.campusLocation
+        );
+        const operatorPermissions = extractOperatorPermissions(identity as any, role);
+        if (!userCanDispatch(role, operatorPermissions)) {
+            throw new Error("Insufficient permissions to move cars");
+        }
 
         if (entry.status !== "waiting") {
             throw new Error("Car is not in waiting status");
@@ -523,6 +512,7 @@ export const getQueueMetrics = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             // Current queue
             const currentQueue = await ctx.db
                 .query("dismissalQueue")
@@ -566,7 +556,7 @@ export const getQueueMetrics = query({
                 averageWaitTime: 0,
                 todayTotal: 0,
                 todayStudents: 0,
-                authState: "error"
+                authState: "forbidden"
             };
         }
     }
@@ -588,6 +578,7 @@ export const getRecentActivity = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             const limit = args.limit || 10;
 
             // Get recent completed pickups
@@ -619,38 +610,11 @@ export const clearAllCars = mutation({
         campus: v.string()
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Get campus ID for assignment
-            const campusId = await getCampusIdByName(ctx.db, args.campus);
-            const assignedCampuses = campusId ? [campusId] : [];
-
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses,
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
+        const { user, role, identity } = await validateUserAccess(ctx, undefined, args.campus);
+        const operatorPermissions = extractOperatorPermissions(identity as any, role);
+        if (!userCanDispatch(role, operatorPermissions)) {
+            throw new Error("Insufficient permissions to clear queues");
         }
-
-        if (!user) throw new Error("Failed to create user record");
 
         // Get all cars in queue for this campus
         const entries = await ctx.db
@@ -695,6 +659,9 @@ export const getCarCountsByCampus = query({
         }
 
         try {
+            const { user, role } = await validateUserAccess(ctx);
+            const accessibleCampusNames = await getAccessibleCampusNames(ctx.db, user, role);
+
             // Get all cars in waiting status
             const allEntries = await ctx.db
                 .query("dismissalQueue")
@@ -705,6 +672,9 @@ export const getCarCountsByCampus = query({
             const counts: Record<string, number> = {};
             allEntries.forEach(entry => {
                 const campus = entry.campusLocation;
+                if (role !== "superadmin" && !accessibleCampusNames.has(campus)) {
+                    return;
+                }
                 counts[campus] = (counts[campus] || 0) + 1;
             });
 

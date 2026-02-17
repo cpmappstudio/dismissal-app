@@ -175,8 +175,65 @@ export const listCampuses = internalQuery({
 });
 
 /**
+ * Migration: admin -> principal (role transition)
+ */
+export const migrateAdminRoleToPrincipal = migrations.define({
+  table: "users",
+  migrateOne: async (ctx, user) => {
+    if (user.role !== "admin") return;
+
+    await ctx.db.patch(user._id, {
+      role: "principal",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Preview users affected by admin -> principal migration
+ */
+export const previewAdminToPrincipalMigration = internalQuery({
+  args: {},
+  returns: v.object({
+    totalUsers: v.number(),
+    adminUsers: v.number(),
+    adminWithoutCampuses: v.number(),
+    users: v.array(
+      v.object({
+        userId: v.id("users"),
+        email: v.optional(v.string()),
+        role: v.optional(v.string()),
+        assignedCampusesCount: v.number(),
+      })
+    ),
+  }),
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const adminUsers = users.filter((user) => user.role === "admin");
+
+    return {
+      totalUsers: users.length,
+      adminUsers: adminUsers.length,
+      adminWithoutCampuses: adminUsers.filter(
+        (user) => !user.assignedCampuses || user.assignedCampuses.length === 0
+      ).length,
+      users: adminUsers.map((user) => ({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        assignedCampusesCount: (user.assignedCampuses || []).length,
+      })),
+    };
+  },
+});
+
+/**
  * Runner for the migration
  */
 export const runMigrateAssignedCampuses = migrations.runner(
   internal.migrations.migrateAssignedCampusesToIds,
+);
+
+export const runMigrateAdminRoleToPrincipal = migrations.runner(
+  internal.migrations.migrateAdminRoleToPrincipal,
 );
