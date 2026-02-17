@@ -7,7 +7,8 @@ const crons = cronJobs();
 
 /**
  * Automatically clear all queues at midnight every day
- * This ensures a fresh start each morning for all campuses
+ * and aggregate dashboard metrics for the previous operational day.
+ * This ensures a fresh start each morning for all campuses.
  * 
  * Time: 00:00 Eastern Time (ET) = 05:00 UTC
  * Note: Adjust hourUTC based on your timezone

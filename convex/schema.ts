@@ -167,7 +167,67 @@ export default defineSchema({
   })
     .index("by_campus_date", ["campusLocation", "date"])
     .index("by_car_date", ["carNumber", "date"])
-    .index("by_campus_completed", ["campusLocation", "completedAt"]),
+    .index("by_campus_completed", ["campusLocation", "completedAt"])
+    .index("by_date", ["date"]),
+
+  /**
+   * Dashboard Metrics - Pre-calculated metrics for dashboard
+   */
+  dashboardMetrics: defineTable({
+    metricType: v.union(
+      v.literal("campus_activity"),
+      v.literal("avg_wait_time"),
+      v.literal("session_duration")
+    ),
+
+    campusLocation: v.optional(v.string()),
+    month: v.optional(v.string()),
+
+    totalEvents: v.optional(v.number()),
+    totalWaitSeconds: v.optional(v.number()),
+    avgWaitSeconds: v.optional(v.number()),
+    totalSessionSeconds: v.optional(v.number()),
+    avgSessionSeconds: v.optional(v.number()),
+    daysCount: v.optional(v.number()),
+    recordCount: v.number(),
+
+    lastUpdatedAt: v.number(),
+  })
+    .index("by_type", ["metricType"])
+    .index("by_type_campus", ["metricType", "campusLocation"])
+    .index("by_type_month", ["metricType", "month"])
+    .index("by_type_campus_month", ["metricType", "campusLocation", "month"]),
+
+  /**
+   * Dashboard Top Arrivals - Top 5 fastest arrivals per campus per month
+   */
+  dashboardTopArrivals: defineTable({
+    campusLocation: v.string(),
+    month: v.string(),
+    topArrivals: v.array(
+      v.object({
+        carNumber: v.number(),
+        queuedAt: v.number(),
+        studentNames: v.array(v.string()),
+        position: v.number(),
+        appearances: v.optional(v.number()),
+      })
+    ),
+    lastUpdatedAt: v.number(),
+  })
+    .index("by_campus_month", ["campusLocation", "month"])
+    .index("by_month", ["month"]),
+
+  /**
+   * Dashboard processed dates - prevents duplicate daily aggregation
+   */
+  dashboardProcessedDates: defineTable({
+    date: v.string(), // YYYY-MM-DD
+    month: v.string(), // YYYY-MM
+    processedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_month", ["month"]),
 
   /**
    * Campus Settings - Basic campus configuration
