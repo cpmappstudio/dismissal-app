@@ -5,6 +5,7 @@ export const clearDashboardMetrics = internalMutation({
   handler: async (ctx) => {
     const metrics = await ctx.db.query("dashboardMetrics").collect();
     const topArrivals = await ctx.db.query("dashboardTopArrivals").collect();
+    const processedDates = await ctx.db.query("dashboardProcessedDates").collect();
 
     for (const metric of metrics) {
       await ctx.db.delete(metric._id);
@@ -14,14 +15,19 @@ export const clearDashboardMetrics = internalMutation({
       await ctx.db.delete(arrival._id);
     }
 
+    for (const processedDate of processedDates) {
+      await ctx.db.delete(processedDate._id);
+    }
+
     console.log(
-      `[Dashboard Clear] Deleted ${metrics.length} metrics and ${topArrivals.length} top arrivals`
+      `[Dashboard Clear] Deleted ${metrics.length} metrics, ${topArrivals.length} top arrivals, and ${processedDates.length} processed dates`
     );
 
     return {
       success: true,
       deletedMetrics: metrics.length,
       deletedTopArrivals: topArrivals.length,
+      deletedProcessedDates: processedDates.length,
     };
   },
 });

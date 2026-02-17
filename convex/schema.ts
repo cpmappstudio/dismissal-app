@@ -210,11 +210,24 @@ export default defineSchema({
         queuedAt: v.number(),
         studentNames: v.array(v.string()),
         position: v.number(),
+        appearances: v.optional(v.number()),
       })
     ),
     lastUpdatedAt: v.number(),
   })
-    .index("by_campus_month", ["campusLocation", "month"]),
+    .index("by_campus_month", ["campusLocation", "month"])
+    .index("by_month", ["month"]),
+
+  /**
+   * Dashboard processed dates - prevents duplicate daily aggregation
+   */
+  dashboardProcessedDates: defineTable({
+    date: v.string(), // YYYY-MM-DD
+    month: v.string(), // YYYY-MM
+    processedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_month", ["month"]),
 
   /**
    * Campus Settings - Basic campus configuration

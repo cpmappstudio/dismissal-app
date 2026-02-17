@@ -17,6 +17,7 @@ export interface TopArrival {
   queuedAt: number;
   studentNames: string[];
   position: number;
+  appearances?: number;
 }
 
 export interface DashboardTopArrivals {

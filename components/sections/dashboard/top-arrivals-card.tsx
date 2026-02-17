@@ -1,6 +1,5 @@
 "use client";
 
-
 import {
   Card,
   CardContent,
@@ -12,16 +11,25 @@ import { useTopArrivals } from "@/hooks/use-dashboard-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, Car } from "lucide-react";
-import { formatTimestamp } from "@/lib/dashboard/utils";
+import type { DashboardFilters } from "@/lib/dashboard/types";
 
 interface TopArrivalsCardProps {
-  campus: string;
-  month: string;
+  filters?: DashboardFilters;
 }
 
-export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
-  const data = useTopArrivals(campus, month);
-
+export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
+  const data = useTopArrivals(filters);
+  const formatStudentFragments = (studentNames: string[]) => {
+    const unique = new Set(
+      studentNames
+        .map((fullName) => {
+          const parts = fullName.trim().split(/\s+/);
+          return parts[parts.length - 1] ?? fullName;
+        })
+        .filter((part) => part.length > 0),
+    );
+    return Array.from(unique).join(", ");
+  };
 
   if (data === undefined) {
     return (
@@ -40,42 +48,24 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
     );
   }
 
-
-  // Unificar todos los topArrivals de todos los registros devueltos
-
-  // Unificar todos los topArrivals de todos los registros devueltos
-  const allTopArrivals = (data ?? [])
-    .flatMap((record) =>
-      (record.topArrivals ?? []).map((arrival) => ({
-        ...arrival,
-        campusLocation: record.campusLocation,
-        month: record.month,
-      }))
-    );
-
-  // Calcular apariciones por carNumber en todos los días del mes
-  // 1. Obtener todos los días del mes
-  const days = Array.from(new Set((data ?? []).flatMap(record => record.topArrivals?.map(a => {
-    // Extraer día a partir de queuedAt (YYYY-MM-DD)
-    const d = new Date(a.queuedAt);
-    return d.toISOString().split("T")[0];
-  }) ?? [])));
-
-  // 2. Mapear carNumber a cantidad de apariciones en el top 5 diario
-  const carAppearances: Record<number, number> = {};
-  (data ?? []).forEach(record => {
-    (record.topArrivals ?? []).forEach(arrival => {
-      carAppearances[arrival.carNumber] = (carAppearances[arrival.carNumber] || 0) + 1;
-    });
-  });
+  const allTopArrivals = (data ?? []).flatMap((record) =>
+    (record.topArrivals ?? []).map((arrival) => ({
+      carNumber: arrival.carNumber,
+      queuedAt: arrival.queuedAt,
+      studentNames: arrival.studentNames ?? [],
+      appearances:
+        typeof arrival.appearances === "number" ? arrival.appearances : 1,
+      position: arrival.position,
+    })),
+  );
 
   if (!data || data.length === 0 || allTopArrivals.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top 5 Fastest Arrivals</CardTitle>
+          <CardTitle>Top 5 Most Frequent Early Arrivals</CardTitle>
           <CardDescription>
-            {campus} - {month}
+            No data available for the selected period
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,19 +75,21 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
     );
   }
 
-
-  // Ordenar por posición ascendente (1 es el más frecuente)
-  // y agregar la cantidad de apariciones
   const sortedArrivals = allTopArrivals
-    .map(a => ({ ...a, appearances: carAppearances[a.carNumber] || 0 }))
     .sort((a, b) => {
       if (b.appearances !== a.appearances) return b.appearances - a.appearances;
-      return a.position - b.position;
-    });
+      if (a.position !== b.position) return a.position - b.position;
+      return a.queuedAt - b.queuedAt;
+    })
+    .slice(0, 5)
+    .map((arrival, index) => ({
+      ...arrival,
+      position: index + 1,
+    }));
+
   const top3 = sortedArrivals.slice(0, 3);
   const rest = sortedArrivals.slice(3);
 
-  // Podio: 1° al centro, 2° izq, 3° der
   const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
 
   const getPodiumIcon = (index: number) => {
@@ -110,17 +102,27 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-col justify-center items-center">
-        <CardTitle className="text-2xl">Top 5 Most Frequent Early Arrivals</CardTitle>
-        <CardDescription>Cars that appeared most often in the daily top 5 this month</CardDescription>
+        <CardTitle className="text-2xl">
+          Top 5 Most Frequent Early Arrivals
+        </CardTitle>
+        <CardDescription>
+          Based on the number of appearances in the top 5 early arrivals in the current month
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Podio Top 3 */}
         {top3.length > 0 && (
           <div className="flex items-end justify-center gap-4 pb-6">
             {podiumOrder.map((arrival, displayIndex) => {
               const originalIndex = top3.indexOf(arrival);
               const carLabel = `Car #${arrival.carNumber}`;
-              const students = arrival.studentNames.join(", ");
+              const students = formatStudentFragments(arrival.studentNames);
+              const initials = students
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+
               const heights =
                 displayIndex === 1
                   ? "h-40"
@@ -136,7 +138,7 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
                   <div className="relative">
                     <Avatar className="h-16 w-16 border-2 border-border">
                       <AvatarFallback className="bg-gradient-to-br from-american-blue to-yankees-blue text-accent text-lg font-bold">
-                        {arrival.carNumber}
+                        {initials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1">
@@ -147,11 +149,9 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
                     <p className="text-xs font-semibold text-foreground">
                       {carLabel}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {students}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {arrival.appearances} appearances in daily top 5
+                    <p className="text-xs text-muted-foreground">{students}</p>
+                    <p className="text-sm font-bold flex items-center gap-1 justify-center">
+                      {arrival.appearances}
                     </p>
                   </div>
                   <div
@@ -165,14 +165,13 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
           </div>
         )}
 
-        {/* Lista del resto */}
         {rest.length > 0 && (
           <div className="space-y-3">
             <div className="space-y-2 px-2">
               {rest.map((arrival, index) => {
                 const rank = arrival.position;
                 const carLabel = `Car #${arrival.carNumber}`;
-                const students = arrival.studentNames.join(", ");
+                const students = formatStudentFragments(arrival.studentNames);
                 return (
                   <div
                     key={`${arrival.carNumber}-${arrival.position}-${index}`}
@@ -183,14 +182,16 @@ export function TopArrivalsCard({ campus, month }: TopArrivalsCardProps) {
                         #{rank}
                       </span>
                       <Car className="h-8 w-8 text-american-blue" />
-                      <span className="text-sm font-medium">{carLabel}</span>
+                      <div className="fle flex-row">
+                        <p className="text-sm font-medium">{carLabel}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {students}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs text-muted-foreground">
-                        {students}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {arrival.appearances} appearances in daily top 5
+                      <span className="text-sm font-bold">
+                        {arrival.appearances}
                       </span>
                     </div>
                   </div>

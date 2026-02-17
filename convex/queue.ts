@@ -121,9 +121,10 @@ async function clearCarFromQueue(
     db: any,
     entry: any,
     removedByUserId: any,
-    now: number = Date.now()
+    now: number = Date.now(),
+    dateOverride?: string
 ): Promise<void> {
-    const today = new Date(now).toISOString().split('T')[0];
+    const today = dateOverride ?? new Date(now).toISOString().split('T')[0];
     const waitTimeSeconds = Math.floor((now - entry.assignedTime) / 1000);
 
     // Create history entry
@@ -721,23 +722,24 @@ export const getCarCountsByCampus = query({
 export const scheduledClearAllQueues = internalMutation({
     args: {},
     handler: async (ctx) => {
+        const now = Date.now();
+        const currentDate = new Date(now);
+        // Midnight cron closes the previous operational day.
+        const processingDate = new Date(
+            currentDate.getTime() - 24 * 60 * 60 * 1000
+        )
+            .toISOString()
+            .split('T')[0];
+        const processingMonth = processingDate.substring(0, 7);
+
         // Get all distinct campuses that have cars in queue
         const allEntries = await ctx.db
             .query("dismissalQueue")
             .filter(q => q.eq(q.field("status"), "waiting"))
             .collect();
 
-        if (allEntries.length === 0) {
-            return { success: true, clearedCampuses: 0, totalCarsCleared: 0 };
-        }
-
         // Get unique campus locations
         const campuses = [...new Set(allEntries.map(entry => entry.campusLocation))];
-
-        const now = Date.now();
-        const currentDate = new Date(now);
-        const dateString = currentDate.toISOString().split('T')[0];
-        const monthString = dateString.substring(0, 7);
         let totalCleared = 0;
 
         // Process each campus
@@ -747,21 +749,29 @@ export const scheduledClearAllQueues = internalMutation({
             // Create history entries for all cars in this campus using shared helper
             for (const entry of campusEntries) {
                 // For scheduled clears, removedBy = addedBy (system operation)
-                await clearCarFromQueue(ctx.db, entry, entry.addedBy, now);
+                await clearCarFromQueue(
+                    ctx.db,
+                    entry,
+                    entry.addedBy,
+                    now,
+                    processingDate
+                );
                 totalCleared++;
             }
         }
 
         await ctx.scheduler.runAfter(0, internal.dashboard.updateDashboardMetrics, {
-            date: dateString,
-            month: monthString
+            date: processingDate,
+            month: processingMonth
         });
 
         return {
             success: true,
             clearedCampuses: campuses.length,
             totalCarsCleared: totalCleared,
-            campuses
+            campuses,
+            processedDate: processingDate,
+            processedMonth: processingMonth,
         };
     }
 });

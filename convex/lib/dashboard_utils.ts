@@ -362,6 +362,7 @@ export async function calculateTopArrivalsForMonth(
       studentNames: stat.studentNames,
       queuedAt: stat.firstQueuedAt, // Para cumplir con el validador del schema
       position: index + 1,
+      appearances: stat.count,
     }));
 
   return sorted;

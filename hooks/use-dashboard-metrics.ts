@@ -23,10 +23,10 @@ export function useSessionDuration(filters?: DashboardFilters) {
   });
 }
 
-export function useTopArrivals(campus: string, month: string) {
+export function useTopArrivals(filters?: DashboardFilters) {
   return useQuery(api.dashboard.getTopArrivals, {
-    campus,
-    month,
+    campus: filters?.campus,
+    month: filters?.month,
   });
 }
 
