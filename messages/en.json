@@ -598,6 +598,10 @@
         "title": "Protected Accounts",
         "description": "{count, plural, =1 {1 superadmin user} other {# superadmin users}} cannot be deleted and will be excluded from this operation."
       },
+      "principalWarning": {
+        "title": "Restricted Roles",
+        "description": "{count, plural, =1 {1 selected user} other {# selected users}} cannot be deleted by your role and will be excluded from this operation."
+      },
       "actions": {
         "cancel": "Cancel",
         "delete": "Delete Staff",

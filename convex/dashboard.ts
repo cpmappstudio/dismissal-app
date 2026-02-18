@@ -16,7 +16,7 @@ import {
   upsertTopArrivals,
 } from "./lib/dashboard_utils";
 
-const DASHBOARD_ALLOWED_ROLES = new Set(["principal", "admin", "superadmin"]);
+const DASHBOARD_ALLOWED_ROLES = new Set(["superadmin"]);
 
 type DashboardAccessCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 

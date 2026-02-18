@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Plus, Upload, X, Loader2, Save, Trash2, TriangleAlert, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, Upload, X, Loader2, Save, Trash2, TriangleAlert, ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -35,12 +36,29 @@ import { Staff } from "../types";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import {
+  canCrudStaffRole,
+  extractRoleFromMetadata,
+  getCrudStaffRoles,
+  type DismissalRole,
+} from "@/lib/role-utils";
 
 type CampusOption = {
   id: Id<"campusSettings">;
   value: string;
   label: string;
 };
+
+type AssignableStaffRole = Exclude<DismissalRole, "admin">;
+
+const STAFF_ROLE_OPTIONS: AssignableStaffRole[] = [
+  "superadmin",
+  "principal",
+  "allocator",
+  "dispatcher",
+  "viewer",
+  "operator",
+];
 
 interface StaffFormDialogProps {
   mode: "create" | "edit";
@@ -62,7 +80,9 @@ export function StaffFormDialog({
   onDelete,
 }: StaffFormDialogProps) {
   const t = useTranslations("staffManagement");
+  const { user } = useUser();
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const actorRole = user ? extractRoleFromMetadata(user.publicMetadata) : null;
 
   // Ref for file input to allow resetting
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -90,6 +110,24 @@ export function StaffFormDialog({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
+  const normalizeRole = React.useCallback(
+    (role?: string): AssignableStaffRole | null => {
+      const normalized = role === "admin" ? "principal" : role;
+      if (
+        normalized === "superadmin" ||
+        normalized === "principal" ||
+        normalized === "operator" ||
+        normalized === "allocator" ||
+        normalized === "dispatcher" ||
+        normalized === "viewer"
+      ) {
+        return normalized;
+      }
+      return null;
+    },
+    [],
+  );
+
   const initial = React.useMemo(() => {
     if (mode === "edit" && staff) {
       return {
@@ -97,7 +135,7 @@ export function StaffFormDialog({
         lastName: staff.lastName,
         email: staff.email || "",
         phoneNumber: staff.phoneNumber || "",
-        role: staff.role || "",
+        role: staff.role === "admin" ? "principal" : staff.role || "",
         assignedCampuses: staff.assignedCampuses || [],
         avatarUrl: staff.avatarUrl || "",
         avatarStorageId: staff.avatarStorageId || null,
@@ -118,6 +156,35 @@ export function StaffFormDialog({
   }, [mode, staff]);
 
   const [formData, setFormData] = React.useState(initial);
+  const targetRole = normalizeRole(staff?.role);
+  const allowedCrudRoles = React.useMemo(
+    () =>
+      getCrudStaffRoles(actorRole).filter(
+        (role): role is AssignableStaffRole => role !== "admin",
+      ),
+    [actorRole],
+  );
+  const allowedRoleSet = React.useMemo(
+    () => new Set(allowedCrudRoles),
+    [allowedCrudRoles],
+  );
+  const roleOptions = React.useMemo(
+    () => STAFF_ROLE_OPTIONS.filter((role) => allowedRoleSet.has(role)),
+    [allowedRoleSet],
+  );
+  const canEditTarget =
+    mode === "edit" ? canCrudStaffRole(actorRole, targetRole) : false;
+  const isSuperadminTarget = mode === "edit" && targetRole === "superadmin";
+  const selectedFormRole = normalizeRole(formData.role);
+  const canUseSelectedRole = selectedFormRole
+    ? allowedRoleSet.has(selectedFormRole)
+    : false;
+  const canSubmitForm =
+    mode === "create"
+      ? allowedCrudRoles.length > 0 && canUseSelectedRole
+      : canEditTarget && canUseSelectedRole;
+  const canDeleteTarget = mode === "edit" && canEditTarget && !isSuperadminTarget;
+  const formReadOnly = mode === "edit" && !canEditTarget;
 
   React.useEffect(() => {
     if (open) {
@@ -251,6 +318,8 @@ export function StaffFormDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmitForm) return;
+
     if (
       !formData.firstName ||
       !formData.lastName ||
@@ -314,15 +383,6 @@ export function StaffFormDialog({
     : t("editDialog.actions.save");
   const SubmitIcon = isCreate ? Plus : Save;
 
-  const ROLE_OPTIONS = [
-    "superadmin",
-    "admin",
-    "allocator",
-    "dispatcher",
-    "viewer",
-    "operator",
-  ] as const;
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -349,6 +409,7 @@ export function StaffFormDialog({
                     value={formData.firstName}
                     onChange={(e) => update("firstName", e.target.value)}
                     placeholder={t("createDialog.fields.firstName.placeholder")}
+                    disabled={formReadOnly}
                     required
                   />
                 </div>
@@ -361,6 +422,7 @@ export function StaffFormDialog({
                     value={formData.lastName}
                     onChange={(e) => update("lastName", e.target.value)}
                     placeholder={t("createDialog.fields.lastName.placeholder")}
+                    disabled={formReadOnly}
                     required
                   />
                 </div>
@@ -376,6 +438,7 @@ export function StaffFormDialog({
                     value={formData.email}
                     onChange={(e) => update("email", e.target.value)}
                     placeholder={t("createDialog.fields.email.placeholder")}
+                    disabled={formReadOnly}
                     required
                   />
                 </div>
@@ -387,6 +450,7 @@ export function StaffFormDialog({
                     value={formData.phoneNumber}
                     onChange={(e) => update("phoneNumber", e.target.value)}
                     placeholder={t("createDialog.fields.phone.placeholder")}
+                    disabled={formReadOnly}
                   />
                 </div>
               </div>
@@ -398,7 +462,7 @@ export function StaffFormDialog({
                     <span className="text-destructive">*</span>
                   </Label>
                   <Select
-                    disabled={initial.role === "superadmin" && mode === "edit"}
+                    disabled={formReadOnly || isSuperadminTarget}
                     value={formData.role}
                     onValueChange={(v) => update("role", v)}
                   >
@@ -408,7 +472,7 @@ export function StaffFormDialog({
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {ROLE_OPTIONS.map((r) => (
+                      {roleOptions.map((r) => (
                         <SelectItem key={r} value={r}>
                           {r}
                         </SelectItem>
@@ -426,6 +490,7 @@ export function StaffFormDialog({
                       <Button
                         variant="outline"
                         role="combobox"
+                        disabled={formReadOnly}
                         className="w-full h-10 justify-between font-normal"
                       >
                         <span className="truncate">
@@ -447,6 +512,7 @@ export function StaffFormDialog({
                               key={campus.id}
                               className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer"
                               onClick={() => {
+                                if (formReadOnly) return;
                                 setFormData((prev) => ({
                                   ...prev,
                                   assignedCampuses: isSelected
@@ -469,15 +535,15 @@ export function StaffFormDialog({
                 </div>
               </div>
 
-              {initial.role === "superadmin" && mode === "edit" && (
+              {formReadOnly && mode === "edit" && (
                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <TriangleAlert className="h-5 w-5 text-amber-600"/>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      {t("editDialog.protectedAccount.title")}
+                      Restricted Access
                     </p>
                     <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                      {t("editDialog.protectedAccount.description")}
+                      Principals can only manage operator, allocator, dispatcher, and viewer accounts.
                     </p>
                   </div>
                 </div>
@@ -510,7 +576,7 @@ export function StaffFormDialog({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={isUploadingAvatar}
+                          disabled={isUploadingAvatar || formReadOnly}
                           asChild
                         >
                           <span>
@@ -530,7 +596,7 @@ export function StaffFormDialog({
                         accept="image/*"
                         onChange={handleFile}
                         className="hidden"
-                        disabled={isUploadingAvatar}
+                        disabled={isUploadingAvatar || formReadOnly}
                       />
 
                       {/* Show "Clear Preview" button if there's a new preview */}
@@ -540,7 +606,7 @@ export function StaffFormDialog({
                           variant="outline"
                           size="sm"
                           onClick={removePreview}
-                          disabled={isUploadingAvatar}
+                          disabled={isUploadingAvatar || formReadOnly}
                         >
                           <X className="h-4 w-4 mr-1" /> Clear Preview
                         </Button>
@@ -556,7 +622,7 @@ export function StaffFormDialog({
                             variant="outline"
                             size="sm"
                             onClick={removeAvatar}
-                            disabled={isUploadingAvatar}
+                            disabled={isUploadingAvatar || formReadOnly}
                           >
                             <X className="h-4 w-4 mr-1" /> Remove Avatar
                           </Button>
@@ -573,13 +639,12 @@ export function StaffFormDialog({
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-6 border-t">
             <div className="flex gap-2 w-full justify-end">
-              {mode === "edit" && onDelete && staff && (
+              {canDeleteTarget && onDelete && staff && (
                 <DeleteStaffDialog
                   selectedStaff={[staff]}
                   onDeleteStaff={(ids: string[]) => onDelete(ids[0])}
                   trigger={
                     <Button
-                      disabled={initial.role === "superadmin"}
                       type="button"
                       variant="destructive"
                       className="gap-2"
@@ -597,6 +662,7 @@ export function StaffFormDialog({
               )}
               <Button
                 type="submit"
+                disabled={!canSubmitForm}
                 className="bg-yankees-blue hover:bg-yankees-blue/90 gap-2"
               >
                 <SubmitIcon className="h-4 w-4" />

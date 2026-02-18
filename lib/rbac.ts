@@ -19,7 +19,7 @@ import {
 
 // Rutas específicas por rol/función
 const roleMatchers = {
-    admin: createRouteMatcher(['/:locale/admin(.*)', '/admin(.*)']),
+    management: createRouteMatcher(['/:locale/management(.*)', '/management(.*)']),
     operators: createRouteMatcher(['/:locale/operators(.*)', '/operators(.*)']), // Ruta general de operators
     allocator: createRouteMatcher(['/:locale/operators/allocator(.*)', '/operators/allocator(.*)']),
     dispatcher: createRouteMatcher(['/:locale/operators/dispatcher(.*)', '/operators/dispatcher(.*)']),
@@ -28,11 +28,11 @@ const roleMatchers = {
 
 // Permisos por ruta - quién puede acceder a qué
 const ROLE_PERMISSIONS = {
-    admin: ['admin', 'superadmin'] as const,
-    operators: ['operator', 'admin', 'superadmin'] as const, // Operator puede ver todo en /operators
-    allocator: ['allocator', 'operator', 'admin', 'superadmin'] as const,
-    dispatcher: ['dispatcher', 'operator', 'admin', 'superadmin'] as const,
-    viewer: ['viewer', 'operator', 'allocator', 'dispatcher', 'admin', 'superadmin'] as const, // Todos pueden ver
+    management: ['principal', 'admin', 'superadmin'] as const,
+    operators: ['operator', 'principal', 'admin', 'superadmin'] as const, // Operator puede ver todo en /operators
+    allocator: ['allocator', 'operator', 'principal', 'admin', 'superadmin'] as const,
+    dispatcher: ['dispatcher', 'operator', 'principal', 'admin', 'superadmin'] as const,
+    viewer: ['viewer', 'operator', 'allocator', 'dispatcher', 'principal', 'admin', 'superadmin'] as const, // Todos pueden ver
 } satisfies Record<keyof typeof roleMatchers, readonly DismissalRole[]>;
 
 /**
@@ -77,7 +77,7 @@ export function checkRoleAccess(
         'dispatcher',
         'viewer',
         'operators', // Debe ir después de los específicos
-        'admin'
+        'management'
     ] as const;
 
     for (const route of matchers) {

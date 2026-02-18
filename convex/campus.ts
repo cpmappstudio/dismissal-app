@@ -577,10 +577,10 @@ export const getStaffByCampus = query({
 });
 
 /**
- * Get principal/superadmin users for director selection.
+ * Get principal users for director selection.
  * Keeps original function name for backward compatibility with current frontend.
  */
-export const getSuperadmins = query({
+export const getPrincipals = query({
     handler: async (ctx) => {
         try {
             const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
@@ -590,9 +590,7 @@ export const getSuperadmins = query({
                 .collect();
 
             const eligible = allUsers.filter((candidate) =>
-                candidate.role === "superadmin" ||
-                candidate.role === "principal" ||
-                candidate.role === "admin"
+                candidate.role === "principal"
             );
 
             const scoped = isSuperadmin(role)

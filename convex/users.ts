@@ -228,6 +228,26 @@ function isSuperadminRole(role: string | undefined): boolean {
   return role === "superadmin";
 }
 
+function isPrincipalLikeRole(role: string | undefined): boolean {
+  return role === "principal" || role === "admin";
+}
+
+function canPrincipalCrudRole(role: string | undefined): boolean {
+  return (
+    role === "operator" ||
+    role === "allocator" ||
+    role === "dispatcher" ||
+    role === "viewer"
+  );
+}
+
+function ensurePrincipalCrudTarget(actorRole: string | undefined, targetRole: string | undefined) {
+  if (!isPrincipalLikeRole(actorRole)) return;
+  if (!canPrincipalCrudRole(targetRole)) {
+    throw new Error("Principals can only manage operator, allocator, dispatcher, and viewer users");
+  }
+}
+
 function hasCampusOverlap(
   sourceCampuses: Id<"campusSettings">[] | undefined,
   targetCampuses: Id<"campusSettings">[] | undefined
@@ -626,6 +646,7 @@ export const createUserWithClerk = action({
     if (!isSuperadminRole(actor.role) && args.role === "superadmin") {
       throw new Error("Only superadmin can create superadmin users");
     }
+    ensurePrincipalCrudTarget(actor.role, args.role);
 
     // Get Clerk secret key
     const clerkSecretKey = process.env.CLERK_SECRET_KEY;
@@ -743,7 +764,16 @@ export const updateUserWithClerk = action({
       throw new Error("Target user not found");
     }
 
+    if (
+      targetUser.role === "superadmin" &&
+      args.role !== undefined &&
+      args.role !== "superadmin"
+    ) {
+      throw new Error("Superadmin role cannot be changed");
+    }
+
     if (!isSuperadminRole(actor.role)) {
+      ensurePrincipalCrudTarget(actor.role, targetUser.role);
       if (targetUser.role === "superadmin") {
         throw new Error("Only superadmin can update superadmin users");
       }
@@ -752,6 +782,9 @@ export const updateUserWithClerk = action({
       }
       if (args.role === "superadmin") {
         throw new Error("Only superadmin can grant superadmin role");
+      }
+      if (args.role !== undefined) {
+        ensurePrincipalCrudTarget(actor.role, args.role);
       }
       if (args.assignedCampuses !== undefined) {
         ensureCampusScopeForManagement(actor, args.assignedCampuses);
@@ -869,10 +902,12 @@ export const deleteUserWithClerk = action({
       throw new Error("Target user not found");
     }
 
+    if (targetUser.role === "superadmin") {
+      throw new Error("Superadmin users cannot be deleted");
+    }
+
     if (!isSuperadminRole(actor.role)) {
-      if (targetUser.role === "superadmin") {
-        throw new Error("Only superadmin can delete superadmin users");
-      }
+      ensurePrincipalCrudTarget(actor.role, targetUser.role);
       if (!hasCampusOverlap(actor.assignedCampuses, targetUser.assignedCampuses)) {
         throw new Error("Cannot delete users outside your assigned campuses");
       }
@@ -1127,6 +1162,7 @@ export const createTempUser = mutation({
     if (!isSuperadminRole(actor.role) && args.role === "superadmin") {
       throw new Error("Only superadmin can create superadmin users");
     }
+    ensurePrincipalCrudTarget(actor.role, args.role);
 
     // Check if email already exists
     const existing = await ctx.db
