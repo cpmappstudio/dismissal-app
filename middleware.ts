@@ -31,7 +31,7 @@ const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([
 // Rutas por defecto para cada rol (donde redirigir cuando acceden a rutas no permitidas)
 const DEFAULT_REDIRECTS: Record<DismissalRole, string> = {
   superadmin: '/management/staff',
-  principal: '/management/staff',
+  principal: '/management/campuses',
   admin: '/management/staff',
   operator: '/operators/allocator',
   allocator: '/operators/allocator',
@@ -134,10 +134,10 @@ const getRedirectUrl = (
   locale: string,
   baseUrl: string
 ): URL | null => {
-  // REGLA 1: Roles de gestión y superadmin pueden ver el dashboard en la raíz
+  // REGLA 1: Solo admin y superadmin pueden ver el dashboard en la raíz
   // Otros roles son redirigidos a su ruta específica
   if (pathWithoutLocale === '/') {
-    if (userRole === 'principal' || userRole === 'admin' || userRole === 'superadmin') {
+    if (userRole === 'superadmin') {
       return null // Permitir acceso al dashboard
     }
     return new URL(`/${locale}${DEFAULT_REDIRECTS[userRole]}`, baseUrl)
