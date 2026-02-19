@@ -20,10 +20,9 @@ export interface OperatorPermissions {
  * Works for both server-side sessionClaims and Convex identity
  */
 export function extractRoleFromMetadata(metadata: {
-    publicMetadata?: { dismissalRole?: string; role?: string };
-    privateMetadata?: { dismissalRole?: string; role?: string };
-    metadata?: { dismissalRole?: string; role?: string };
-    dismissalRole?: string;
+    publicMetadata?: { role?: string };
+    privateMetadata?: { role?: string };
+    metadata?: { role?: string };
     role?: string;
 }): DismissalRole {
     const publicMeta = metadata.publicMetadata || metadata;
@@ -31,11 +30,8 @@ export function extractRoleFromMetadata(metadata: {
     const meta = metadata.metadata;
 
     // Priority order for role extraction
-    const role = publicMeta?.dismissalRole ||
-        publicMeta?.role ||
-        privateMeta?.dismissalRole ||
+    const role = publicMeta?.role ||
         privateMeta?.role ||
-        meta?.dismissalRole ||
         meta?.role;
 
     return (role as DismissalRole) || 'viewer';

@@ -176,8 +176,15 @@ const roleValidator = v.union(
   v.literal("superadmin")
 );
 
+const reconciliationFieldValidator = v.union(
+  v.literal("role"),
+  v.literal("assignedCampuses")
+);
+
 type Role = typeof ROLE_VALUES[number];
+type ReconciliationField = "role" | "assignedCampuses";
 const MANAGEMENT_ROLES: Role[] = ["principal", "admin", "superadmin"];
+const RECONCILIATION_FIELDS: ReconciliationField[] = ["role", "assignedCampuses"];
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -280,9 +287,7 @@ function ensureCampusScopeForManagement(
  * Extract role from Clerk metadata (fallback to public_metadata.role or default to viewer)
  */
 function extractRoleFromMetadata(clerkUser: any): Role {
-  const role = clerkUser.public_metadata?.dismissalRole ||
-               clerkUser.public_metadata?.role ||
-               clerkUser.publicMetadata?.dismissalRole ||
+  const role = clerkUser.public_metadata?.role ||
                clerkUser.publicMetadata?.role ||
                "viewer";
   
@@ -292,6 +297,27 @@ function extractRoleFromMetadata(clerkUser: any): Role {
   }
   
   console.warn(`Invalid role "${role}" for user, defaulting to viewer`);
+  return "viewer";
+}
+
+function normalizeCampusMetadata(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const values = value.filter((entry): entry is string => typeof entry === "string");
+  return Array.from(new Set(values)).sort();
+}
+
+function arraysMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
+function toClerkRole(rawRole: string | undefined): Role {
+  if (rawRole && ROLE_VALUES.includes(rawRole as Role)) {
+    return rawRole as Role;
+  }
   return "viewer";
 }
 
@@ -416,6 +442,16 @@ export const getUserByClerkIdInternal = internalQuery({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .first();
   }
+});
+
+/**
+ * Internal query used by reconciliation action to scan users in Convex
+ */
+export const listUsersForReconciliationInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("users").collect();
+  },
 });
 
 // ============================================================================
@@ -618,6 +654,46 @@ async function checkManagementPermissions(ctx: any) {
   }
   
   return user;
+}
+
+/**
+ * Allow reconciliation either as mapped superadmin user or with an ops token.
+ * This avoids lockout when running from Convex dashboard during auth drift incidents.
+ */
+async function authorizeReconciliation(
+  ctx: any,
+  adminToken?: string
+): Promise<"superadmin_user" | "ops_token"> {
+  const identity = await ctx.auth.getUserIdentity();
+
+  if (identity) {
+    const user = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
+      clerkId: identity.subject,
+    });
+
+    if (user && isSuperadminRole(user.role)) {
+      return "superadmin_user";
+    }
+  }
+
+  const configuredOpsToken = process.env.RECONCILIATION_ADMIN_TOKEN;
+  if (!configuredOpsToken) {
+    throw new Error(
+      "Not authorized for reconciliation. Configure RECONCILIATION_ADMIN_TOKEN or run as mapped superadmin user."
+    );
+  }
+
+  if (!adminToken) {
+    throw new Error(
+      "Not authorized for reconciliation. Provide adminToken (matches RECONCILIATION_ADMIN_TOKEN)."
+    );
+  }
+
+  if (adminToken !== configuredOpsToken) {
+    throw new Error("Invalid adminToken for reconciliation");
+  }
+
+  return "ops_token";
 }
 
 // ============================================================================
@@ -827,7 +903,9 @@ export const updateUserWithClerk = action({
       };
       
       // Update only the fields that were provided
-      if (args.role) publicMetadata.role = args.role;
+      if (args.role) {
+        publicMetadata.role = args.role;
+      }
       if (args.assignedCampuses !== undefined) publicMetadata.assignedCampuses = args.assignedCampuses;
       if (args.phone !== undefined) publicMetadata.phone = args.phone;
       if (args.status) publicMetadata.status = args.status;
@@ -950,6 +1028,217 @@ export const deleteUserWithClerk = action({
       throw new Error(`Failed to delete user: ${err.message}`);
     }
   }
+});
+
+/**
+ * Reconcile Convex user role/campus assignments to Clerk public_metadata.
+ * Use dryRun=true to preview drift before applying changes.
+ */
+export const reconcileUsersToClerk = action({
+  args: {
+    dryRun: v.boolean(),
+    fields: v.optional(v.array(reconciliationFieldValidator)),
+    clerkUserIds: v.optional(v.array(v.string())),
+    limit: v.optional(v.number()),
+    includeDetails: v.optional(v.boolean()),
+    adminToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const authorizationMode = await authorizeReconciliation(ctx, args.adminToken);
+
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (!clerkSecretKey) {
+      throw new Error("CLERK_SECRET_KEY not configured");
+    }
+
+    if (
+      args.limit !== undefined &&
+      (!Number.isInteger(args.limit) || args.limit <= 0)
+    ) {
+      throw new Error("limit must be a positive integer");
+    }
+
+    const selectedFields = new Set<ReconciliationField>(
+      args.fields && args.fields.length > 0 ? args.fields : RECONCILIATION_FIELDS
+    );
+    const includeDetails = args.includeDetails ?? true;
+
+    let users: any[] = [];
+    if (args.clerkUserIds && args.clerkUserIds.length > 0) {
+      const uniqueIds = Array.from(new Set(args.clerkUserIds));
+      for (const clerkId of uniqueIds) {
+        const user = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
+          clerkId,
+        });
+        if (user) users.push(user);
+      }
+    } else {
+      users = await ctx.runQuery(internal.users.listUsersForReconciliationInternal, {});
+    }
+
+    if (args.limit !== undefined) {
+      users = users.slice(0, args.limit);
+    }
+
+    const summary = {
+      dryRun: args.dryRun,
+      authorizationMode,
+      fields: Array.from(selectedFields.values()),
+      candidates: users.length,
+      processed: 0,
+      inSync: 0,
+      driftDetected: 0,
+      updated: 0,
+      skippedTemp: 0,
+      missingInClerk: 0,
+      failed: 0,
+    };
+
+    const details: any[] = [];
+
+    for (const user of users) {
+      const clerkId = user.clerkId;
+      const detail: any = {
+        clerkUserId: clerkId,
+        userId: user._id,
+        email: user.email || null,
+      };
+
+      if (!clerkId || clerkId.startsWith("temp_")) {
+        summary.skippedTemp += 1;
+        if (includeDetails) {
+          detail.status = "skipped_temp";
+          details.push(detail);
+        }
+        continue;
+      }
+
+      summary.processed += 1;
+
+      try {
+        const getUserResponse = await fetch(`https://api.clerk.com/v1/users/${clerkId}`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (getUserResponse.status === 404) {
+          summary.missingInClerk += 1;
+          if (includeDetails) {
+            detail.status = "missing_in_clerk";
+            details.push(detail);
+          }
+          continue;
+        }
+
+        if (!getUserResponse.ok) {
+          const errorBody = await getUserResponse.text();
+          throw new Error(`Failed to fetch Clerk user: ${getUserResponse.status} - ${errorBody}`);
+        }
+
+        const clerkUser = await getUserResponse.json();
+        const currentPublicMetadata = clerkUser.public_metadata || {};
+
+        const expectedRole = toClerkRole(user.role);
+        const currentRoleRaw = currentPublicMetadata.role;
+        const currentRole = typeof currentRoleRaw === "string" ? currentRoleRaw : undefined;
+
+        const expectedCampuses = normalizeCampusMetadata(user.assignedCampuses || []);
+        const currentCampuses = normalizeCampusMetadata(
+          currentPublicMetadata.assignedCampuses ||
+            (currentPublicMetadata.campusId ? [currentPublicMetadata.campusId] : [])
+        );
+
+        const roleDrift =
+          selectedFields.has("role") &&
+          currentRole !== expectedRole;
+        const campusesDrift =
+          selectedFields.has("assignedCampuses") &&
+          !arraysMatch(currentCampuses, expectedCampuses);
+
+        if (!roleDrift && !campusesDrift) {
+          summary.inSync += 1;
+          if (includeDetails) {
+            detail.status = "in_sync";
+            details.push(detail);
+          }
+          continue;
+        }
+
+        summary.driftDetected += 1;
+        if (includeDetails) {
+          detail.changes = {};
+          if (roleDrift) {
+            detail.changes.role = {
+              convex: expectedRole,
+              clerk: currentRole || null,
+            };
+          }
+          if (campusesDrift) {
+            detail.changes.assignedCampuses = {
+              convex: expectedCampuses,
+              clerk: currentCampuses,
+            };
+          }
+        }
+
+        if (args.dryRun) {
+          if (includeDetails) {
+            detail.status = "drift_detected";
+            details.push(detail);
+          }
+          continue;
+        }
+
+        const mergedPublicMetadata: any = {
+          ...currentPublicMetadata,
+        };
+
+        if (selectedFields.has("role")) {
+          mergedPublicMetadata.role = expectedRole;
+          delete mergedPublicMetadata.dismissalRole;
+        }
+
+        if (selectedFields.has("assignedCampuses")) {
+          mergedPublicMetadata.assignedCampuses = expectedCampuses;
+          delete mergedPublicMetadata.campusId;
+        }
+
+        const patchResponse = await fetch(`https://api.clerk.com/v1/users/${clerkId}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            public_metadata: mergedPublicMetadata,
+          }),
+        });
+
+        if (!patchResponse.ok) {
+          const patchError = await patchResponse.text();
+          throw new Error(`Failed to patch Clerk user: ${patchResponse.status} - ${patchError}`);
+        }
+
+        summary.updated += 1;
+        if (includeDetails) {
+          detail.status = "updated";
+          details.push(detail);
+        }
+      } catch (error) {
+        summary.failed += 1;
+        if (includeDetails) {
+          detail.status = "error";
+          detail.error = (error as Error).message;
+          details.push(detail);
+        }
+      }
+    }
+
+    return includeDetails ? { ...summary, details } : summary;
+  },
 });
 
 /**
