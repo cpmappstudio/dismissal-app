@@ -194,7 +194,7 @@ export function StaffTable() {
       lastName: user.lastName || "",
       email: user.email || "",
       phoneNumber: user.phone || "",
-      role: user.role || "",
+      role: user.role === "admin" ? "principal" : user.role || "",
       // Resolve campus IDs to names for display
       assignedCampuses: (user.assignedCampuses || []).map(
         (campusId) => getCampusNameById(campusId)
@@ -416,7 +416,7 @@ export function StaffTable() {
   // Role options for the visual role filter (static, UI-only)
   const ROLE_OPTIONS = [
     "superadmin",
-    "admin",
+    "principal",
     "allocator",
     "dispatcher",
     "viewer",

@@ -86,6 +86,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { campusStatusOptions } from "@/lib/location-data";
+import {
+  canCreateDeleteCampus,
+  extractRoleFromMetadata,
+} from "@/lib/role-utils";
 
 // Grade type definition
 type Grade = {
@@ -175,6 +179,10 @@ export function CampusSettingsDialog({
 
   // Clerk user (for authentication check)
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const userRole = clerkUser
+    ? extractRoleFromMetadata(clerkUser.publicMetadata)
+    : null;
+  const canManageCampusLifecycle = canCreateDeleteCampus(userRole);
 
   // Alert state
   const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -231,7 +239,7 @@ export function CampusSettingsDialog({
   }, []);
 
   // Queries
-  const potentialDirectors = useQuery(api.campus.getSuperadmins);
+  const potentialDirectors = useQuery(api.campus.getPrincipals);
 
   // Mutations
   const createCampusMutation = useMutation(api.campus.create);
@@ -458,6 +466,15 @@ export function CampusSettingsDialog({
 
     if (!clerkUser) {
       console.error("User not authenticated. Please log in.");
+      return;
+    }
+
+    if (!isEditing && !canManageCampusLifecycle) {
+      showAlert(
+        "error",
+        t("alerts.createError.title"),
+        t("alerts.createError.message"),
+      );
       return;
     }
 
@@ -708,6 +725,15 @@ export function CampusSettingsDialog({
   };
 
   const handleDelete = async () => {
+    if (!canManageCampusLifecycle) {
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        t("alerts.deleteError.message"),
+      );
+      return;
+    }
+
     if (!campus) return;
 
     try {
@@ -741,6 +767,11 @@ export function CampusSettingsDialog({
       setIsSubmitting(false);
     }
   };
+
+  // Principal can edit campuses but cannot create or delete them.
+  if (!isEditing && !canManageCampusLifecycle) {
+    return null;
+  }
 
   const defaultTrigger = isEditing ? (
     <Button className="gap-2 cursor-pointer">
@@ -884,7 +915,7 @@ export function CampusSettingsDialog({
                                       {director.name}
                                     </span>
                                     <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                                      superadmin
+                                      principal
                                     </span>
                                   </div>
                                   <span className="text-sm text-muted-foreground ml-6">
@@ -1211,7 +1242,7 @@ export function CampusSettingsDialog({
 
             <DialogFooter className="flex justify-between">
               <div className="flex gap-2">
-                {isEditing && (
+                {isEditing && canManageCampusLifecycle && (
                   <Button
                     type="button"
                     variant="destructive"
@@ -1242,7 +1273,10 @@ export function CampusSettingsDialog({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+      <AlertDialog
+        open={showDeleteAlert && canManageCampusLifecycle}
+        onOpenChange={setShowDeleteAlert}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

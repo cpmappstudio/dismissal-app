@@ -25,6 +25,7 @@ export default defineSchema({
         v.literal("dispatcher"),
         v.literal("allocator"),
         v.literal("operator"),
+        v.literal("principal"),
         v.literal("admin"),
         v.literal("superadmin"),
       ),

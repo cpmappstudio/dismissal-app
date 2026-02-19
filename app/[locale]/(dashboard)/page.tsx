@@ -1,8 +1,8 @@
 import { getCurrentUserRole } from '@/lib/rbac';
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import AdminDashboard from '@/components/dashboard/admin-dashboard'
 import { DismissalDashboard } from '@/components/sections/dashboard';
+import { canAccessDashboard } from '@/lib/role-utils';
 
 export default async function DashboardPage({
   params,
@@ -12,6 +12,7 @@ export default async function DashboardPage({
   const { locale } = await params;
   const { userId } = await auth();
   const userRole = await getCurrentUserRole();
+  const hasDashboardAccess = canAccessDashboard(userRole ?? null);
 
   if (!userId) {
     redirect(`/${locale}/sign-in`)
@@ -22,10 +23,10 @@ export default async function DashboardPage({
       {/* Render condicional por rol - AQUÍ van los componentes */}
       {/* {userRole === 'student' && <div>Student Dashboard Placeholder</div>}
       {userRole === 'professor' && <div>Professor Dashboard Placeholder</div>} */}
-      {(userRole === 'admin' || userRole === 'superadmin') && <DismissalDashboard/>}
+      {hasDashboardAccess && <DismissalDashboard/>}
 
       {/* Fallback si no hay rol asignado */}
-      {!userRole && <div>Welcome! Please contact admin to assign your role.</div>}
+      {!userRole && <div>Welcome! Please contact your administrator to assign your role.</div>}
     </div>
   )
 }
