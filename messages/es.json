@@ -126,12 +126,8 @@
         "url": "/operators",
         "items": [
           {
-            "title": "Asignador",
-            "url": "/operators/allocator"
-          },
-          {
-            "title": "Despachador",
-            "url": "/operators/dispatcher"
+            "title": "Carretera",
+            "url": "/operators"
           },
           {
             "title": "Visor",
@@ -294,21 +290,9 @@
       },
       "operators": {
         "badge": "Acceso Total",
-        "title": "Funciones de Operador",
-        "description": "Acceso completo a todas las herramientas de operadores: asignador, despachador y visor de la fila de salida.",
-        "action": "Ir a Operadores"
-      },
-      "allocator": {
-        "badge": "Asignación",
-        "title": "Asignador",
-        "description": "Asignar vehículos a los carriles de salida para organizar la fila de recogida de estudiantes.",
-        "action": "Ir a Asignador"
-      },
-      "dispatcher": {
-        "badge": "Despacho",
-        "title": "Despachador",
-        "description": "Despachar vehículos de la fila cuando los estudiantes son recogidos y gestionar el flujo de salida.",
-        "action": "Ir a Despachador"
+        "title": "Carretera",
+        "description": "Registrar los vehículos que llegan y despacharlos tras la recogida desde una misma pantalla.",
+        "action": "Ir a Carretera"
       },
       "viewer": {
         "badge": "Visualización",

@@ -3,6 +3,8 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
+import { repositionLaneCars, validateUserAccess } from "./helpers";
+import { canAllocate, canDispatch } from "../lib/role-utils";
 
 /**
  * Helper functions
@@ -87,25 +89,6 @@ function studentToSummary(student: any) {
         avatarStorageId: student.avatarStorageId,
         birthday: student.birthday,
     };
-}
-
-async function repositionLaneCars(db: any, campus: string, lane: string, removedPosition: number): Promise<void> {
-    const entries = await db
-        .query("dismissalQueue")
-        .withIndex("by_campus_lane_position", (q: any) =>
-            q.eq("campusLocation", campus).eq("lane", lane)
-        )
-        .filter((q: any) => q.gt(q.field("position"), removedPosition))
-        .collect();
-
-    // Instead of patch, we'll delete and recreate with new positions
-    for (const entry of entries) {
-        const { _id, _creationTime, ...entryData } = entry;
-        const newEntry = { ...entryData, position: entry.position - 1 };
-
-        await db.delete(entry._id);
-        await db.insert("dismissalQueue", newEntry);
-    }
 }
 
 /**
@@ -210,34 +193,8 @@ export const addCar = mutation({
         lane: laneValidator
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
-        }
-
-        if (!user) throw new Error("Failed to create user record");
+        const { user, role } = await validateUserAccess(ctx);
+        if (!canAllocate(role)) throw new Error("Not authorized to allocate vehicles");
 
         // Validate inputs
         if (!args.campus.trim()) {
@@ -305,34 +262,8 @@ export const removeCar = mutation({
         queueId: v.id("dismissalQueue")
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: ["default"], // Default campus
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
-        }
-
-        if (!user) throw new Error("Failed to create user record");
+        const { user, role } = await validateUserAccess(ctx);
+        if (!canDispatch(role)) throw new Error("Not authorized to dispatch vehicles");
 
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
@@ -432,8 +363,8 @@ export const moveCar = mutation({
         newLane: laneValidator
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { role } = await validateUserAccess(ctx);
+        if (!canAllocate(role)) throw new Error("Not authorized to allocate vehicles");
 
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
@@ -452,21 +383,16 @@ export const moveCar = mutation({
         // Get next position in new lane
         const newPosition = await getNextPosition(ctx.db, entry.campusLocation, args.newLane);
 
-        // Instead of patch, delete and recreate with new lane/position
-        const { _id, _creationTime, ...entryData } = entry;
-        const newEntry = {
-            ...entryData,
+        // Preserve the ID used by other sessions and the reactive UI.
+        await ctx.db.patch(args.queueId, {
             lane: args.newLane,
             position: newPosition
-        };
-
-        await ctx.db.delete(args.queueId);
-        const newQueueId = await ctx.db.insert("dismissalQueue", newEntry);
+        });
 
         // Reposition cars in old lane
         await repositionLaneCars(ctx.db, entry.campusLocation, oldLane, oldPosition);
 
-        return newQueueId;
+        return args.queueId;
     }
 });
 
@@ -590,34 +516,8 @@ export const clearAllCars = mutation({
         campus: v.string()
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        // Get or create user record
-        let user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-            .first();
-
-        if (!user) {
-            // Create user record if it doesn't exist
-            const userId = await ctx.db.insert("users", {
-                clerkId: identity.subject,
-                username: (identity.username as string) || (identity.email as string) || "unknown",
-                email: (identity.email as string) || (identity.emailAddress as string),
-                firstName: (identity.firstName as string) || (identity.givenName as string),
-                lastName: (identity.lastName as string) || (identity.familyName as string),
-                imageUrl: (identity.imageUrl as string) || (identity.pictureUrl as string),
-                assignedCampuses: [args.campus],
-                role: "viewer", // Default role
-                isActive: true,
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-            });
-            user = await ctx.db.get(userId);
-        }
-
-        if (!user) throw new Error("Failed to create user record");
+        const { user, role } = await validateUserAccess(ctx);
+        if (!canDispatch(role)) throw new Error("Not authorized to dispatch vehicles");
 
         // Get all cars in queue for this campus
         const entries = await ctx.db

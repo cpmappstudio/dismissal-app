@@ -78,6 +78,7 @@ interface CarCardProps {
   car: CarData;
   onRemove?: (carId: string) => void;
   showRemoveButton?: boolean;
+  removeDisabled?: boolean;
   lane: "left" | "right";
   isViewerMode?: boolean;
   hasBirthdayToday?: boolean;
@@ -89,6 +90,7 @@ export const CarCard = React.memo<CarCardProps>(
     car,
     onRemove,
     showRemoveButton = false,
+    removeDisabled = false,
     lane,
     isViewerMode = false,
     hasBirthdayToday = false,
@@ -277,11 +279,13 @@ export const CarCard = React.memo<CarCardProps>(
                 >
                   {showRemoveButton && (
                     <button
+                      aria-label={`${t("dispatcher.removeCar")} ${car.carNumber}`}
+                      disabled={removeDisabled}
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemove?.(car.id);
                       }}
-                      className="p-1.5 hover:text-red-500 rounded-l-full transition-colors duration-200"
+                      className="p-1.5 hover:text-red-500 rounded-l-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

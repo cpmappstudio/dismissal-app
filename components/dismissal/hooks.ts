@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { CarData } from './types'
+import { CarData, RemoveCarHandler } from './types'
 import { ANIMATION_DURATIONS } from './constants'
 
 interface UseCarAnimationsReturn {
-    removingCarId: string | null
     newCarIds: Set<string>
-    handleRemoveCar: (carId: string, onRemove: (carId: string) => void) => void
+    handleRemoveCar: (carId: string, onRemove: RemoveCarHandler) => boolean
     isCarRemoving: (carId: string) => boolean
 }
 
 export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
-    const [removingCarId, setRemovingCarId] = useState<string | null>(null)
     const [newCarIds, setNewCarIds] = useState<Set<string>>(new Set())
     const [removingCars, setRemovingCars] = useState<Set<string>>(new Set())
     const prevCarIdsRef = useRef<Set<string>>(new Set())
@@ -57,42 +55,25 @@ export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
         }
     }, [carIds, cars]) // Include cars dependency
 
-    // Clean up removing cars when they're actually removed from the data
-    useEffect(() => {
-        const currentCarIds = new Set(cars.map(car => car.id))
-        setRemovingCars(prev => {
-            const stillRemoving = new Set<string>()
-            for (const carId of prev) {
-                // Keep the car in removing state if it still exists in data
-                if (currentCarIds.has(carId)) {
-                    stillRemoving.add(carId)
-                }
-            }
-            return stillRemoving
-        })
-    }, [cars])
+    const handleRemoveCar = useCallback((carId: string, onRemove: RemoveCarHandler) => {
+        // Acquire the view's mutation lock before starting any visual removal.
+        const removal = onRemove(carId)
+        if (!removal) return false
 
-    const handleRemoveCar = useCallback((carId: string, onRemove: (carId: string) => void) => {
-        // Immediately mark as removing and start animation
-        setRemovingCarId(carId)
         setRemovingCars(prev => new Set(prev).add(carId))
 
-        // Call onRemove after a short delay (about 1/3 of animation duration)
-        // This allows the animation to start but updates Convex quickly
-        setTimeout(() => {
-            onRemove(carId)
-        }, 200)
-
-        // Keep the removing state for the full animation duration
-        // This prevents the car from reappearing when Convex updates
-        setTimeout(() => {
-            setRemovingCarId(null)
-            setRemovingCars(prev => {
-                const newSet = new Set(prev)
-                newSet.delete(carId)
-                return newSet
+        // Keep slow requests hidden until completion; restore immediately on failure.
+        const animation = new Promise<void>(resolve => setTimeout(resolve, ANIMATION_DURATIONS.EXIT))
+        void Promise.all([removal, animation])
+            .catch(() => { /* The view reports the mutation error. */ })
+            .finally(() => {
+                setRemovingCars(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(carId)
+                    return newSet
+                })
             })
-        }, ANIMATION_DURATIONS.EXIT)
+        return true
     }, [])
 
     const isCarRemoving = useCallback((carId: string) => {
@@ -100,7 +81,6 @@ export function useCarAnimations(cars: CarData[]): UseCarAnimationsReturn {
     }, [removingCars])
 
     return {
-        removingCarId,
         newCarIds,
         handleRemoveCar,
         isCarRemoving

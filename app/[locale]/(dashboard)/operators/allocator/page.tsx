@@ -1,9 +1,6 @@
-import { DismissalView } from "@/components/dismissal/dismissal-view"
+import { getLocale } from "next-intl/server"
+import { redirect } from "next/navigation"
 
-export default function AllocatorPage() {
-    return (
-        <div className="flex flex-1 flex-col gap-4 sm:px-4 pt-0">
-            <DismissalView mode="allocator" />
-        </div>
-    )
+export default async function AllocatorPage() {
+    redirect(`/${await getLocale()}/operators`)
 }

@@ -2,6 +2,7 @@
 
 import { QueryCtx, MutationCtx, DatabaseReader, DatabaseWriter } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import type { UserIdentity } from "convex/server";
 import type {
     UserProfile,
     StudentWithCar,
@@ -17,8 +18,6 @@ import type {
 import {
     DismissalRole,
     OperatorPermissions,
-    extractRoleFromMetadata,
-    extractOperatorPermissions,
     canAccessAdmin,
     canAllocate,
     canDispatch
@@ -70,20 +69,22 @@ export async function validateUserAccess(
 ): Promise<{
     user: Doc<"users">;
     role: DismissalRole;
-    identity: any;
+    identity: UserIdentity;
 }> {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    // Use centralized role extraction from shared utilities
-    const role = extractRoleFromMetadata(identity as any);
+    const user = await getUserByClerkId(ctx.db, identity.subject);
+    if (!user || !user.isActive || user.status === "inactive") {
+        throw new Error("User not active in system");
+    }
+
+    // Clerk webhooks sync this role; custom JWT claims are not required.
+    const role = user.role ?? "viewer";
 
     if (requiredRoles && !requiredRoles.includes(role)) {
         throw new Error(`Requires role: ${requiredRoles.join(' or ')}`);
     }
-
-    const user = await getUserByClerkId(ctx.db, identity.subject);
-    if (!user || !user.isActive) throw new Error("User not active in system");
 
     if (campus && role !== 'superadmin' && !user.assignedCampuses.includes(campus)) {
         throw new Error(`No access to campus: ${campus}`);
@@ -593,7 +594,7 @@ export async function createAuditLogFromContext(
     await createAuditLog(
         ctx.db,
         user._id,
-        identity.email || user.email,
+        identity.email || user.email || "",
         role,
         action,
         details

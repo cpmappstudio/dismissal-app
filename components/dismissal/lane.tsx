@@ -4,7 +4,7 @@ import * as React from "react"
 import { Car } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { CarCard } from "./car-card"
-import { CarData, LaneType, ModeType } from "./types"
+import { CarData, LaneType, ModeType, RemoveCarHandler } from "./types"
 import { LANE_COLORS } from "./constants"
 import { useCarAnimations } from "./hooks"
 
@@ -12,12 +12,13 @@ interface LaneProps {
     cars: CarData[]
     lane: LaneType
     mode: ModeType
-    onRemoveCar: (carId: string) => void
+    onRemoveCar?: RemoveCarHandler
+    disableRemoval?: boolean
     emptyMessage?: string
     birthdayCarIds?: Set<string>
 }
 
-export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, emptyMessage, birthdayCarIds }) => {
+export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, disableRemoval = false, emptyMessage, birthdayCarIds }) => {
     const t = useTranslations('dismissal')
     const isViewer = mode === 'viewer'
 
@@ -29,12 +30,11 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
 
     // Update removing cars when cars change
     React.useEffect(() => {
-        const currentCarIds = new Set(cars.map(car => car.id))
         setRemovingCars(prev => {
             const newMap = new Map(prev)
             // Remove cars that are no longer being animated
             for (const [carId] of newMap) {
-                if (currentCarIds.has(carId) || !isCarRemoving(carId)) {
+                if (!isCarRemoving(carId)) {
                     newMap.delete(carId)
                 }
             }
@@ -44,12 +44,13 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
 
     // Handle remove car with local state tracking
     const onRemove = React.useCallback((carId: string) => {
+        if (isViewer || disableRemoval || !onRemoveCar) return
+        if (!handleRemoveCar(carId, onRemoveCar)) return
         const carToRemove = cars.find(car => car.id === carId)
         if (carToRemove) {
             setRemovingCars(prev => new Map(prev).set(carId, carToRemove))
         }
-        handleRemoveCar(carId, onRemoveCar)
-    }, [handleRemoveCar, onRemoveCar, cars])
+    }, [isViewer, disableRemoval, handleRemoveCar, onRemoveCar, cars])
 
     // Get lane colors from constants
     const colors = LANE_COLORS[lane]
@@ -81,7 +82,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                 ? 'max-md:flex-col max-md:justify-end max-md:gap-4 md:flex-row md:justify-start md:items-center md:gap-4'
                 : 'flex-col justify-end gap-4'
                 }`}>
-                {cars.length > 0 ? (
+                {extendedCars.length > 0 ? (
                     <div className={`flex transition-all duration-500 ease-in-out ${isViewer
                         ? 'max-md:flex-col max-md:gap-4 md:flex-row-reverse'
                         : 'flex-col gap-4'
@@ -121,7 +122,8 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                                         car={car}
                                         lane={lane}
                                         onRemove={onRemove}
-                                        showRemoveButton={mode === 'dispatcher'}
+                                        showRemoveButton={!isViewer && !!onRemoveCar}
+                                        removeDisabled={disableRemoval || isRemoving}
                                         isViewerMode={mode === 'viewer'}
                                         hasBirthdayToday={birthdayCarIds?.has(car.id) || false}
                                     />
@@ -130,7 +132,7 @@ export const Lane = React.memo<LaneProps>(({ cars, lane, mode, onRemoveCar, empt
                         })}
                     </div>
                 ) : (
-                    <div className={`flex items-center justify-center text-muted-foreground ${isViewer ? 'max-md:h-48 md:w-48 md:h-full' : 'h-48'
+                    <div className={`flex items-center justify-center text-muted-foreground ${isViewer ? 'md:w-48 md:h-full' : ''
                         }`}>
                         <div className="text-center">
                             <div className={`${colors.iconColor} mb-2`}>

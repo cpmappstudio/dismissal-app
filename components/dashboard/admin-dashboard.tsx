@@ -172,8 +172,8 @@ export default function AdminDashboard() {
             {t("adminDashboard.operatorsSection.subtitle")}
           </p>
         </div>
-        <article className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-          {/* Allocator Card */}
+        <article className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+          {/* Shared Road Card */}
           <Card className="flex flex-col md:grid md:grid-cols-3">
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
@@ -187,10 +187,10 @@ export default function AdminDashboard() {
             <CardContent className="md:col-span-2 flex flex-col justify-between px-4 py-3 md:px-3 md:py-2">
               <div className="flex-1 space-y-2">
                 <CardTitle className="text-base md:text-lg">
-                  {t("adminDashboard.cards.allocator.title")}
+                  {t("adminDashboard.cards.operators.title")}
                 </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  {t("adminDashboard.cards.allocator.description")}
+                  {t("adminDashboard.cards.operators.description")}
                 </CardDescription>
               </div>
               <CardAction>
@@ -199,50 +199,10 @@ export default function AdminDashboard() {
                   className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
-                    href="/operators/allocator"
-                    aria-label={t("adminDashboard.cards.allocator.action")}
+                    href="/operators"
+                    aria-label={t("adminDashboard.cards.operators.action")}
                   >
-                    <span>{t("adminDashboard.cards.allocator.action")}</span>
-                    <ArrowRight
-                      className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
-                    />
-                  </Link>
-                </Button>
-              </CardAction>
-            </CardContent>
-          </Card>
-
-          {/* Dispatcher Card */}
-          <Card className="flex flex-col md:grid md:grid-cols-3">
-            {/* Left column - Icon (2/5) */}
-            <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
-              <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
-                aria-hidden="true"
-              />
-            </CardHeader>
-
-            {/* Right column - Content (3/5) */}
-            <CardContent className="md:col-span-2 flex flex-col justify-between px-4 py-3 md:px-3 md:py-2">
-              <div className="flex-1 space-y-2">
-                <CardTitle className="text-base md:text-lg">
-                  {t("adminDashboard.cards.dispatcher.title")}
-                </CardTitle>
-                <CardDescription className="text-xs md:text-sm">
-                  {t("adminDashboard.cards.dispatcher.description")}
-                </CardDescription>
-              </div>
-              <CardAction>
-                <Button
-                  asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
-                >
-                  <Link
-                    href="/operators/dispatcher"
-                    aria-label={t("adminDashboard.cards.dispatcher.action")}
-                  >
-                    <span>{t("adminDashboard.cards.dispatcher.action")}</span>
+                    <span>{t("adminDashboard.cards.operators.action")}</span>
                     <ArrowRight
                       className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
                       aria-hidden="true"

@@ -125,12 +125,8 @@
         "url": "/operators",
         "items": [
           {
-            "title": "Allocator",
-            "url": "/operators/allocator"
-          },
-          {
-            "title": "Dispatcher",
-            "url": "/operators/dispatcher"
+            "title": "Road",
+            "url": "/operators"
           },
           {
             "title": "Viewer",
@@ -293,21 +289,9 @@
       },
       "operators": {
         "badge": "Full Access",
-        "title": "Operator Functions",
-        "description": "Complete access to all operator tools: allocator, dispatcher, and dismissal queue viewer.",
-        "action": "Go to Operators"
-      },
-      "allocator": {
-        "badge": "Allocation",
-        "title": "Allocator",
-        "description": "Assign vehicles to dismissal lanes to organize the student pickup queue.",
-        "action": "Go to Allocator"
-      },
-      "dispatcher": {
-        "badge": "Dispatch",
-        "title": "Dispatcher",
-        "description": "Dispatch vehicles from the queue when students are picked up and manage the exit flow.",
-        "action": "Go to Dispatcher"
+        "title": "Road",
+        "description": "Register arriving vehicles and dispatch them after pickup from the same screen.",
+        "action": "Go to Road"
       },
       "viewer": {
         "badge": "Viewing",

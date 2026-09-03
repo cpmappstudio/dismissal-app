@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 import { getLocaleFromPathname } from './lib/locale-setup'
-import { extractRoleFromMetadata } from './lib/role-utils'
+import { canAccessOperators, extractRoleFromMetadata } from './lib/role-utils'
 import type { DismissalRole } from './lib/role-utils'
 
 const intlMiddleware = createIntlMiddleware(routing)
@@ -32,9 +32,9 @@ const COMMON_AUTHENTICATED_ROUTES = createRouteMatcher([
 const DEFAULT_REDIRECTS: Record<DismissalRole, string> = {
   superadmin: '/users/staff',
   admin: '/users/staff',
-  operator: '/operators/allocator',
-  allocator: '/operators/allocator',
-  dispatcher: '/operators/dispatcher',
+  operator: '/operators',
+  allocator: '/operators',
+  dispatcher: '/operators',
   viewer: '/operators/viewer',
 }
 
@@ -99,6 +99,9 @@ const getPathWithoutLocale = (pathname: string): string => {
  * Verifica si el usuario puede acceder a una ruta específica
  */
 const canAccessRoute = (userRole: DismissalRole, path: string): boolean => {
+  // Exact match: access to the shared road must not grant access to every subroute.
+  if (path === '/operators') return canAccessOperators(userRole)
+
   const permissions = ROLE_PERMISSIONS[userRole]
 
   // Si tiene acceso completo (superadmin/admin)
@@ -211,7 +214,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     // Permitir acceso
     return intlMiddleware(req)
 
-  } catch (error) {
+  } catch {
     // En caso de error, redirigir a sign-in
     const errorUrl = new URL(`/${locale}/sign-in`, req.url)
     errorUrl.searchParams.set('error', 'auth_error')

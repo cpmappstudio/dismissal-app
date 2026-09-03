@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useUser } from "@clerk/nextjs"
 import { useTranslations } from "next-intl"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -23,9 +24,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
+import { canAllocate, canDispatch, extractRoleFromMetadata } from "@/lib/role-utils"
 import { useBirthdayCars } from "@/hooks/use-birthday-cars"
 import { Road } from "./road"
-import { CarData, ModeType } from "./types"
+import { CarData, ModeType, RemoveCarHandler } from "./types"
 
 interface DismissalViewProps {
     mode: ModeType
@@ -34,6 +36,10 @@ interface DismissalViewProps {
 
 export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
+    const { user } = useUser()
+    const role = user ? extractRoleFromMetadata(user.publicMetadata) : null
+    const allowAllocate = mode === 'operator' && canAllocate(role)
+    const allowDispatch = mode === 'operator' && canDispatch(role)
 
     // Usar el hook de sesión de campus
     const { selectedCampus, updateSelectedCampus, isLoaded: campusLoaded } = useCampusSession()
@@ -42,7 +48,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const [isSubmitting, setIsSubmitting] = React.useState(false)
     const [showClearDialog, setShowClearDialog] = React.useState(false)
 
-    // Ref para mantener el focus del input en modo allocator
+    // Ref para mantener el focus del input al añadir vehículos
     const carInputRef = React.useRef<HTMLInputElement>(null)
     const [shouldMaintainFocus, setShouldMaintainFocus] = React.useState(false)
 
@@ -52,7 +58,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     const focusFrameRef = React.useRef<number | null>(null)
     // Ref para el valor actual del input (para evitar dependencias innecesarias)
     const carInputValueRef = React.useRef<string>('')
-    // Ref para el estado de submitting (para evitar dependencias innecesarias)
+    // ponytail: one operation per view; use per-vehicle locks only if parallel entry is needed.
     const isSubmittingRef = React.useRef<boolean>(false)
 
     // Alert state
@@ -192,7 +198,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     // Add car function using Convex mutation
     const handleAddCarToLane = React.useCallback(async (lane: 'left' | 'right') => {
         const currentValue = carInputValueRef.current
-        if (!currentValue.trim() || isSubmittingRef.current) return
+        if (!allowAllocate || !currentValue.trim() || isSubmittingRef.current) return
 
         const carNumber = parseInt(currentValue.trim())
         if (isNaN(carNumber) || carNumber <= 0) {
@@ -256,28 +262,31 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         } finally {
             updateIsSubmitting(false)
         }
-    }, [selectedCampus, isCampusSelected, addCarToQueue, showAlert, shouldMaintainFocus, updateCarInputValue, updateIsSubmitting])
+    }, [allowAllocate, selectedCampus, isCampusSelected, addCarToQueue, showAlert, shouldMaintainFocus, updateCarInputValue, updateIsSubmitting])
 
     // Remove car function using Convex mutation
-    const handleRemoveCar = React.useCallback(async (carId: string) => {
-        if (isSubmittingRef.current) return
+    const handleRemoveCar = React.useCallback<RemoveCarHandler>((carId) => {
+        if (!allowDispatch || isSubmittingRef.current) return
 
         updateIsSubmitting(true)
-        try {
-            const result = await removeCarFromQueue({ queueId: carId as Id<"dismissalQueue"> })
-            if (result && result.carNumber) {
-                showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
+        return (async () => {
+            try {
+                const result = await removeCarFromQueue({ queueId: carId as Id<"dismissalQueue"> })
+                if (result && result.carNumber) {
+                    showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
+                }
+            } catch (error) {
+                showAlert('error', 'Error', 'Failed to remove car from queue')
+                throw error // Let the animation roll back as well.
+            } finally {
+                updateIsSubmitting(false)
             }
-        } catch {
-            showAlert('error', 'Error', 'Failed to remove car from queue')
-        } finally {
-            updateIsSubmitting(false)
-        }
-    }, [removeCarFromQueue, showAlert, updateIsSubmitting])
+        })()
+    }, [allowDispatch, removeCarFromQueue, showAlert, updateIsSubmitting])
 
     // Clear all cars function
     const handleClearAllCars = React.useCallback(async () => {
-        if (isSubmittingRef.current || !isCampusSelected) return
+        if (!allowDispatch || isSubmittingRef.current || !isCampusSelected) return
 
         updateIsSubmitting(true)
         try {
@@ -291,7 +300,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         } finally {
             updateIsSubmitting(false)
         }
-    }, [clearAllCars, selectedCampus, isCampusSelected, showAlert, updateIsSubmitting, t])
+    }, [allowDispatch, clearAllCars, selectedCampus, isCampusSelected, showAlert, updateIsSubmitting, t])
 
     // Handle keyboard shortcuts for the single input
     const handleKeyPress = React.useCallback((e: React.KeyboardEvent) => {
@@ -302,12 +311,12 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         }
     }, [handleAddCarToLane])
 
-    // Handlers para mantener el focus en modo allocator
+    // Mantener el focus mientras se añaden vehículos
     const handleInputFocus = React.useCallback(() => {
-        if (mode === 'allocator') {
+        if (allowAllocate) {
             setShouldMaintainFocus(true)
         }
-    }, [mode])
+    }, [allowAllocate])
 
     const handleArrowClick = React.useCallback((lane: 'left' | 'right', event: React.MouseEvent) => {
         event.preventDefault() // Prevenir que el botón tome el focus
@@ -316,8 +325,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     // Detectar clics fuera del área de allocator para desactivar el mantenimiento de focus
     React.useEffect(() => {
-        // Solo agregar el listener si estamos en modo allocator y manteniendo focus
-        if (mode !== 'allocator' || !shouldMaintainFocus) {
+        // Escuchar solo mientras el input está habilitado y mantiene el focus
+        if (!allowAllocate || !shouldMaintainFocus) {
             return
         }
 
@@ -332,7 +341,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [mode, shouldMaintainFocus])
+    }, [allowAllocate, shouldMaintainFocus])
 
     // Cleanup effect para el timeout de alerta y animationFrame
     React.useEffect(() => {
@@ -359,7 +368,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     // Evitar render antes de cargar campus desde localStorage
     if (!campusLoaded) {
         return (
-            <div className={cn("w-full h-full flex flex-col items-center justify-center", className)}>
+            <div data-dismissal-view className={cn("w-full min-h-0 flex flex-1 flex-col items-center justify-center", className)}>
                 <div className="text-center space-y-2">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yankees-blue mx-auto"></div>
                     <p className="text-sm text-muted-foreground">Loading campus selection...</p>
@@ -369,7 +378,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
     }
 
     return (
-        <div className={cn("w-full h-full flex flex-col", className)}>
+        <div data-dismissal-view className={cn("w-full min-h-0 flex flex-1 flex-col", className)}>
             {/* Campus Selection and Clear All Button */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between flex-shrink-0">
                 <div className="flex-shrink-0 relative">
@@ -395,8 +404,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     )}
                 </div>
 
-                {/* Clear All Button - Only visible in dispatcher mode */}
-                {/* {mode === 'dispatcher' && isCampusSelected && (
+                {/* Clear All Button - Currently disabled */}
+                {/* {allowDispatch && isCampusSelected && (
                     <Button
                         onClick={() => setShowClearDialog(true)}
                         disabled={isSubmitting || (leftLaneCars.length === 0 && rightLaneCars.length === 0)}
@@ -411,13 +420,14 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             </div>
 
             {/* Main Content Area - Takes remaining space */}
-            <div className="flex-1 flex flex-col mt-4 min-h-0 relative">
-                <div className={`relative  ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
+            <div className="flex-1 flex flex-col mt-4 mb-4 gap-4 min-h-0 relative">
+                <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
                     <Road
                         leftLaneCars={leftLaneCars}
                         rightLaneCars={rightLaneCars}
                         mode={mode}
-                        onRemoveCar={handleRemoveCar}
+                        onRemoveCar={allowDispatch ? handleRemoveCar : undefined}
+                        disableRemoval={isSubmitting}
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
                         birthdayCarIds={birthdayCarIds}
@@ -442,13 +452,14 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </div>
 
                 {/* Allocator Control with Finish Line - Responsive */}
-                {mode === 'allocator' && isCampusSelected && (
-                    <div className="absolute bottom-8 left-0 right-0 z-20 px-2">
+                {allowAllocate && isCampusSelected && (
+                    <div className="shrink-0 px-2">
                         <div className="flex justify-center">
                             <div className="allocator-area bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
                                 <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
                                     {/* Left Arrow Button */}
                                     <Button
+                                        aria-label={t('allocator.addToLeft')}
                                         onClick={(e) => handleArrowClick('left', e)}
                                         disabled={!carInputValue.trim() || isSubmitting}
                                         size="sm"
@@ -464,6 +475,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                         inputMode="numeric"
                                         pattern="[0-9]*"
                                         placeholder={t('allocator.addCarPlaceholder')}
+                                        aria-label={t('allocator.addCarPlaceholder')}
                                         value={carInputValue}
                                         onChange={(e) => {
                                             // Solo permitir números
@@ -479,6 +491,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
                                     {/* Right Arrow Button */}
                                     <Button
+                                        aria-label={t('allocator.addToRight')}
                                         onClick={(e) => handleArrowClick('right', e)}
                                         disabled={!carInputValue.trim() || isSubmitting}
                                         size="sm"

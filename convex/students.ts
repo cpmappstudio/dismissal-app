@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { gradeValidator } from "./types";
 import { Id } from "./_generated/dataModel";
+import { repositionLaneCars } from "./helpers";
 
 // ============================================================================
 // AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
@@ -493,22 +494,7 @@ export const deleteStudent = mutation({
                     });
 
                     // Reposition remaining cars in lane
-                    const entriesToReposition = await ctx.db
-                        .query("dismissalQueue")
-                        .withIndex("by_campus_lane_position", (q: any) =>
-                            q.eq("campusLocation", queueEntry.campusLocation)
-                                .eq("lane", queueEntry.lane)
-                        )
-                        .filter((q: any) => q.gt(q.field("position"), queueEntry.position))
-                        .collect();
-
-                    // Reposition cars
-                    for (const entry of entriesToReposition) {
-                        const { _id, _creationTime, ...entryData } = entry;
-                        const newEntry = { ...entryData, position: entry.position - 1 };
-                        await ctx.db.delete(entry._id);
-                        await ctx.db.insert("dismissalQueue", newEntry);
-                    }
+                    await repositionLaneCars(ctx.db, queueEntry.campusLocation, queueEntry.lane, queueEntry.position);
 
                     // Remove the queue entry
                     await ctx.db.delete(queueEntry._id);
@@ -613,22 +599,7 @@ export const deleteMultipleStudents = mutation({
                         });
 
                         // Reposition remaining cars in lane
-                        const entriesToReposition = await ctx.db
-                            .query("dismissalQueue")
-                            .withIndex("by_campus_lane_position", (q: any) =>
-                                q.eq("campusLocation", queueEntry.campusLocation)
-                                    .eq("lane", queueEntry.lane)
-                            )
-                            .filter((q: any) => q.gt(q.field("position"), queueEntry.position))
-                            .collect();
-
-                        // Reposition cars
-                        for (const entry of entriesToReposition) {
-                            const { _id, _creationTime, ...entryData } = entry;
-                            const newEntry = { ...entryData, position: entry.position - 1 };
-                            await ctx.db.delete(entry._id);
-                            await ctx.db.insert("dismissalQueue", newEntry);
-                        }
+                        await repositionLaneCars(ctx.db, queueEntry.campusLocation, queueEntry.lane, queueEntry.position);
 
                         // Remove the queue entry
                         await ctx.db.delete(queueEntry._id);

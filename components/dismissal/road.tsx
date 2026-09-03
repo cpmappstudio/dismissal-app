@@ -6,14 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
 import { Lane } from "./lane";
-import { CarData, ModeType } from "./types";
+import { CarData, ModeType, RemoveCarHandler } from "./types";
 import "./road.css";
 
 interface RoadProps {
   leftLaneCars: CarData[];
   rightLaneCars: CarData[];
   mode: ModeType;
-  onRemoveCar: (carId: string) => void;
+  onRemoveCar?: RemoveCarHandler;
+  disableRemoval?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   className?: string;
@@ -26,6 +27,7 @@ export const Road = React.memo<RoadProps>(
     rightLaneCars,
     mode,
     onRemoveCar,
+    disableRemoval = false,
     isFullscreen = false,
     onToggleFullscreen,
     birthdayCarIds,
@@ -49,17 +51,10 @@ export const Road = React.memo<RoadProps>(
 
     return (
       <div
-        className={`flex-1 min-h-0 ${isFullscreen ? "fixed inset-0 z-[9999] bg-white" : ""}`}
-        style={{ marginBottom: mode === "allocator" ? "6rem" : "0" }}
+        className={`flex flex-1 flex-col min-h-0 min-w-0 ${isFullscreen ? "fixed inset-0 z-[9999] bg-white" : ""}`}
       >
         <Card
-          className={`border-2 border-yankees-blue flex flex-col py-0 overflow-hidden relative ${
-            isFullscreen
-              ? "h-screen max-h-screen"
-              : mode === "viewer" || mode === "dispatcher"
-                ? "h-[calc(100vh-9rem)] md:max-w-[calc(100vw-20rem)] max-h-[calc(100vh-9rem)] mb-4"
-                : "h-[calc(100vh-12rem)] max-h-[calc(100vh-12rem)]"
-          }`}
+          className="border-2 border-yankees-blue flex flex-1 flex-col min-h-0 min-w-0 py-0 overflow-hidden relative"
           style={{ backgroundColor: "#9CA3AF" }}
         >
           {/* Fullscreen Toggle Button - Only visible in viewer mode */}
@@ -177,7 +172,7 @@ export const Road = React.memo<RoadProps>(
             //         }
             //     }
             // }}
-            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? "max-md:overflow-y-scroll md:overflow-x-scroll md:overflow-y-hidden" : "overflow-y-scroll"}`}
+            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? "max-md:overflow-y-auto max-md:overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden" : "overflow-y-auto overflow-x-hidden"}`}
             style={{
               WebkitOverflowScrolling: "touch",
             }}
@@ -189,7 +184,7 @@ export const Road = React.memo<RoadProps>(
               <div
                 className={`absolute z-5 ${
                   isViewer
-                    ? "max-md:left-1/2 max-md:top-0 max-md:bottom-16 max-md:w-2 max-md:-translate-x-1/2 md:top-1/2 md:left-16 md:h-2 md:-translate-y-1/2 md:w-full"
+                    ? "max-md:left-1/2 max-md:top-0 max-md:bottom-16 max-md:w-2 max-md:-translate-x-1/2 md:top-1/2 md:left-16 md:right-0 md:h-2 md:-translate-y-1/2"
                     : "left-1/2 top-0 bottom-16 w-2 -translate-x-1/2"
                 }`}
               >
@@ -246,6 +241,7 @@ export const Road = React.memo<RoadProps>(
                 lane="left"
                 mode={mode}
                 onRemoveCar={onRemoveCar}
+                disableRemoval={disableRemoval}
                 birthdayCarIds={birthdayCarIds}
               />
 
@@ -254,6 +250,7 @@ export const Road = React.memo<RoadProps>(
                 lane="right"
                 mode={mode}
                 onRemoveCar={onRemoveCar}
+                disableRemoval={disableRemoval}
                 birthdayCarIds={birthdayCarIds}
               />
 

@@ -21,4 +21,7 @@ export interface CarData {
 }
 
 export type LaneType = 'left' | 'right'
-export type ModeType = 'allocator' | 'dispatcher' | 'viewer'
+export type ModeType = 'operator' | 'viewer'
+
+// Undefined declines the click synchronously; a promise means the mutation started.
+export type RemoveCarHandler = (carId: string) => Promise<void> | undefined

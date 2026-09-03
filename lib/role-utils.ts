@@ -66,7 +66,7 @@ export function canAccessAdmin(userRole: DismissalRole | null): boolean {
 }
 
 export function canAccessOperators(userRole: DismissalRole | null): boolean {
-    return hasRole(userRole, ['operator', 'admin', 'superadmin']);
+    return canAllocate(userRole) || canDispatch(userRole);
 }
 
 export function canAllocate(userRole: DismissalRole | null): boolean {
