@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectDropdown } from "@/components/ui/select-dropdown";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Plus,
   Edit,
@@ -21,15 +22,25 @@ import {
   X,
   GraduationCap,
   GripVertical,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
+
+type DirectorOption = {
+  id: Id<"users">;
+  name: string;
+  email: string | undefined;
+  phone: string | undefined;
+};
+
 import {
   Dialog,
   DialogContent,
@@ -75,6 +86,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { campusStatusOptions } from "@/lib/location-data";
+import {
+  canCreateDeleteCampus,
+  extractRoleFromMetadata,
+} from "@/lib/role-utils";
 
 // Grade type definition
 type Grade = {
@@ -160,12 +175,71 @@ export function CampusSettingsDialog({
   const isEditing = !!campus;
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations("campusManagement");
 
   // Clerk user (for authentication check)
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const userRole = clerkUser
+    ? extractRoleFromMetadata(clerkUser.publicMetadata)
+    : null;
+  const canManageCampusLifecycle = canCreateDeleteCampus(userRole);
+
+  // Alert state
+  const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Queries
-  const potentialDirectors = useQuery(api.campus.getSuperadmins);
+  const potentialDirectors = useQuery(api.campus.getPrincipals);
 
   // Mutations
   const createCampusMutation = useMutation(api.campus.create);
@@ -224,7 +298,7 @@ export function CampusSettingsDialog({
   );
 
   const selectedDirector = potentialDirectors?.find(
-    (director) => director.id === selectedDirectorId,
+    (director: DirectorOption) => director.id === selectedDirectorId,
   );
   const [selectedCountry, setSelectedCountry] = useState<string>(
     campus?.address?.country || "US",
@@ -395,6 +469,15 @@ export function CampusSettingsDialog({
       return;
     }
 
+    if (!isEditing && !canManageCampusLifecycle) {
+      showAlert(
+        "error",
+        t("alerts.createError.title"),
+        t("alerts.createError.message"),
+      );
+      return;
+    }
+
     const formData = new FormData(form);
     // When editing, disabled fields are not included in FormData, so use existing campus name
     const campusName =
@@ -468,7 +551,7 @@ export function CampusSettingsDialog({
           updates.directorId = selectedDirectorId || null;
           if (selectedDirectorId) {
             const director = potentialDirectors?.find(
-              (d) => d.id === selectedDirectorId,
+              (d: DirectorOption) => d.id === selectedDirectorId,
             );
             if (director) {
               updates.directorName = director.name;
@@ -520,11 +603,19 @@ export function CampusSettingsDialog({
             });
           }
 
-          console.log("Campus updated successfully");
+          showAlert(
+            "success",
+            t("alerts.updateSuccess.title"),
+            t("alerts.updateSuccess.message", { name: campusName }),
+          );
           setIsOpen(false);
           router.refresh();
         } else {
-          console.log("No changes detected");
+          showAlert(
+            "success",
+            t("alerts.noChanges.title"),
+            t("alerts.noChanges.message"),
+          );
         }
       } else {
         // Create new campus
@@ -571,7 +662,7 @@ export function CampusSettingsDialog({
         // Director fields
         if (selectedDirectorId) {
           const director = potentialDirectors?.find(
-            (d) => d.id === selectedDirectorId,
+            (d: DirectorOption) => d.id === selectedDirectorId,
           );
           campusData.directorId = selectedDirectorId;
           if (director) {
@@ -604,7 +695,11 @@ export function CampusSettingsDialog({
 
         await createCampusMutation(campusData);
 
-        console.log("Campus created successfully");
+        showAlert(
+          "success",
+          t("alerts.createSuccess.title"),
+          t("alerts.createSuccess.message", { name: campusName }),
+        );
         form.reset();
         setSelectedDirectorId(undefined);
         setSelectedImage(null);
@@ -618,34 +713,65 @@ export function CampusSettingsDialog({
       }
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to save campus";
-      console.error("Error saving campus:", errorMessage);
+        error instanceof Error ? error.message : t("alerts.saveError.message");
+      showAlert(
+        "error",
+        isEditing ? t("alerts.updateError.title") : t("alerts.createError.title"),
+        errorMessage,
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
+    if (!canManageCampusLifecycle) {
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        t("alerts.deleteError.message"),
+      );
+      return;
+    }
+
     if (!campus) return;
 
     try {
       setIsSubmitting(true);
-      await deleteCampusMutation({ campusId: campus._id });
-
-      console.log("Campus deleted successfully");
+      
+      // 1. Cerrar los diálogos primero
       setIsOpen(false);
       setShowDeleteAlert(false);
-
-      router.push(`/${locale}/management/campuses`);
-      router.refresh();
+      
+      // 2. Navegar ANTES de eliminar con query param para mostrar alerta en destino
+      const deletedName = encodeURIComponent(campus.campusName);
+      router.push(`/${locale}/management/campuses?deleted=${deletedName}`);
+      
+      // 3. Pequeño delay para asegurar que la navegación inicie
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 4. Ahora sí eliminar el campus
+      await deleteCampusMutation({ campusId: campus._id });
+      
     } catch (error) {
+      // Si falla, el usuario ya está en la página de listado
+      // pero el campus sigue existiendo
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete campus";
-      console.error("Error deleting campus:", errorMessage);
+        error instanceof Error ? error.message : t("alerts.deleteError.message");
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        errorMessage,
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Principal can edit campuses but cannot create or delete them.
+  if (!isEditing && !canManageCampusLifecycle) {
+    return null;
+  }
 
   const defaultTrigger = isEditing ? (
     <Button className="gap-2 cursor-pointer">
@@ -727,7 +853,7 @@ export function CampusSettingsDialog({
                     />
                   </div>
                   <div className="grid gap-3">
-                    <Label>Director</Label>
+                    <Label>Principal</Label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -743,7 +869,7 @@ export function CampusSettingsDialog({
                             </div>
                           ) : (
                             <span className="text-muted-foreground">
-                              Select a director
+                              Select a Principal
                             </span>
                           )}
                           <ChevronDown className="h-4 w-4" />
@@ -751,12 +877,12 @@ export function CampusSettingsDialog({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-80" align="start">
                         <DropdownMenuLabel>
-                          Available Directors
+                          Available Principals
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {potentialDirectors?.length === 0 ? (
                           <DropdownMenuItem disabled>
-                            No directors available
+                            No Principals available
                           </DropdownMenuItem>
                         ) : (
                           <>
@@ -766,11 +892,11 @@ export function CampusSettingsDialog({
                             >
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4" />
-                                <span>No director assigned</span>
+                                <span>No Principal assigned</span>
                               </div>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {potentialDirectors?.map((director) => (
+                            {potentialDirectors?.map((director: DirectorOption) => (
                               <DropdownMenuItem
                                 key={director.id}
                                 onClick={() =>
@@ -789,7 +915,7 @@ export function CampusSettingsDialog({
                                       {director.name}
                                     </span>
                                     <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                                      superadmin
+                                      principal
                                     </span>
                                   </div>
                                   <span className="text-sm text-muted-foreground ml-6">
@@ -804,7 +930,7 @@ export function CampusSettingsDialog({
                     </DropdownMenu>
                     {potentialDirectors === undefined && (
                       <div className="text-sm text-muted-foreground">
-                        Loading available directors...
+                        Loading available Principals...
                       </div>
                     )}
                   </div>
@@ -955,7 +1081,6 @@ export function CampusSettingsDialog({
                   </div>
 
                   {/* State and City - Second row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-3">
                       <Label htmlFor="state">
                         {selectedCountry === "HN"
@@ -983,7 +1108,7 @@ export function CampusSettingsDialog({
                         disabled={availableStates.length === 0}
                       />
                     </div>
-                    <div className="grid gap-3">
+                    {/* <div className="grid gap-3">
                       <Label htmlFor="city">City</Label>
                       <SelectDropdown
                         options={availableCities}
@@ -1006,8 +1131,7 @@ export function CampusSettingsDialog({
                           No major cities available for selected state
                         </p>
                       )}
-                    </div>
-                  </div>
+                    </div> */}
 
                   {/* Street - Third row */}
                   <div className="grid gap-3">
@@ -1117,27 +1241,19 @@ export function CampusSettingsDialog({
             </div>
 
             <DialogFooter className="flex justify-between">
-              {isEditing && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setShowDeleteAlert(true)}
-                  className="gap-2 mr-auto"
-                  disabled={isSubmitting}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Campus
-                </Button>
-              )}
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
+                {isEditing && canManageCampusLifecycle && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setShowDeleteAlert(true)}
+                    className="gap-2 mr-auto"
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Campus
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={isSubmitting || !isClerkLoaded || !clerkUser}
@@ -1157,7 +1273,10 @@ export function CampusSettingsDialog({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+      <AlertDialog
+        open={showDeleteAlert && canManageCampusLifecycle}
+        onOpenChange={setShowDeleteAlert}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -1178,6 +1297,30 @@ export function CampusSettingsDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
     </>
   );
 }

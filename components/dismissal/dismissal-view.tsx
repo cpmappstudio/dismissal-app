@@ -22,7 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { CAMPUS_LOCATIONS, type CampusLocation, type Id } from "@/convex/types"
+import { type Id } from "@/convex/types"
 import { cn } from "@/lib/utils"
 import { canAllocate, canDispatch, extractRoleFromMetadata } from "@/lib/role-utils"
 import { useBirthdayCars } from "@/hooks/use-birthday-cars"
@@ -79,6 +79,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         selectedCampus ? { campus: selectedCampus } : "skip"
     )
     const carCountsByCampus = useQuery(api.queue.getCarCountsByCampus)
+    const campusOptions = useQuery(api.campus.getOptions)
 
     // Mutations de Convex
     const addCarToQueue = useMutation(api.queue.addCar)
@@ -382,10 +383,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             {/* Campus Selection and Clear All Button */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between flex-shrink-0">
                 <div className="flex-shrink-0 relative">
-                    <FilterDropdown<CampusLocation>
-                        value={selectedCampus as CampusLocation}
+                    <FilterDropdown<string>
+                        value={selectedCampus}
                         onChange={(value) => updateSelectedCampus(value)}
-                        options={CAMPUS_LOCATIONS}
+                        options={campusOptions?.map((c) => c.label) ?? []}
                         icon={MapPin}
                         label={t('campus.select')}
                         placeholder={t('campus.select')}

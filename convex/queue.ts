@@ -3,43 +3,66 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { laneValidator } from "./types";
-import { repositionLaneCars, validateUserAccess } from "./helpers";
+import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import {
+    repositionLaneCars,
+    userHasAccessToCampusAsync,
+    validateUserAccess,
+} from "./helpers";
 import { canAllocate, canDispatch } from "../lib/role-utils";
+
+/**
+ * Helper to get campus ID by name
+ */
+async function getCampusIdByName(db: any, campusName: string): Promise<Id<"campusSettings"> | null> {
+    const campus = await db
+        .query("campusSettings")
+        .withIndex("by_name", (q: any) => q.eq("campusName", campusName))
+        .unique();
+    return campus?._id || null;
+}
+
+async function getAccessibleCampusNames(db: any, user: any, role: string): Promise<Set<string>> {
+    if (role === "superadmin") return new Set<string>();
+
+    const campusDocs = await Promise.all(
+        (user.assignedCampuses || []).map((campusId: Id<"campusSettings">) => db.get(campusId))
+    );
+
+    return new Set(
+        campusDocs
+            .filter((campus: any) => campus !== null)
+            .map((campus: any) => campus.campusName)
+    );
+}
 
 /**
  * Helper functions
  */
-async function getStudentsByCarNumber(db: any, carNumber: number, campus: string) {
+async function getStudentsByCarNumber(db: any, carNumber: number, campusId: Id<"campusSettings">) {
     if (carNumber === 0) return [];
 
-    // First, try to find in the current campus (optimized with index)
-    const studentsInCampus = await db
+    // Get all students with this car number using by_car_number index
+    const allStudentsWithCar = await db
         .query("students")
-        .withIndex("by_car_campus", (q: any) =>
-            q.eq("carNumber", carNumber)
-                .eq("campusLocation", campus)
-                .eq("isActive", true)
-        )
+        .withIndex("by_car_number", (q: any) => q.eq("carNumber", carNumber))
+        .filter((q: any) => q.eq(q.field("isActive"), true))
         .collect();
+
+    // First, try to find in the current campus
+    const studentsInCampus = allStudentsWithCar.filter((s: any) =>
+        s.campuses?.includes(campusId)
+    );
 
     // If found in current campus, return immediately
     if (studentsInCampus.length > 0) {
         return studentsInCampus;
     }
 
-    // If not found in current campus, search across ALL campuses
+    // If not found in current campus, return all students with this car number
     // This allows calling cars from any campus to any campus
-    const allStudents = await db
-        .query("students")
-        .filter((q: any) =>
-            q.and(
-                q.eq(q.field("carNumber"), carNumber),
-                q.eq(q.field("isActive"), true)
-            )
-        )
-        .collect();
-
-    return allStudents;
+    return allStudentsWithCar;
 }
 
 async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
@@ -99,9 +122,10 @@ async function clearCarFromQueue(
     db: any,
     entry: any,
     removedByUserId: any,
-    now: number = Date.now()
+    now: number = Date.now(),
+    dateOverride?: string
 ): Promise<void> {
-    const today = new Date(now).toISOString().split('T')[0];
+    const today = dateOverride ?? new Date(now).toISOString().split('T')[0];
     const waitTimeSeconds = Math.floor((now - entry.assignedTime) / 1000);
 
     // Create history entry
@@ -146,6 +170,8 @@ export const getCurrentQueue = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
+
             const entries = await ctx.db
                 .query("dismissalQueue")
                 .withIndex("by_campus_status", q =>
@@ -169,7 +195,19 @@ export const getCurrentQueue = query({
                 lastUpdated: Date.now(),
                 authState: "authenticated"
             };
-        } catch {
+        } catch (error) {
+            const err = error as Error;
+            if (err.message === "Not authenticated") {
+                return {
+                    campus: args.campus,
+                    leftLane: [],
+                    rightLane: [],
+                    totalCars: 0,
+                    lastUpdated: Date.now(),
+                    authState: "unauthenticated"
+                };
+            }
+
             // Return empty state on database errors too
             return {
                 campus: args.campus,
@@ -177,7 +215,7 @@ export const getCurrentQueue = query({
                 rightLane: [],
                 totalCars: 0,
                 lastUpdated: Date.now(),
-                authState: "error"
+                authState: "forbidden"
             };
         }
     }
@@ -193,7 +231,7 @@ export const addCar = mutation({
         lane: laneValidator
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(ctx);
+        const { user, role } = await validateUserAccess(ctx, undefined, args.campus);
         if (!canAllocate(role)) throw new Error("Not authorized to allocate vehicles");
 
         // Validate inputs
@@ -221,8 +259,18 @@ export const addCar = mutation({
             };
         }
 
+        // Get campus ID for student lookup
+        const campusId = await getCampusIdByName(ctx.db, args.campus);
+        if (!campusId) {
+            return {
+                success: false,
+                error: "INVALID_CAMPUS",
+                message: "Campus not found"
+            };
+        }
+
         // Get students for this car (searches across all campuses)
-        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, args.campus);
+        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, campusId);
         if (students.length === 0) {
             return {
                 success: false,
@@ -267,6 +315,9 @@ export const removeCar = mutation({
 
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
+        if (!await userHasAccessToCampusAsync(ctx.db, user, entry.campusLocation, role)) {
+            throw new Error(`No access to campus: ${entry.campusLocation}`);
+        }
 
         if (entry.status !== "waiting") {
             throw new Error("Car is not in waiting status");
@@ -320,6 +371,7 @@ export const checkCarInQueue = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             const inQueue = await isCarInQueue(ctx.db, args.carNumber, args.campus);
 
             if (inQueue) {
@@ -349,7 +401,7 @@ export const checkCarInQueue = query({
 
             return { inQueue: false, entry: null, authState: "authenticated" };
         } catch {
-            return { inQueue: false, entry: null, authState: "error" };
+            return { inQueue: false, entry: null, authState: "forbidden" };
         }
     }
 });
@@ -363,11 +415,13 @@ export const moveCar = mutation({
         newLane: laneValidator
     },
     handler: async (ctx, args) => {
-        const { role } = await validateUserAccess(ctx);
-        if (!canAllocate(role)) throw new Error("Not authorized to allocate vehicles");
-
+        const { user, role } = await validateUserAccess(ctx);
+        if (!canDispatch(role)) throw new Error("Not authorized to dispatch vehicles");
         const entry = await ctx.db.get(args.queueId);
         if (!entry) throw new Error("Queue entry not found");
+        if (!await userHasAccessToCampusAsync(ctx.db, user, entry.campusLocation, role)) {
+            throw new Error(`No access to campus: ${entry.campusLocation}`);
+        }
 
         if (entry.status !== "waiting") {
             throw new Error("Car is not in waiting status");
@@ -420,6 +474,7 @@ export const getQueueMetrics = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             // Current queue
             const currentQueue = await ctx.db
                 .query("dismissalQueue")
@@ -463,7 +518,7 @@ export const getQueueMetrics = query({
                 averageWaitTime: 0,
                 todayTotal: 0,
                 todayStudents: 0,
-                authState: "error"
+                authState: "forbidden"
             };
         }
     }
@@ -485,6 +540,7 @@ export const getRecentActivity = query({
         }
 
         try {
+            await validateUserAccess(ctx, undefined, args.campus);
             const limit = args.limit || 10;
 
             // Get recent completed pickups
@@ -516,7 +572,7 @@ export const clearAllCars = mutation({
         campus: v.string()
     },
     handler: async (ctx, args) => {
-        const { user, role } = await validateUserAccess(ctx);
+        const { user, role } = await validateUserAccess(ctx, undefined, args.campus);
         if (!canDispatch(role)) throw new Error("Not authorized to dispatch vehicles");
 
         // Get all cars in queue for this campus
@@ -562,6 +618,9 @@ export const getCarCountsByCampus = query({
         }
 
         try {
+            const { user, role } = await validateUserAccess(ctx);
+            const accessibleCampusNames = await getAccessibleCampusNames(ctx.db, user, role);
+
             // Get all cars in waiting status
             const allEntries = await ctx.db
                 .query("dismissalQueue")
@@ -572,6 +631,9 @@ export const getCarCountsByCampus = query({
             const counts: Record<string, number> = {};
             allEntries.forEach(entry => {
                 const campus = entry.campusLocation;
+                if (role !== "superadmin" && !accessibleCampusNames.has(campus)) {
+                    return;
+                }
                 counts[campus] = (counts[campus] || 0) + 1;
             });
 
@@ -589,20 +651,24 @@ export const getCarCountsByCampus = query({
 export const scheduledClearAllQueues = internalMutation({
     args: {},
     handler: async (ctx) => {
+        const now = Date.now();
+        const currentDate = new Date(now);
+        // Midnight cron closes the previous operational day.
+        const processingDate = new Date(
+            currentDate.getTime() - 24 * 60 * 60 * 1000
+        )
+            .toISOString()
+            .split('T')[0];
+        const processingMonth = processingDate.substring(0, 7);
+
         // Get all distinct campuses that have cars in queue
         const allEntries = await ctx.db
             .query("dismissalQueue")
             .filter(q => q.eq(q.field("status"), "waiting"))
             .collect();
 
-        if (allEntries.length === 0) {
-            return { success: true, clearedCampuses: 0, totalCarsCleared: 0 };
-        }
-
         // Get unique campus locations
         const campuses = [...new Set(allEntries.map(entry => entry.campusLocation))];
-
-        const now = Date.now();
         let totalCleared = 0;
 
         // Process each campus
@@ -612,16 +678,29 @@ export const scheduledClearAllQueues = internalMutation({
             // Create history entries for all cars in this campus using shared helper
             for (const entry of campusEntries) {
                 // For scheduled clears, removedBy = addedBy (system operation)
-                await clearCarFromQueue(ctx.db, entry, entry.addedBy, now);
+                await clearCarFromQueue(
+                    ctx.db,
+                    entry,
+                    entry.addedBy,
+                    now,
+                    processingDate
+                );
                 totalCleared++;
             }
         }
+
+        await ctx.scheduler.runAfter(0, internal.dashboard.updateDashboardMetrics, {
+            date: processingDate,
+            month: processingMonth
+        });
 
         return {
             success: true,
             clearedCampuses: campuses.length,
             totalCarsCleared: totalCleared,
-            campuses
+            campuses,
+            processedDate: processingDate,
+            processedMonth: processingMonth,
         };
     }
 });

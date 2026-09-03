@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   ColumnFiltersState,
@@ -14,9 +14,10 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { Search, GraduationCap, Plus, MapPin } from "lucide-react";
+import { Search, GraduationCap, Plus, MapPin, AlertCircle, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 // import {
 //     DropdownMenu,
 //     DropdownMenuContent,
@@ -41,10 +42,9 @@ import { DeleteStudentsDialog } from "./delete-students-dialog";
 import { StudentFormDialog } from "./student-form-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import {
-  CAMPUS_LOCATIONS,
+  CampusOption,
   GRADES,
   Grade,
-  CampusLocation,
   Id,
 } from "@/convex/types";
 import { useStudentsData } from "@/hooks/use-students-data";
@@ -106,6 +106,63 @@ export function StudentsTable() {
     Student | undefined
   >();
 
+  // Alert state
+  const alertTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = React.useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = React.useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = React.useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  React.useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Query for campus options (dynamic)
+  const campusOptions = useQuery(api.campus.getOptions, {});
+
   // Hook personalizado para datos de estudiantes - SIN filtros (enfoque estándar)
   const studentsData = useStudentsData({
     // Cargar TODOS los estudiantes sin filtros para que React Table maneje el filtrado
@@ -144,7 +201,12 @@ export function StudentsTable() {
 
   // Transform Convex data con memoización mejorada
   const data: Student[] = React.useMemo(() => {
-    if (!studentsData?.students) return [];
+    if (!studentsData?.students || !campusOptions) return [];
+
+    // Create a map of campus IDs to names for quick lookup
+    const campusMap = new Map(
+      campusOptions.map((c: { id: Id<"campusSettings">; label: string }) => [c.id, c.label])
+    );
 
     return studentsData.students.map(
       (student: {
@@ -155,12 +217,15 @@ export function StudentsTable() {
         birthday: string;
         carNumber: number;
         grade: string;
-        campusLocation: string;
+        campuses: Id<"campusSettings">[];
         avatarUrl?: string;
         avatarStorageId?: Id<"_storage">;
         isActive: boolean;
         createdAt: number;
       }) => {
+        const campusId = student.campuses[0];
+        const campusName = campusId ? campusMap.get(campusId) : undefined;
+
         return {
           id: student._id,
           fullName: student.fullName,
@@ -169,13 +234,14 @@ export function StudentsTable() {
           birthday: student.birthday,
           carNumber: student.carNumber,
           grade: student.grade as Grade,
-          campusLocation: student.campusLocation as CampusLocation,
+          campusId: campusId,
+          campusLocation: campusName || "Unknown",
           avatarUrl: student.avatarUrl || "",
           avatarStorageId: student.avatarStorageId,
         };
       },
     );
-  }, [studentsData?.students]); // Más específico que studentsData completo
+  }, [studentsData?.students, campusOptions]); // Más específico que studentsData completo
 
   // Loading state - Convex retorna undefined mientras carga
   const isLoading = studentsData === undefined;
@@ -240,13 +306,20 @@ export function StudentsTable() {
           });
         }
         setRowSelection({});
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.deleteSuccess.title"),
+          t("alerts.deleteSuccess.message", { count: studentIds.length }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.deleteError.title"),
+          t("alerts.deleteError.message"),
+        );
       }
     },
-    [deleteStudent, deleteMultipleStudents],
+    [deleteStudent, deleteMultipleStudents, showAlert, t],
   );
 
   const handleCreateStudent = React.useCallback(
@@ -256,19 +329,26 @@ export function StudentsTable() {
           firstName: studentData.firstName,
           lastName: studentData.lastName,
           grade: studentData.grade,
-          campusLocation: studentData.campusLocation,
+          campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: studentData.avatarStorageId,
         });
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.createSuccess.title"),
+          t("alerts.createSuccess.message", { name: `${studentData.firstName} ${studentData.lastName}` }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.createError.title"),
+          t("alerts.createError.message"),
+        );
       }
     },
-    [createStudent],
+    [createStudent, showAlert, t],
   );
 
   const handleUpdateStudent = React.useCallback(
@@ -285,7 +365,7 @@ export function StudentsTable() {
           firstName: studentData.firstName,
           lastName: studentData.lastName,
           grade: studentData.grade,
-          campusLocation: studentData.campusLocation,
+          campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
           avatarUrl: studentData.avatarUrl,
@@ -302,13 +382,20 @@ export function StudentsTable() {
 
         setEditDialogOpen(false);
         setSelectedStudent(undefined);
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.updateSuccess.title"),
+          t("alerts.updateSuccess.message", { name: `${studentData.firstName} ${studentData.lastName}` }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.updateError.title"),
+          t("alerts.updateError.message"),
+        );
       }
     },
-    [selectedStudent, updateStudent, deleteAvatar],
+    [selectedStudent, updateStudent, deleteAvatar, showAlert, t],
   );
 
   const handleDeleteStudent = React.useCallback(
@@ -317,13 +404,20 @@ export function StudentsTable() {
         await deleteStudent({ studentId: studentId as Id<"students"> });
         setEditDialogOpen(false);
         setSelectedStudent(undefined);
-        // La página se mantiene automáticamente con autoResetPageIndex: false
-        // TODO: Agregar toast de éxito aquí
+        showAlert(
+          "success",
+          t("alerts.deleteSuccess.title"),
+          t("alerts.deleteSuccess.message", { count: 1 }),
+        );
       } catch {
-        // TODO: Agregar toast de error aquí
+        showAlert(
+          "error",
+          t("alerts.deleteError.title"),
+          t("alerts.deleteError.message"),
+        );
       }
     },
-    [deleteStudent],
+    [deleteStudent, showAlert, t],
   );
 
   const handleRowClick = React.useCallback(
@@ -359,16 +453,16 @@ export function StudentsTable() {
           </div>
 
           {/* Campus filter */}
-          <FilterDropdown<(typeof CAMPUS_LOCATIONS)[number]>
+          <FilterDropdown<string>
             value={
               (table
                 .getColumn("campusLocation")
-                ?.getFilterValue() as (typeof CAMPUS_LOCATIONS)[number]) ?? ""
+                ?.getFilterValue() as string) ?? ""
             }
             onChange={(value: string) =>
               table.getColumn("campusLocation")?.setFilterValue(value)
             }
-            options={CAMPUS_LOCATIONS}
+            options={campusOptions?.map((c: CampusOption) => c.label) ?? []}
             icon={MapPin}
             label={t("filters.campus.label")}
             placeholder={t("filters.campus.all")}
@@ -531,6 +625,30 @@ export function StudentsTable() {
         onSubmit={handleUpdateStudent}
         onDelete={handleDeleteStudent}
       />
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 // import { LangToggle } from "./lang-toggle"
 import { UserButtonWrapper } from "./user-button-wrapper";
-import { canAccessOperators, extractRoleFromMetadata } from "@/lib/role-utils";
+import { canAccessDashboard, canAccessOperators, extractRoleFromMetadata, isManagementRole } from "@/lib/role-utils";
 
 // Configuración de íconos para cada tipo de menú
 const iconMap = {
@@ -39,6 +39,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userRole = user
     ? extractRoleFromMetadata(user.publicMetadata)
     : undefined;
+  const hasManagementAccess = isManagementRole(userRole ?? null);
+  const hasDashboardAccess = canAccessDashboard(userRole ?? null);
 
   // Generar estructura de navegación basada en el rol del usuario
   const navItems = React.useMemo(() => {
@@ -53,8 +55,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     const items = [];
 
-    // Admin y SuperAdmin ven todos los enlaces
-    if (userRole === "admin" || userRole === "superadmin") {
+    // Principal (y legacy admin) + SuperAdmin ven todos los enlaces de gestión
+    if (hasManagementAccess) {
       // Usuarios con todos los sub-elementos
       if (menuConfig.management) {
         items.push({
@@ -102,7 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     return items;
-  }, [t, userRole]);
+  }, [t, hasManagementAccess, userRole]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -117,7 +119,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items={navItems}
           dashboardLabel={t("dashboard")}
           navigationLabel={t("navigation")}
-          showDashboard={userRole === "admin" || userRole === "superadmin"}
+          showDashboard={hasDashboardAccess}
         />
       </SidebarContent>
       <SidebarFooter>

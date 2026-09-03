@@ -16,7 +16,7 @@ const operations = [
 
 test('Reordering and moving preserve IDs, metadata, lane order and subsequent dispatch', async () => {
     for (const operation of operations) {
-        const student = { _id: 'student-A', fullName: 'Student A', carNumber: 1, campusLocation: 'campus', isActive: true };
+        const student = { _id: 'student-A', fullName: 'Student A', carNumber: 1, campuses: ['campus-id'], isActive: true };
         const car = (id: string, position: number, lane = 'left', campusLocation = 'campus'): Row => ({
             _id: id, _creationTime: 100, carNumber: id.charCodeAt(0) - 64,
             campusLocation, lane, position, assignedTime: 200, addedBy: 'user',
@@ -29,7 +29,8 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
         const tables = {
             dismissalQueue: queue,
             students: new Map([['student-A', student]]),
-            users: new Map([['user', { _id: 'user', clerkId: 'clerk', role: 'operator', isActive: true }]]),
+            users: new Map([['user', { _id: 'user', clerkId: 'clerk', role: 'principal', assignedCampuses: ['campus-id'], isActive: true }]]),
+            campusSettings: new Map([['campus-id', { _id: 'campus-id', campusName: 'campus' }]]),
             dismissalHistory: new Map<string, Row>(),
         };
         const ctx = {
@@ -46,10 +47,11 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
                         },
                         collect: async () => rows,
                         first: async () => rows[0] ?? null,
+                        unique: async () => rows[0] ?? null,
                     };
                     return query;
                 },
-                get: async (id: string) => queue.get(id) ?? tables.students.get(id) ?? null,
+                get: async (id: string) => queue.get(id) ?? tables.students.get(id) ?? tables.campusSettings.get(id) ?? null,
                 patch: async (id: string, fields: Row) => {
                     assert.ok(queue.has(id), `Cannot patch missing vehicle ${id}`);
                     queue.set(id, { ...queue.get(id), ...fields });

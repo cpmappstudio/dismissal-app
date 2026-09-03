@@ -2,7 +2,6 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import type { CampusLocation } from '@/convex/types'
 
 const CAMPUS_SESSION_KEY = 'dismissal-app-selected-campus'
 

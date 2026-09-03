@@ -34,7 +34,7 @@ function renderLane(mode: ModeType, onRemoveCar?: RemoveCarHandler, disableRemov
     );
 }
 
-for (const role of ['operator', 'allocator', 'dispatcher', 'admin', 'superadmin', 'viewer', null] as const) {
+for (const role of ['operator', 'allocator', 'dispatcher', 'principal', 'admin', 'superadmin', 'viewer', null] as const) {
     test(`${role ?? 'unauthenticated'}: dispatch control on the shared road`, () => {
         const canRemove = canDispatch(role);
         const html = renderLane('operator', canRemove ? async () => {} : undefined);

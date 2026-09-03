@@ -8,6 +8,7 @@ const roles: [DismissalRole | null, boolean, boolean][] = [
     ['allocator', true, false],
     ['dispatcher', false, true],
     ['admin', true, true],
+    ['principal', true, true],
     ['superadmin', true, true],
     ['viewer', false, false],
     [null, false, false],

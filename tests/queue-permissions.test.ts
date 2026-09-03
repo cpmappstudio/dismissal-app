@@ -15,13 +15,14 @@ function invoke(mutation: object, ctx: MutationCtx, args: Record<string, unknown
     return handler(ctx, args);
 }
 const actions = [
-    { name: 'add', roles: ['allocator', 'operator', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(addCar, ctx, { carNumber: 11, campus: 'test', lane: 'left' }) },
-    { name: 'move', roles: ['allocator', 'operator', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(moveCar, ctx, { queueId, newLane: 'right' }) },
-    { name: 'remove', roles: ['dispatcher', 'operator', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(removeCar, ctx, { queueId }) },
-    { name: 'clear', roles: ['dispatcher', 'operator', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(clearAllCars, ctx, { campus: 'test' }) },
+    { name: 'add', roles: ['allocator', 'operator', 'principal', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(addCar, ctx, { carNumber: 11, campus: 'test', lane: 'left' }) },
+    { name: 'move', roles: ['dispatcher', 'operator', 'principal', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(moveCar, ctx, { queueId, newLane: 'right' }) },
+    { name: 'remove', roles: ['dispatcher', 'operator', 'principal', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(removeCar, ctx, { queueId }) },
+    { name: 'clear', roles: ['dispatcher', 'operator', 'principal', 'admin', 'superadmin'], run: (ctx: MutationCtx) => invoke(clearAllCars, ctx, { campus: 'test' }) },
 ];
 
-function context(user: Partial<Doc<'users'>> | null, authenticated = true): MutationCtx {
+const campusId = 'campus-test' as Id<'campusSettings'>;
+function context(user: Partial<Doc<'users'>> | null, authenticated = true, campusAccess = true): MutationCtx {
     return {
         auth: {
             // An elevated token claim must not override a revoked database role.
@@ -29,6 +30,9 @@ function context(user: Partial<Doc<'users'>> | null, authenticated = true): Muta
         },
         db: {
             query(table: string) {
+                if (table === 'campusSettings') return {
+                    withIndex: () => ({ unique: async () => ({ _id: campusId }) }),
+                };
                 if (table !== 'users') throw reachedQueue;
                 return {
                     withIndex(_name: string, select: (q: unknown) => void) {
@@ -36,11 +40,14 @@ function context(user: Partial<Doc<'users'>> | null, authenticated = true): Muta
                             assert.equal(field, 'clerkId');
                             assert.equal(value, 'clerk-test');
                         } });
-                        return { first: async () => user };
+                        return { first: async () => user && { ...user, assignedCampuses: campusAccess ? [campusId] : [] } };
                     },
                 };
             },
-            get() { throw reachedQueue; },
+            get() {
+                if (!campusAccess) return { campusLocation: 'test' };
+                throw reachedQueue;
+            },
             insert() { assert.fail('Authorization must not create users or write queue data'); },
         },
     } as unknown as MutationCtx;
@@ -48,12 +55,24 @@ function context(user: Partial<Doc<'users'>> | null, authenticated = true): Muta
 
 test('Every public queue mutation enforces its role before touching queue data', async () => {
     for (const action of actions) {
-        for (const role of ['viewer', 'allocator', 'dispatcher', 'operator', 'admin', 'superadmin', undefined] as const) {
+        for (const role of ['viewer', 'allocator', 'dispatcher', 'operator', 'principal', 'admin', 'superadmin', undefined] as const) {
             const allowed = action.roles.includes(role ?? 'viewer');
             await assert.rejects(
                 async () => action.run(context({ role, isActive: true })),
                 (error: unknown) => allowed ? error === reachedQueue : error instanceof Error && /Not authorized/.test(error.message),
                 `${action.name}: ${role ?? 'missing role'}`,
+            );
+        }
+    }
+});
+
+test('Queue mutations preserve campus restrictions for non-global roles', async () => {
+    for (const action of actions) {
+        for (const role of action.roles.filter(role => role !== 'superadmin')) {
+            await assert.rejects(
+                () => action.run(context({ role: role as Doc<'users'>['role'], isActive: true }, true, false)),
+                /No access to campus/,
+                `${action.name}: ${role}`,
             );
         }
     }

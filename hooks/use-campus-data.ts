@@ -44,8 +44,8 @@ export function useCampusById(campusId: Id<"campusSettings">) {
 /**
  * Hook para obtener estadísticas de un campus
  */
-export function useCampusStats(campus: string) {
-    return useQuery(api.campus.getStats, { campus })
+export function useCampusStats(campusId: Id<"campusSettings">) {
+    return useQuery(api.campus.getStats, { campusId })
 }
 
 /**

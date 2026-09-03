@@ -12,12 +12,14 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { Search, MapPin, Plus, UserSearch } from "lucide-react";
+import { Search, MapPin, Plus, UserSearch, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id, Doc } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -32,7 +34,13 @@ import { Staff } from "../types";
 import { StaffFormDialog } from "./staff-form-dialog";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { CAMPUS_LOCATIONS, CampusLocation } from "@/convex/types";
+
+
+type CampusOption = {
+  id: Id<"campusSettings">;
+  value: string;
+  label: string;
+};
 
 // Simple skeleton placeholder
 function StaffTableSkeleton() {
@@ -86,8 +94,63 @@ export function StaffTable() {
     }));
   }, [columnFilters]);
 
+  // Alert state
+  const alertTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [alert, setAlert] = React.useState<{
+    show: boolean;
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Function to show alerts
+  const showAlert = React.useCallback(
+    (type: "success" | "error", title: string, message: string) => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+
+      setAlert({
+        show: true,
+        type,
+        title,
+        message,
+      });
+
+      alertTimeoutRef.current = setTimeout(() => {
+        setAlert((prev) => ({ ...prev, show: false }));
+        alertTimeoutRef.current = null;
+      }, 5000);
+    },
+    [],
+  );
+
+  // Function to hide alert manually
+  const hideAlert = React.useCallback(() => {
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+    setAlert((prev) => ({ ...prev, show: false }));
+  }, []);
+
+  // Cleanup effect for alert timeout
+  React.useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Convex queries and actions
   const usersData = useQuery(api.users.listUsers, {});
+  const campusOptions = useQuery(api.campus.getOptions, {});
   const createUser = useAction(api.users.createUserWithClerk);
   const updateUser = useAction(api.users.updateUserWithClerk);
   const deleteUser = useAction(api.users.deleteUserWithClerk);
@@ -95,11 +158,31 @@ export function StaffTable() {
   const deleteAvatar = useMutation(api.users.deleteAvatar);
   const updateClerkProfileImage = useAction(api.users.updateClerkProfileImage);
 
+  // Helper to resolve campus name from ID
+  const getCampusNameById = React.useCallback(
+    (campusId: string) => {
+      if (!campusOptions) return "Not Assigned";
+      const campus = campusOptions.find((c: CampusOption) => c.id === campusId);
+      return campus?.label || "Not Assigned";
+    },
+    [campusOptions],
+  );
+
+  // Helper to get campus ID from name
+  const getCampusIdByName = React.useCallback(
+    (campusName: string) => {
+      if (!campusOptions) return null;
+      const campus = campusOptions.find((c: CampusOption) => c.label === campusName);
+      return campus?.id || null;
+    },
+    [campusOptions],
+  );
+
   // Transform Convex users to Staff format
   const data = React.useMemo<Staff[]>(() => {
     if (!usersData) return [];
 
-    return usersData.map((user) => ({
+    return usersData.map((user: Doc<"users">) => ({
       id: user.clerkId,
       convexId: user._id,
       fullName:
@@ -111,40 +194,62 @@ export function StaffTable() {
       lastName: user.lastName || "",
       email: user.email || "",
       phoneNumber: user.phone || "",
-      role: user.role || "",
-      campusLocation: (user.assignedCampuses?.[0] ||
-        "Not Assigned") as CampusLocation,
+      role: user.role === "admin" ? "principal" : user.role || "",
+      // Resolve campus IDs to names for display
+      assignedCampuses: (user.assignedCampuses || []).map(
+        (campusId) => getCampusNameById(campusId)
+      ),
       status: (user.status || "active") as "active" | "inactive",
       // Only use Clerk's imageUrl if there's no custom avatar storage ID
       // This prevents showing old Clerk image when custom avatar is removed
       avatarUrl: !user.avatarStorageId ? user.imageUrl || "" : "",
       avatarStorageId: user.avatarStorageId,
     }));
-  }, [usersData]);
+  }, [usersData, getCampusNameById]);
 
   const isLoading = usersData === undefined;
 
   // Handlers for CRUD operations
   const handleCreateStaff = async (staffData: Omit<Staff, "id">) => {
     try {
+      // Convert campus names to IDs
+      const campusIds = staffData.assignedCampuses
+        .map((name) => getCampusIdByName(name))
+        .filter((id): id is Id<"campusSettings"> => id !== null);
+      
+      if (campusIds.length === 0) {
+        showAlert(
+          "error",
+          t("alerts.createError.title"),
+          t("alerts.campusRequired"),
+        );
+        return;
+      }
+
       // Create user in Clerk (avatar will be synced via webhook and updateUserWithClerk)
       await createUser({
         email: staffData.email,
         firstName: staffData.firstName,
         lastName: staffData.lastName,
         role: staffData.role as Role,
-        assignedCampuses: [staffData.campusLocation],
+        assignedCampuses: campusIds,
         phone: staffData.phoneNumber || undefined,
         avatarStorageId: staffData.avatarStorageId || undefined,
       });
 
-      // Note: The avatar sync to Clerk's profile_image_url happens after webhook
-      // creates the user in Convex. For now, the avatar is stored in public_metadata
-      // and will be synced when the user is first edited or manually synced.
+      showAlert(
+        "success",
+        t("alerts.createSuccess.title"),
+        t("alerts.createSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
+      );
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Error creating user:", err);
-      alert(`Error: ${err.message || "Failed to create user"}`);
+      console.error("Error creating user:", err);
+      showAlert(
+        "error",
+        t("alerts.createError.title"),
+        err.message || t("alerts.createError.message"),
+      );
     }
   };
 
@@ -155,10 +260,19 @@ export function StaffTable() {
         await deleteUser({ clerkUserId: clerkId });
       }
       setRowSelection({});
+      showAlert(
+        "success",
+        t("alerts.deleteSuccess.title"),
+        t("alerts.deleteSuccess.message", { count: staffIds.length }),
+      );
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Error deleting users:", err);
-      alert(`Error: ${err.message || "Failed to delete users"}`);
+      console.error("Error deleting users:", err);
+      showAlert(
+        "error",
+        t("alerts.deleteError.title"),
+        err.message || t("alerts.deleteError.message"),
+      );
     }
   };
 
@@ -166,6 +280,20 @@ export function StaffTable() {
     if (!selectedStaff) return;
 
     try {
+      // Convert campus names to IDs
+      const campusIds = staffData.assignedCampuses
+        .map((name) => getCampusIdByName(name))
+        .filter((id): id is Id<"campusSettings"> => id !== null);
+      
+      if (campusIds.length === 0) {
+        showAlert(
+          "error",
+          t("alerts.updateError.title"),
+          t("alerts.campusRequired"),
+        );
+        return;
+      }
+
       // Check if avatar changed
       const oldAvatarId = selectedStaff.avatarStorageId;
       const newAvatarId = staffData.avatarStorageId;
@@ -200,8 +328,8 @@ export function StaffTable() {
         firstName: staffData.firstName,
         lastName: staffData.lastName,
         role: staffData.role as Role,
-        assignedCampuses: [staffData.campusLocation] as string[],
-        phone: staffData.phoneNumber || undefined,
+        assignedCampuses: campusIds,
+        phone: staffData.phoneNumber || "",
         status: staffData.status as "active" | "inactive",
         avatarStorageId: staffData.avatarStorageId || null, // Sync avatar to Clerk metadata
       });
@@ -242,10 +370,19 @@ export function StaffTable() {
 
       setEditDialogOpen(false);
       setSelectedStaff(undefined);
+      showAlert(
+        "success",
+        t("alerts.updateSuccess.title"),
+        t("alerts.updateSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
+      );
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Error updating user:", err);
-      alert(`Error: ${err.message || "Failed to update user"}`);
+      console.error("Error updating user:", err);
+      showAlert(
+        "error",
+        t("alerts.updateError.title"),
+        err.message || t("alerts.updateError.message"),
+      );
     }
   };
 
@@ -279,7 +416,7 @@ export function StaffTable() {
   // Role options for the visual role filter (static, UI-only)
   const ROLE_OPTIONS = [
     "superadmin",
-    "admin",
+    "principal",
     "allocator",
     "dispatcher",
     "viewer",
@@ -315,13 +452,13 @@ export function StaffTable() {
           {/* Campus filter */}
           <FilterDropdown<string>
             value={
-              (table.getColumn("campusLocation")?.getFilterValue() as string) ??
+              (table.getColumn("assignedCampuses")?.getFilterValue() as string) ??
               ""
             }
             onChange={(value: string) =>
-              table.getColumn("campusLocation")?.setFilterValue(value)
+              table.getColumn("assignedCampuses")?.setFilterValue(value)
             }
-            options={CAMPUS_LOCATIONS}
+            options={campusOptions?.map((c) => c.label) ?? []}
             icon={MapPin}
             label={t("filters.campus.label")}
             placeholder={t("filters.campus.all")}
@@ -497,6 +634,30 @@ export function StaffTable() {
             setSelectedStaff(undefined);
           }}
         />
+      )}
+
+      {/* Alert Component - Fixed at top right */}
+      {alert.show && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+          <Alert
+            variant={alert.type === "error" ? "destructive" : "default"}
+            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            onClick={hideAlert}
+          >
+            {alert.type === "error" ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+            <AlertDescription className="text-sm mt-1">
+              {alert.message}
+              <div className="text-xs text-muted-foreground mt-1">
+                {t("alerts.tapToDismiss")}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
     </div>
   );

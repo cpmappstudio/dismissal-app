@@ -2,11 +2,12 @@
 
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import type { Grade, CampusLocation } from "@/convex/types"
+import type { Grade } from "@/convex/types"
+import type { Id } from "@/convex/_generated/dataModel"
 
 interface StudentFilters {
     search?: string
-    campus?: CampusLocation
+    campus?: string
     grade?: Grade
     limit?: number
     offset?: number
@@ -33,10 +34,10 @@ export function useStudentsData(filters: StudentFilters) {
 /**
  * Hook para obtener estudiantes por número de carro
  */
-export function useStudentsByCarNumber(carNumber: number, campus: CampusLocation) {
+export function useStudentsByCarNumber(carNumber: number, campusId: Id<"campusSettings">) {
     return useQuery(api.students.getByCarNumber, {
         carNumber,
-        campus
+        campusId
     })
 }
 
