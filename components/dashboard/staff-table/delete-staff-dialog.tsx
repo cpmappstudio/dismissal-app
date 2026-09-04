@@ -51,6 +51,7 @@ export function DeleteStaffDialog({
         const normalized = role === "admin" ? "admin" : role
         if (
             normalized === "superadmin" ||
+            normalized === "bus_driver" ||
             normalized === "principal" ||
             normalized === "admin" ||
             normalized === "operator" ||

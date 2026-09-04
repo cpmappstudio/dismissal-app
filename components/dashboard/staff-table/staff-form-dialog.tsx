@@ -36,6 +36,8 @@ import { Staff } from "../types";
 import { DeleteStaffDialog } from "./delete-staff-dialog";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { normalizeVehicleIdentifier } from "@/lib/vehicle";
+import { ConvexError } from "convex/values";
 import {
   canCrudStaffRole,
   extractRoleFromMetadata,
@@ -52,6 +54,7 @@ type CampusOption = {
 type AssignableStaffRole = Exclude<DismissalRole, "admin">;
 
 const STAFF_ROLE_OPTIONS: AssignableStaffRole[] = [
+  "bus_driver",
   "superadmin",
   "principal",
   "allocator",
@@ -61,16 +64,18 @@ const STAFF_ROLE_OPTIONS: AssignableStaffRole[] = [
 ];
 
 interface StaffFormDialogProps {
+  driversOnly?: boolean;
   mode: "create" | "edit";
   staff?: Staff;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  onSubmit: (staff: Omit<Staff, "id">) => void;
+  onSubmit: (staff: Omit<Staff, "id">, password?: string) => Promise<void>;
   onDelete?: (staffId: string) => void;
 }
 
 export function StaffFormDialog({
+  driversOnly = false,
   mode,
   staff,
   trigger,
@@ -80,8 +85,12 @@ export function StaffFormDialog({
   onDelete,
 }: StaffFormDialogProps) {
   const t = useTranslations("staffManagement");
+  const bt = useTranslations("transport");
   const { user } = useUser();
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const [password, setPassword] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
   const actorRole = user ? extractRoleFromMetadata(user.publicMetadata) : null;
 
   // Ref for file input to allow resetting
@@ -115,6 +124,7 @@ export function StaffFormDialog({
       const normalized = role === "admin" ? "principal" : role;
       if (
         normalized === "superadmin" ||
+        normalized === "bus_driver" ||
         normalized === "principal" ||
         normalized === "operator" ||
         normalized === "allocator" ||
@@ -134,7 +144,9 @@ export function StaffFormDialog({
         firstName: staff.firstName,
         lastName: staff.lastName,
         email: staff.email || "",
+        username: staff.username || "",
         phoneNumber: staff.phoneNumber || "",
+        busNumber: String(staff.busNumber ?? ""),
         role: staff.role === "admin" ? "principal" : staff.role || "",
         assignedCampuses: staff.assignedCampuses || [],
         avatarUrl: staff.avatarUrl || "",
@@ -146,16 +158,19 @@ export function StaffFormDialog({
       firstName: "",
       lastName: "",
       email: "",
+      username: "",
       phoneNumber: "",
-      role: "",
+      busNumber: "",
+      role: driversOnly ? "bus_driver" : "",
       assignedCampuses: [] as string[],
       avatarUrl: "",
       avatarStorageId: null,
       status: "active",
     };
-  }, [mode, staff]);
+  }, [mode, staff, driversOnly]);
 
   const [formData, setFormData] = React.useState(initial);
+  const isDriver = driversOnly || formData.role === "bus_driver";
   const targetRole = normalizeRole(staff?.role);
   const allowedCrudRoles = React.useMemo(
     () =>
@@ -183,10 +198,13 @@ export function StaffFormDialog({
     mode === "create"
       ? allowedCrudRoles.length > 0 && canUseSelectedRole
       : canEditTarget && canUseSelectedRole;
-  const canDeleteTarget = mode === "edit" && canEditTarget && !isSuperadminTarget;
+  const canDeleteTarget =
+    mode === "edit" && canEditTarget && !isSuperadminTarget;
   const formReadOnly = mode === "edit" && !canEditTarget;
 
   React.useEffect(() => {
+    setPassword("");
+    setSubmitError(null);
     if (open) {
       setFormData(initial);
       setAvatarFile(null);
@@ -318,17 +336,19 @@ export function StaffFormDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmitForm) return;
+    if (!canSubmitForm || isSubmitting) return;
 
     if (
       !formData.firstName ||
       !formData.lastName ||
-      !formData.email ||
+      (isDriver ? !formData.username.trim() : !formData.email) ||
       !formData.role ||
       formData.assignedCampuses.length === 0
     )
       return;
 
+    setIsSubmitting(true);
+    setSubmitError(null);
     try {
       // Determine final avatar values
       let finalAvatarStorageId: Id<"_storage"> | undefined | null;
@@ -356,27 +376,48 @@ export function StaffFormDialog({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
+        username: isDriver ? formData.username.trim() : staff?.username,
         phoneNumber: formData.phoneNumber,
-        role: formData.role,
+        role: driversOnly ? "bus_driver" : formData.role,
+        busNumber:
+          formData.role === "bus_driver"
+            ? normalizeVehicleIdentifier(formData.busNumber)
+            : undefined,
         assignedCampuses: formData.assignedCampuses,
         status: formData.status,
         avatarUrl: finalAvatarUrl,
         avatarStorageId: finalAvatarStorageId,
       };
 
-      onSubmit(payload);
+      await onSubmit(
+        payload,
+        isDriver && mode === "create" ? password : undefined,
+      );
+      setPassword("");
       setOpen(false);
-    } catch {
-      alert("Failed to save user. Please try again.");
+    } catch (error) {
+      setSubmitError(
+        error instanceof ConvexError && typeof error.data === "string"
+          ? error.data
+          : bt("saveError"),
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const isCreate = mode === "create";
   const dialogTitle = isCreate
-    ? t("createDialog.title")
-    : t("editDialog.title");
+    ? formData.role === "bus_driver"
+      ? bt("createDriver")
+      : t("createDialog.title")
+    : formData.role === "bus_driver"
+      ? bt("editDriver")
+      : t("editDialog.title");
   const dialogSubtitle = isCreate
-    ? t("createDialog.subtitle")
+    ? isDriver
+      ? bt("driverCredentials")
+      : t("createDialog.subtitle")
     : t("editDialog.subtitle");
   const submitText = isCreate
     ? t("createDialog.actions.create")
@@ -430,14 +471,30 @@ export function StaffFormDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("createDialog.fields.email.label")}{" "}
+                  <Label
+                    htmlFor="staff-identifier"
+                    className="text-sm font-medium"
+                  >
+                    {isDriver
+                      ? bt("username")
+                      : t("createDialog.fields.email.label")}{" "}
                     <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    value={formData.email}
-                    onChange={(e) => update("email", e.target.value)}
-                    placeholder={t("createDialog.fields.email.placeholder")}
+                    id="staff-identifier"
+                    type={isDriver ? "text" : "email"}
+                    autoComplete={isDriver ? "username" : "email"}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={isDriver ? formData.username : formData.email}
+                    onChange={(e) =>
+                      update(isDriver ? "username" : "email", e.target.value)
+                    }
+                    placeholder={
+                      isDriver
+                        ? bt("username")
+                        : t("createDialog.fields.email.placeholder")
+                    }
                     disabled={formReadOnly}
                     required
                   />
@@ -455,31 +512,56 @@ export function StaffFormDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {isDriver && isCreate && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("createDialog.fields.role.label")}{" "}
-                    <span className="text-destructive">*</span>
+                  <Label htmlFor="driver-password">
+                    {bt("password")} <span className="text-destructive">*</span>
                   </Label>
-                  <Select
-                    disabled={formReadOnly || isSuperadminTarget}
-                    value={formData.role}
-                    onValueChange={(v) => update("role", v)}
-                  >
-                    <SelectTrigger className="w-full h-10">
-                      <SelectValue
-                        placeholder={t("createDialog.fields.role.placeholder")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roleOptions.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="driver-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {bt("driverCredentials")}
+                  </p>
                 </div>
+              )}
+
+              <div
+                className={`grid gap-4 ${driversOnly ? "grid-cols-1" : "grid-cols-2"}`}
+              >
+                {!driversOnly && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("createDialog.fields.role.label")}{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      disabled={formReadOnly || isSuperadminTarget}
+                      value={formData.role}
+                      onValueChange={(v) => update("role", v)}
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue
+                          placeholder={t(
+                            "createDialog.fields.role.placeholder",
+                          )}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roleOptions.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r === "bus_driver" ? bt("driver") : r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">
                     {t("createDialog.fields.campus.label")}{" "}
@@ -503,10 +585,15 @@ export function StaffFormDialog({
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      align="start"
+                    >
                       <div className="max-h-60 overflow-y-auto p-1">
                         {campusOptions?.map((campus: CampusOption) => {
-                          const isSelected = formData.assignedCampuses.includes(campus.label);
+                          const isSelected = formData.assignedCampuses.includes(
+                            campus.label,
+                          );
                           return (
                             <div
                               key={campus.id}
@@ -516,7 +603,9 @@ export function StaffFormDialog({
                                 setFormData((prev) => ({
                                   ...prev,
                                   assignedCampuses: isSelected
-                                    ? prev.assignedCampuses.filter((c) => c !== campus.label)
+                                    ? prev.assignedCampuses.filter(
+                                        (c) => c !== campus.label,
+                                      )
                                     : [...prev.assignedCampuses, campus.label],
                                 }));
                               }}
@@ -535,15 +624,30 @@ export function StaffFormDialog({
                 </div>
               </div>
 
+              {formData.role === "bus_driver" && (
+                <div className="space-y-2">
+                  <Label htmlFor="busNumber">{bt("identifier")}</Label>
+                  <Input
+                    id="busNumber"
+                    value={formData.busNumber}
+                    onChange={(e) => update("busNumber", e.target.value)}
+                    required
+                    maxLength={20}
+                    disabled={formReadOnly}
+                    autoCapitalize="characters"
+                  />
+                </div>
+              )}
               {formReadOnly && mode === "edit" && (
                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <TriangleAlert className="h-5 w-5 text-amber-600"/>
+                  <TriangleAlert className="h-5 w-5 text-amber-600" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
                       Restricted Access
                     </p>
                     <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                      Principals can only manage operator, allocator, dispatcher, and viewer accounts.
+                      Principals can only manage operator, allocator,
+                      dispatcher, and viewer accounts.
                     </p>
                   </div>
                 </div>
@@ -638,6 +742,11 @@ export function StaffFormDialog({
           </div>
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-6 border-t">
+            {submitError && (
+              <p role="alert" className="text-sm text-destructive">
+                {submitError}
+              </p>
+            )}
             <div className="flex gap-2 w-full justify-end">
               {canDeleteTarget && onDelete && staff && (
                 <DeleteStaffDialog
@@ -662,7 +771,7 @@ export function StaffFormDialog({
               )}
               <Button
                 type="submit"
-                disabled={!canSubmitForm}
+                disabled={!canSubmitForm || isSubmitting}
                 className="bg-yankees-blue hover:bg-yankees-blue/90 gap-2"
               >
                 <SubmitIcon className="h-4 w-4" />

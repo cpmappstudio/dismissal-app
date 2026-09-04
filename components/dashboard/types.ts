@@ -7,7 +7,7 @@ export type Student = {
     firstName: string
     lastName: string
     birthday: string
-    carNumber: number
+    carNumber: number | string
     grade: Grade
     campusId: Id<"campusSettings"> // Campus ID for database operations
     campusLocation: string // Campus name for display (derived from campusId)
@@ -16,6 +16,8 @@ export type Student = {
 }
 
 export type Staff = {
+    username?: string
+    busNumber?: number | string
     id: string // clerkId for external use
     convexId?: Id<"users"> // Internal Convex ID for mutations
     fullName: string

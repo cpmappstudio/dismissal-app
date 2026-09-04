@@ -7,7 +7,8 @@ export type DismissalRole =
     | 'allocator'
     | 'dispatcher'
     | 'viewer'
-    | 'operator';
+    | 'operator'
+    | 'bus_driver';
 
 export interface OperatorPermissions {
     canAllocate: boolean;
@@ -117,6 +118,7 @@ export function canAccessDashboard(userRole: DismissalRole | null): boolean {
 }
 
 const PRINCIPAL_CRUD_STAFF_ROLES: DismissalRole[] = [
+    "bus_driver",
     "operator",
     "allocator",
     "dispatcher",
@@ -124,6 +126,7 @@ const PRINCIPAL_CRUD_STAFF_ROLES: DismissalRole[] = [
 ];
 
 const SUPERADMIN_CRUD_STAFF_ROLES: DismissalRole[] = [
+    "bus_driver",
     "superadmin",
     "principal",
     "admin",

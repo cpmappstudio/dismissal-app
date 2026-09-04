@@ -86,7 +86,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       }
     }
 
-    if (menuConfig.operators && userRole) {
+    if (userRole === "bus_driver") {
+      items.push({ title: t("bus"), url: "/bus", icon: iconMap.operators, isActive: true, items: [{ title: t("bus"), url: "/bus" }] });
+    }
+    if (menuConfig.operators && userRole && userRole !== "bus_driver") {
       const operatorItems = menuConfig.operators.items.filter((item) =>
         item.url === "/operators"
           ? canAccessOperators(userRole)

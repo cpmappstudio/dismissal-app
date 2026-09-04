@@ -1,4 +1,59 @@
 {
+  "transport": {
+    "driverCreated": "Bus driver created",
+    "username": "Username",
+    "password": "Password",
+    "driverCredentials": "The driver signs in with a username and password. Share these credentials securely; no email invitation is sent.",
+    "driver": "Bus driver",
+    "createDriver": "Create bus driver",
+    "editDriver": "Edit bus driver",
+    "identifier": "Number or license plate",
+    "invalidIdentifier": "Enter a valid number or license plate (maximum 20 characters).",
+    "bus": "Bus",
+    "campus": "Campus",
+    "drivers": "Bus drivers",
+    "earlyPickups": "Early pickups",
+    "student": "Student",
+    "vehicle": "Vehicle",
+    "actions": "Actions",
+    "correctDeparture": "Correct",
+    "correctDepartureFor": "Correct departure for {name}",
+    "departureCorrectionDescription": "Return this student to Pending. This does not restore their vehicle to the road or delete the departure history. The correction and its reason will be recorded.",
+    "pickupCorrectionDescription": "Cancel this early pickup and return the student to Pending. The correction and its reason will be recorded.",
+    "noDepartures": "No departures recorded today for students assigned to this campus.",
+    "moreDepartures": "No matches among the loaded departures. Load more to continue searching.",
+    "departureCampus": "Departure recorded at {campus}",
+    "loadMore": "Load more",
+    "pickupDescription": "Record early pickups and review students who departed today.",
+    "loading": "Loading…",
+    "saveError": "Could not save. Please try again.",
+    "notInQueue": "The bus is not on the road. You can review the list; boarding is enabled once it arrives.",
+    "noStudents": "No students assigned to this bus at this campus.",
+    "noAssignment": "No active campus or bus assigned. Contact the school.",
+    "markBoarded": "Boarded",
+    "boardingStatus": "Boarding status",
+    "boardingProgress": "{boarded} of {total} expected students have boarded",
+    "notTraveling": "Not traveling",
+    "undo": "Mark pending",
+    "reason": "Reason",
+    "save": "Save",
+    "collectedBy": "Collected by",
+    "searchStudents": "Search students by name",
+    "searchStudentsHint": "Type at least 2 characters to search.",
+    "noResults": "No matches. Try another name.",
+    "correctionReason": "Reason for correction",
+    "optionalNote": "Note (optional)",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "recordedToday": "Recorded today",
+    "status": {
+      "pending": "Pending",
+      "boarded": "Boarded",
+      "not_traveling": "Not traveling · do not wait",
+      "picked_up_early": "Picked up early · do not wait",
+      "departed": "Departed"
+    }
+  },
   "common": {
     "language": "Language",
     "english": "English",
@@ -12,6 +67,8 @@
     "birthdayMessage": "Happy birthday"
   },
   "navigation": {
+    "busDrivers": "Bus drivers",
+    "bus": "My bus",
     "university": "Dismissal App",
     "dashboard": "Home",
     "navigation": "Navigation",
@@ -114,6 +171,10 @@
           {
             "title": "Staff",
             "url": "/management/staff"
+          },
+          {
+            "title": "Bus drivers",
+            "url": "/management/bus-drivers"
           },
                     {
             "title": "Students",
@@ -332,7 +393,7 @@
     "title": "Students",
     "subtitle": "Manage and view all students in the system",
     "search": {
-      "placeholder": "Search students by name or car number..."
+      "placeholder": "Search students by name, vehicle number or license plate..."
     },
     "filters": {
       "campus": {
@@ -398,7 +459,7 @@
           "placeholder": "Select campus"
         },
         "carNumber": {
-          "label": "Car Number"
+          "label": "Number or license plate"
         },
         "avatarUrl": {
           "label": "Avatar URL"

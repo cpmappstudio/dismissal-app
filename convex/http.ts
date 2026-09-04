@@ -54,12 +54,33 @@ http.route({
     try {
       switch (event.type) {
         case "user.created":
-        case "user.updated":
+        case "user.updated": {
+          let data = event.data;
+          const existing = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
+            clerkId: data.id,
+          });
+          // Bootstrap missing source versions from Clerk, not a potentially stale event.
+          if (existing?.clerkUpdatedAt === undefined) {
+            const secret = process.env.CLERK_SECRET_KEY;
+            if (!secret) throw new Error("CLERK_SECRET_KEY not configured");
+            const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(data.id)}`, {
+              headers: { Authorization: `Bearer ${secret}` },
+            });
+            if (response.status === 404) {
+              await ctx.runMutation(internal.users.deleteFromClerk, { clerkUserId: data.id });
+              break;
+            }
+            if (!response.ok) throw new Error(`Failed to fetch Clerk user: ${response.status}`);
+            const current = await response.json();
+            if (current.id !== data.id) throw new Error("Clerk user ID mismatch");
+            data = current;
+          }
           await ctx.runMutation(internal.users.upsertFromClerk, { 
-            data: event.data 
+            data,
           });
           console.log("✅ User synced:", event.data.id);
           break;
+        }
 
         case "user.deleted":
           await ctx.runMutation(internal.users.deleteFromClerk, { 
@@ -80,12 +101,12 @@ http.route({
     } catch (error) {
       const err = error as Error;
       console.error("❌ Error processing webhook:", err.message);
-      // Still return 200 to prevent Clerk from retrying
+      // Let Clerk retry failed synchronization instead of acknowledging lost data.
       return new Response(JSON.stringify({ 
         success: false, 
         error: err.message 
       }), { 
-        status: 200,
+        status: 500,
         headers: { "Content-Type": "application/json" }
       });
     }

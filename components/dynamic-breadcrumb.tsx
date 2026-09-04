@@ -82,6 +82,8 @@ const ROUTE_CONFIG: Record<string, RouteConfig> = {
     parent: "users",
   },
   profile: { title: "profile", fallback: "Profile" },
+  bus: { title: "bus", fallback: "My bus" },
+  "bus-drivers": { title: "busDrivers", fallback: "Bus drivers" },
 };
 
 // Routes that don't need translation (static labels)

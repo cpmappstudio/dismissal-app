@@ -13,7 +13,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Search, MapPin, Plus, UserSearch, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useQuery, useAction, useMutation } from "convex/react";
+import { useQuery, useAction, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id, Doc } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
@@ -61,9 +61,10 @@ function StaffTableSkeleton() {
   );
 }
 
-export function StaffTable() {
+export function StaffTable({ driversOnly = false }: { driversOnly?: boolean }) {
   const t = useTranslations("staffManagement");
-  const columns = useColumns();
+  const bt = useTranslations("transport");
+  const columns = useColumns(driversOnly);
   const { user } = useUser(); // Get current Clerk user to reload after avatar update
 
   // Table state
@@ -149,7 +150,11 @@ export function StaffTable() {
   }, []);
 
   // Convex queries and actions
-  const usersData = useQuery(api.users.listUsers, {});
+  const { isAuthenticated } = useConvexAuth();
+  const usersData = useQuery(
+    api.users.listUsers,
+    isAuthenticated ? (driversOnly ? { role: "bus_driver" } : {}) : "skip",
+  );
   const campusOptions = useQuery(api.campus.getOptions, {});
   const createUser = useAction(api.users.createUserWithClerk);
   const updateUser = useAction(api.users.updateUserWithClerk);
@@ -193,7 +198,9 @@ export function StaffTable() {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email || "",
+      username: user.username,
       phoneNumber: user.phone || "",
+      busNumber: user.busNumber,
       role: user.role === "admin" ? "principal" : user.role || "",
       // Resolve campus IDs to names for display
       assignedCampuses: (user.assignedCampuses || []).map(
@@ -210,47 +217,46 @@ export function StaffTable() {
   const isLoading = usersData === undefined;
 
   // Handlers for CRUD operations
-  const handleCreateStaff = async (staffData: Omit<Staff, "id">) => {
-    try {
-      // Convert campus names to IDs
-      const campusIds = staffData.assignedCampuses
-        .map((name) => getCampusIdByName(name))
-        .filter((id): id is Id<"campusSettings"> => id !== null);
-      
-      if (campusIds.length === 0) {
-        showAlert(
-          "error",
-          t("alerts.createError.title"),
-          t("alerts.campusRequired"),
-        );
-        return;
-      }
+  const handleCreateStaff = async (
+    staffData: Omit<Staff, "id">,
+    password?: string,
+  ) => {
+    // Convert campus names to IDs
+    const campusIds = staffData.assignedCampuses
+      .map((name) => getCampusIdByName(name))
+      .filter((id): id is Id<"campusSettings"> => id !== null);
 
-      // Create user in Clerk (avatar will be synced via webhook and updateUserWithClerk)
-      await createUser({
-        email: staffData.email,
-        firstName: staffData.firstName,
-        lastName: staffData.lastName,
-        role: staffData.role as Role,
-        assignedCampuses: campusIds,
-        phone: staffData.phoneNumber || undefined,
-        avatarStorageId: staffData.avatarStorageId || undefined,
-      });
-
-      showAlert(
-        "success",
-        t("alerts.createSuccess.title"),
-        t("alerts.createSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
-      );
-    } catch (error) {
-      const err = error as Error;
-      console.error("Error creating user:", err);
+    if (campusIds.length === 0) {
       showAlert(
         "error",
         t("alerts.createError.title"),
-        err.message || t("alerts.createError.message"),
+        t("alerts.campusRequired"),
       );
+      throw new Error("A campus is required");
     }
+
+    // Create user in Clerk (avatar will be synced via webhook and updateUserWithClerk)
+    await createUser({
+      email: staffData.role === "bus_driver" ? undefined : staffData.email,
+      username:
+        staffData.role === "bus_driver" ? staffData.username : undefined,
+      password,
+      firstName: staffData.firstName,
+      lastName: staffData.lastName,
+      role: staffData.role as Role,
+      assignedCampuses: campusIds,
+      phone: staffData.phoneNumber || undefined,
+      busNumber: staffData.busNumber,
+      avatarStorageId: staffData.avatarStorageId || undefined,
+    });
+
+    showAlert(
+      "success",
+      driversOnly ? bt("driverCreated") : t("alerts.createSuccess.title"),
+      t("alerts.createSuccess.message", {
+        name: `${staffData.firstName} ${staffData.lastName}`,
+      }),
+    );
   };
 
   const handleDeleteStaff = async (staffIds: string[]) => {
@@ -279,111 +285,105 @@ export function StaffTable() {
   const handleUpdateStaff = async (staffData: Omit<Staff, "id">) => {
     if (!selectedStaff) return;
 
-    try {
-      // Convert campus names to IDs
-      const campusIds = staffData.assignedCampuses
-        .map((name) => getCampusIdByName(name))
-        .filter((id): id is Id<"campusSettings"> => id !== null);
-      
-      if (campusIds.length === 0) {
-        showAlert(
-          "error",
-          t("alerts.updateError.title"),
-          t("alerts.campusRequired"),
-        );
-        return;
-      }
+    // Convert campus names to IDs
+    const campusIds = staffData.assignedCampuses
+      .map((name) => getCampusIdByName(name))
+      .filter((id): id is Id<"campusSettings"> => id !== null);
 
-      // Check if avatar changed
-      const oldAvatarId = selectedStaff.avatarStorageId;
-      const newAvatarId = staffData.avatarStorageId;
-      const avatarChanged = newAvatarId !== oldAvatarId;
-
-      // Handle avatar changes in Convex Storage first
-      const convexUser = usersData?.find((u) => u.clerkId === selectedStaff.id);
-      if (convexUser && avatarChanged) {
-        // Case 1: Avatar was removed (had one, now null/undefined)
-        if (!newAvatarId && oldAvatarId) {
-          await deleteAvatar({ userId: convexUser._id });
-        }
-        // Case 2: Avatar was replaced (had one, now has different one)
-        else if (newAvatarId && oldAvatarId && newAvatarId !== oldAvatarId) {
-          await saveAvatarStorageId({
-            userId: convexUser._id,
-            storageId: newAvatarId,
-          });
-        }
-        // Case 3: Avatar was added (didn't have one, now has one)
-        else if (newAvatarId && !oldAvatarId) {
-          await saveAvatarStorageId({
-            userId: convexUser._id,
-            storageId: newAvatarId,
-          });
-        }
-      }
-
-      // Update user in Clerk (including avatarStorageId in public_metadata)
-      await updateUser({
-        clerkUserId: selectedStaff.id,
-        firstName: staffData.firstName,
-        lastName: staffData.lastName,
-        role: staffData.role as Role,
-        assignedCampuses: campusIds,
-        phone: staffData.phoneNumber || "",
-        status: staffData.status as "active" | "inactive",
-        avatarStorageId: staffData.avatarStorageId || null, // Sync avatar to Clerk metadata
-      });
-
-      // Sync profile image to Clerk if avatar changed
-      if (avatarChanged) {
-        await updateClerkProfileImage({
-          clerkUserId: selectedStaff.id,
-          avatarStorageId: newAvatarId || null, // Pass storageId directly
-        });
-
-        // Reload Clerk user data to reflect new avatar in UserButton
-        // This updates the UI without a full page reload
-        if (user && user.id === selectedStaff.id) {
-          // Multiple reload attempts to ensure Clerk has processed the new image
-          // Clerk may need a moment to process the uploaded image
-          await user.reload();
-
-          // Second reload after short delay for better reliability
-          setTimeout(async () => {
-            try {
-              await user.reload();
-            } catch (error) {
-              console.warn("Second reload failed, but first succeeded", error);
-            }
-          }, 500);
-
-          // Third reload after slightly longer delay as final fallback
-          setTimeout(async () => {
-            try {
-              await user.reload();
-            } catch (error) {
-              console.warn("Third reload failed", error);
-            }
-          }, 1500);
-        }
-      }
-
-      setEditDialogOpen(false);
-      setSelectedStaff(undefined);
-      showAlert(
-        "success",
-        t("alerts.updateSuccess.title"),
-        t("alerts.updateSuccess.message", { name: `${staffData.firstName} ${staffData.lastName}` }),
-      );
-    } catch (error) {
-      const err = error as Error;
-      console.error("Error updating user:", err);
+    if (campusIds.length === 0) {
       showAlert(
         "error",
         t("alerts.updateError.title"),
-        err.message || t("alerts.updateError.message"),
+        t("alerts.campusRequired"),
       );
+      throw new Error("A campus is required");
     }
+
+    // Check if avatar changed
+    const oldAvatarId = selectedStaff.avatarStorageId;
+    const newAvatarId = staffData.avatarStorageId;
+    const avatarChanged = newAvatarId !== oldAvatarId;
+
+    // Handle avatar changes in Convex Storage first
+    const convexUser = usersData?.find((u) => u.clerkId === selectedStaff.id);
+    if (convexUser && avatarChanged) {
+      // Case 1: Avatar was removed (had one, now null/undefined)
+      if (!newAvatarId && oldAvatarId) {
+        await deleteAvatar({ userId: convexUser._id });
+      }
+      // Case 2: Avatar was replaced (had one, now has different one)
+      else if (newAvatarId && oldAvatarId && newAvatarId !== oldAvatarId) {
+        await saveAvatarStorageId({
+          userId: convexUser._id,
+          storageId: newAvatarId,
+        });
+      }
+      // Case 3: Avatar was added (didn't have one, now has one)
+      else if (newAvatarId && !oldAvatarId) {
+        await saveAvatarStorageId({
+          userId: convexUser._id,
+          storageId: newAvatarId,
+        });
+      }
+    }
+
+    // Update user in Clerk (including avatarStorageId in public_metadata)
+    await updateUser({
+      clerkUserId: selectedStaff.id,
+      username: staffData.username,
+      firstName: staffData.firstName,
+      lastName: staffData.lastName,
+      role: staffData.role as Role,
+      assignedCampuses: campusIds,
+      phone: staffData.phoneNumber || "",
+      busNumber: staffData.busNumber,
+      status: staffData.status as "active" | "inactive",
+      avatarStorageId: staffData.avatarStorageId || null, // Sync avatar to Clerk metadata
+    });
+
+    // Sync profile image to Clerk if avatar changed
+    if (avatarChanged) {
+      await updateClerkProfileImage({
+        clerkUserId: selectedStaff.id,
+        avatarStorageId: newAvatarId || null, // Pass storageId directly
+      });
+
+      // Reload Clerk user data to reflect new avatar in UserButton
+      // This updates the UI without a full page reload
+      if (user && user.id === selectedStaff.id) {
+        // Multiple reload attempts to ensure Clerk has processed the new image
+        // Clerk may need a moment to process the uploaded image
+        await user.reload();
+
+        // Second reload after short delay for better reliability
+        setTimeout(async () => {
+          try {
+            await user.reload();
+          } catch (error) {
+            console.warn("Second reload failed, but first succeeded", error);
+          }
+        }, 500);
+
+        // Third reload after slightly longer delay as final fallback
+        setTimeout(async () => {
+          try {
+            await user.reload();
+          } catch (error) {
+            console.warn("Third reload failed", error);
+          }
+        }, 1500);
+      }
+    }
+
+    setEditDialogOpen(false);
+    setSelectedStaff(undefined);
+    showAlert(
+      "success",
+      t("alerts.updateSuccess.title"),
+      t("alerts.updateSuccess.message", {
+        name: `${staffData.firstName} ${staffData.lastName}`,
+      }),
+    );
   };
 
   const handleRowClick = (staff: Staff) => {
@@ -415,6 +415,7 @@ export function StaffTable() {
 
   // Role options for the visual role filter (static, UI-only)
   const ROLE_OPTIONS = [
+    "bus_driver",
     "superadmin",
     "principal",
     "allocator",
@@ -465,28 +466,30 @@ export function StaffTable() {
             placeholderShort={t("filters.campus.short")}
           />
 
-          {/* Role filter - replaces Grade filter from students table */}
-          <FilterDropdown<(typeof ROLE_OPTIONS)[number]>
-            value={
-              (table
-                .getColumn("role")
-                ?.getFilterValue() as (typeof ROLE_OPTIONS)[number]) ?? ""
-            }
-            onChange={(value: string) =>
-              table.getColumn("role")?.setFilterValue(value)
-            }
-            options={ROLE_OPTIONS as readonly (typeof ROLE_OPTIONS)[number][]}
-            icon={UserSearch}
-            label={t("filters.role.label")}
-            placeholder={t("filters.role.all")}
-            placeholderShort={t("filters.role.short")}
-          />
+          {!driversOnly && (
+            <FilterDropdown<(typeof ROLE_OPTIONS)[number]>
+              value={
+                (table
+                  .getColumn("role")
+                  ?.getFilterValue() as (typeof ROLE_OPTIONS)[number]) ?? ""
+              }
+              onChange={(value: string) =>
+                table.getColumn("role")?.setFilterValue(value)
+              }
+              options={ROLE_OPTIONS as readonly (typeof ROLE_OPTIONS)[number][]}
+              icon={UserSearch}
+              label={t("filters.role.label")}
+              placeholder={t("filters.role.all")}
+              placeholderShort={t("filters.role.short")}
+            />
+          )}
 
           {/* Actions */}
           <div className="col-span-2 flex gap-2 md:col-span-1 md:ml-auto">
             <div className="flex-1 md:flex-none">
               <StaffFormDialog
                 mode="create"
+                driversOnly={driversOnly}
                 onSubmit={handleCreateStaff}
                 trigger={
                   <Button className="w-full gap-2 bg-yankees-blue hover:bg-yankees-blue/90 md:w-auto">

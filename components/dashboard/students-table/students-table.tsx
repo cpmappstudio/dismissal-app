@@ -182,8 +182,8 @@ export function StudentsTable() {
 
       // Buscar en el número de carro (convertir a string para comparación)
       const carNumberMatch =
-        student.carNumber > 0 &&
-        student.carNumber.toString().includes(searchTerm);
+        student.carNumber !== 0 &&
+        student.carNumber.toString().toLowerCase().includes(searchTerm);
 
       return nameMatch || carNumberMatch;
     },
@@ -215,7 +215,7 @@ export function StudentsTable() {
         firstName: string;
         lastName: string;
         birthday: string;
-        carNumber: number;
+        carNumber: number | string;
         grade: string;
         campuses: Id<"campusSettings">[];
         avatarUrl?: string;

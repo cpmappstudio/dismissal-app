@@ -25,6 +25,7 @@ export default defineSchema({
         v.literal("dispatcher"),
         v.literal("allocator"),
         v.literal("operator"),
+        v.literal("bus_driver"),
         v.literal("principal"),
         v.literal("admin"),
         v.literal("superadmin"),
@@ -45,6 +46,7 @@ export default defineSchema({
 
     // Additional info
     phone: v.optional(v.string()),
+    busNumber: v.optional(v.union(v.number(), v.string())),
     avatarStorageId: v.optional(v.id("_storage")),
 
     // Status
@@ -54,13 +56,22 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
+    clerkUpdatedAt: v.optional(v.number()), // Source version, not the local write time
     lastLoginAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_username", ["username"])
     .index("by_email", ["email"])
     .index("by_active", ["isActive"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_busNumber", ["busNumber"]),
+
+  /**
+   * Keep deleted Clerk IDs so delayed events cannot recreate their users.
+   */
+  deletedClerkUsers: defineTable({
+    clerkId: v.string(),
+  }).index("by_clerk_id", ["clerkId"]),
 
   /**
    * Students table
@@ -83,7 +94,7 @@ export default defineSchema({
     birthday: v.string(), // Display format: "July 09"
 
     // Car assignment
-    carNumber: v.number(), // 0 = no car assigned
+    carNumber: v.union(v.number(), v.string()), // 0 = no car assigned
 
     // Additional info
     avatarUrl: v.optional(v.string()),
@@ -99,14 +110,16 @@ export default defineSchema({
   })
     .index("by_car_number", ["carNumber"])
     .index("by_full_name", ["fullName"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .searchIndex("search_fullName", { searchField: "fullName", filterFields: ["isActive"] }),
 
   /**
    * Dismissal Queue - Current cars in lanes
    */
   dismissalQueue: defineTable({
+    vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
     // Core info
-    carNumber: v.number(),
+    carNumber: v.union(v.number(), v.string()),
     campusLocation: v.string(),
 
     // Lane assignment
@@ -145,8 +158,10 @@ export default defineSchema({
    * Dismissal History - Completed pickups
    */
   dismissalHistory: defineTable({
+    vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
+    completionReason: v.optional(v.union(v.literal("dispatched"), v.literal("cleared"))),
     // Reference info
-    carNumber: v.number(),
+    carNumber: v.union(v.number(), v.string()),
     campusLocation: v.string(),
     lane: v.union(v.literal("left"), v.literal("right")),
 
@@ -207,7 +222,7 @@ export default defineSchema({
     month: v.string(),
     topArrivals: v.array(
       v.object({
-        carNumber: v.number(),
+        carNumber: v.union(v.number(), v.string()),
         queuedAt: v.number(),
         studentNames: v.array(v.string()),
         position: v.number(),
@@ -312,8 +327,29 @@ export default defineSchema({
     .index("by_created", ["createdAt"]),
 
   /**
-   * Audit Log - Track critical actions
+   * Daily student state, independent of the vehicle queue lifecycle
    */
+  studentDismissals: defineTable({
+    studentId: v.id("students"),
+    studentName: v.string(),
+    campusId: v.id("campusSettings"),
+    date: v.string(),
+    status: v.union(v.literal("pending"), v.literal("boarded"), v.literal("not_traveling"), v.literal("picked_up_early"), v.literal("departed")),
+    vehicleIdentifier: v.optional(v.union(v.number(), v.string())),
+    vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
+    reason: v.optional(v.string()),
+    collectedBy: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+    updatedByName: v.string(),
+    revision: v.number(),
+  })
+    .index("by_campusId_date_studentId", ["campusId", "date", "studentId"])
+    .index("by_studentId_date_status", ["studentId", "date", "status"])
+    .index("by_campusId_date_vehicleIdentifier_status", ["campusId", "date", "vehicleIdentifier", "status"])
+    .index("by_campusId_date_status", ["campusId", "date", "status"])
+    .index("by_date_status", ["date", "status"]),
+
   auditLogs: defineTable({
     // Who
     userId: v.id("users"),
@@ -323,6 +359,7 @@ export default defineSchema({
     // What
     action: v.union(
       v.literal("student_created"),
+      v.literal("student_dismissal_updated"),
       v.literal("student_updated"),
       v.literal("student_deleted"),
       v.literal("car_assigned"),

@@ -28,6 +28,8 @@ import { canAllocate, canDispatch, extractRoleFromMetadata } from "@/lib/role-ut
 import { useBirthdayCars } from "@/hooks/use-birthday-cars"
 import { Road } from "./road"
 import { CarData, ModeType, RemoveCarHandler } from "./types"
+import { normalizeVehicleIdentifier } from "@/lib/vehicle"
+import { EarlyPickups } from "./early-pickups"
 
 interface DismissalViewProps {
     mode: ModeType
@@ -36,6 +38,7 @@ interface DismissalViewProps {
 
 export function DismissalView({ mode, className }: DismissalViewProps) {
     const t = useTranslations('dismissal')
+    const bt = useTranslations('transport')
     const { user } = useUser()
     const role = user ? extractRoleFromMetadata(user.publicMetadata) : null
     const allowAllocate = mode === 'operator' && canAllocate(role)
@@ -153,7 +156,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
         const transformQueueEntry = (entry: {
             _id: string;
-            carNumber: number;
+            vehicleType?: "car" | "bus";
+            carNumber: number | string;
             lane: "left" | "right";
             position: number;
             assignedTime: number;
@@ -163,6 +167,8 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         }): CarData => {
             return {
                 id: entry._id,
+                vehicleType: entry.vehicleType,
+                timezone: campusOptions?.find(c => c.value === entry.campusLocation)?.timezone,
                 carNumber: entry.carNumber,
                 lane: entry.lane,
                 position: entry.position,
@@ -190,7 +196,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             isLoading: false,
             authError: false
         }
-    }, [queueData])
+    }, [queueData, campusOptions])
 
     // Hook para verificar carros con estudiantes de cumpleaños
     const allCars = [...leftLaneCars, ...rightLaneCars]
@@ -201,9 +207,10 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         const currentValue = carInputValueRef.current
         if (!allowAllocate || !currentValue.trim() || isSubmittingRef.current) return
 
-        const carNumber = parseInt(currentValue.trim())
-        if (isNaN(carNumber) || carNumber <= 0) {
-            showAlert('error', 'Invalid Car Number', 'Please enter a valid car number')
+        let carNumber: number | string
+        try { carNumber = normalizeVehicleIdentifier(currentValue) }
+        catch {
+            showAlert('error', 'Error', bt('invalidIdentifier'))
             return
         }
 
@@ -263,7 +270,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         } finally {
             updateIsSubmitting(false)
         }
-    }, [allowAllocate, selectedCampus, isCampusSelected, addCarToQueue, showAlert, shouldMaintainFocus, updateCarInputValue, updateIsSubmitting])
+    }, [allowAllocate, selectedCampus, isCampusSelected, addCarToQueue, showAlert, shouldMaintainFocus, updateCarInputValue, updateIsSubmitting, bt])
 
     // Remove car function using Convex mutation
     const handleRemoveCar = React.useCallback<RemoveCarHandler>((carId) => {
@@ -277,7 +284,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     showAlert('success', 'Car Removed!', `Car ${result.carNumber} has been removed from the queue`)
                 }
             } catch (error) {
-                showAlert('error', 'Error', 'Failed to remove car from queue')
+                showAlert('error', 'Error', error instanceof Error ? error.message : 'Failed to remove car from queue')
                 throw error // Let the animation roll back as well.
             } finally {
                 updateIsSubmitting(false)
@@ -380,9 +387,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     return (
         <div data-dismissal-view className={cn("w-full min-h-0 flex flex-1 flex-col", className)}>
-            {/* Campus Selection and Clear All Button */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between flex-shrink-0">
-                <div className="flex-shrink-0 relative">
+            {/* Campus selection and early pickups */}
+            <div className="flex items-center gap-2 md:gap-4 md:justify-between flex-shrink-0">
+                <div className="min-w-0 flex-1 md:flex-none relative">
                     <FilterDropdown<string>
                         value={selectedCampus}
                         onChange={(value) => updateSelectedCampus(value)}
@@ -406,6 +413,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 </div>
 
                 {/* Clear All Button - Currently disabled */}
+                {allowDispatch && isCampusSelected && campusOptions?.some(c => c.value === selectedCampus) && (
+                    <EarlyPickups campus={selectedCampus} timezone={campusOptions.find(c => c.value === selectedCampus)!.timezone} />
+                )}
                 {/* {allowDispatch && isCampusSelected && (
                     <Button
                         onClick={() => setShowClearDialog(true)}
@@ -472,16 +482,14 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                     {/* Car Input */}
                                     <Input
                                         ref={carInputRef}
-                                        type="number"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        placeholder={t('allocator.addCarPlaceholder')}
-                                        aria-label={t('allocator.addCarPlaceholder')}
+                                        type="text"
+                                        autoCapitalize="characters"
+                                        maxLength={20}
+                                        placeholder={bt('identifier')}
+                                        aria-label={bt('identifier')}
                                         value={carInputValue}
                                         onChange={(e) => {
-                                            // Solo permitir números
-                                            const value = e.target.value.replace(/[^0-9]/g, '')
-                                            updateCarInputValue(value)
+                                            updateCarInputValue(e.target.value)
                                         }}
                                         onFocus={handleInputFocus}
                                         onKeyDown={handleKeyPress}

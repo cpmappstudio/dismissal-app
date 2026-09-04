@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
-export const useColumns = (): ColumnDef<Staff>[] => {
+export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
   const t = useTranslations("staffManagement");
+  const bt = useTranslations("transport");
 
   return [
     {
@@ -63,6 +64,7 @@ export const useColumns = (): ColumnDef<Staff>[] => {
             <div className="min-w-0 flex-1">
               <div className="font-medium truncate text-sm sm:text-base">
                 {staff.fullName}
+                {staff.busNumber !== undefined && <span className="ml-2 text-xs text-muted-foreground">· {staff.busNumber}</span>}
               </div>
               {/* Show role and campus on mobile under the name */}
               <div className="text-xs text-muted-foreground sm:hidden">
@@ -85,20 +87,20 @@ export const useColumns = (): ColumnDef<Staff>[] => {
       },
     },
     {
-      accessorKey: "email",
+      accessorKey: driversOnly ? "username" : "email",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="h-auto p-0 font-medium hidden sm:flex text-white hover:text-white hover:bg-white/10"
         >
-          {t("table.headers.email")}
+          {driversOnly ? bt("username") : t("table.headers.email")}
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => (
         <div className="text-sm text-muted-foreground hidden sm:block truncate max-w-48">
-          {row.getValue("email")}
+          {driversOnly ? row.original.username : row.original.email || row.original.username}
         </div>
       ),
       meta: {

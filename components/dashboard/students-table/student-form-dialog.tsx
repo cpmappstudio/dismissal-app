@@ -1,4 +1,5 @@
 "use client"
+import { normalizeVehicleIdentifier } from "@/lib/vehicle"
 
 import * as React from "react"
 import { Plus, CalendarIcon, Trash2, Save, Upload, X, Loader2 } from "lucide-react"
@@ -298,7 +299,7 @@ export function StudentFormDialog({
                     month: '2-digit',
                     day: '2-digit'
                 }),
-                carNumber: formData.carNumber ? parseInt(formData.carNumber) : 0,
+                carNumber: normalizeVehicleIdentifier(formData.carNumber, true),
                 grade: formData.grade as Grade,
                 campusId: formData.campusId as Id<"campusSettings">,
                 campusLocation: campusName,
@@ -547,12 +548,13 @@ export function StudentFormDialog({
                             <Label htmlFor="carNumber" className="text-sm font-medium">{t('createDialog.fields.carNumber.label')}</Label>
                             <Input
                                 id="carNumber"
-                                type="number"
+                                type="text"
+                                maxLength={20}
+                                autoCapitalize="characters"
                                 value={formData.carNumber}
                                 onChange={(e) => updateFormData("carNumber", e.target.value)}
                                 placeholder="0"
                                 className="h-10"
-                                min="0"
                             />
                         </div>
 

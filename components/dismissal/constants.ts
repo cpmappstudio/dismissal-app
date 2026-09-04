@@ -8,7 +8,7 @@ export const LANE_COLORS = {
         primary: 'text-blue-600',
         background: 'bg-blue-100',
         textColor: 'text-blue-600',
-        badge: 'bg-blue-500',
+        badge: 'bg-blue-500 text-white',
         iconColor: 'text-blue-400',
         carColor: '#3b82f6'
     },
@@ -16,10 +16,16 @@ export const LANE_COLORS = {
         primary: 'text-green-600',
         background: 'bg-green-100',
         textColor: 'text-green-600',
-        badge: 'bg-green-500',
+        badge: 'bg-green-500 text-white',
         iconColor: 'text-green-400',
         carColor: '#10b981'
     }
+} as const
+
+export const BUS_COLORS = {
+    background: 'bg-amber-100',
+    badge: 'bg-amber-400 text-slate-900',
+    textColor: 'text-amber-800 dark:text-amber-400',
 } as const
 
 export const ANIMATION_DURATIONS = {

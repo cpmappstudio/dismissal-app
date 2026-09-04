@@ -3,6 +3,7 @@
 import * as React from "react"
 
 interface CarProps {
+    vehicleType?: 'car' | 'bus'
     className?: string
     color?: string
     size?: 'sm' | 'md' | 'lg' | 'xl' | 'viewer'
@@ -29,7 +30,7 @@ const sizeClasses = {
     viewer: 'w-32 h-40  xl:w-52 xl:h-64 4xl:w-64 4xl:h-80 5xl:w-72 5xl:h-90'
 }
 
-export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default', isViewer = false }) => {
+export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', style, variant = 'default', isViewer = false, vehicleType = 'car' }) => {
     const sizeClass = sizeClasses[size]
 
     // Use variant color if no custom color provided
@@ -60,6 +61,19 @@ export const Car = React.memo<CarProps>(({ className = '', color, size = 'md', s
         return darkenColor(finalColor, 25)
     }, [finalColor])
 
+    if (vehicleType === 'bus') return (
+        <svg aria-label="Bus" viewBox="0 0 160 280" className={`${sizeClass} object-contain ${isViewer ? 'max-md:rotate-0 md:rotate-90' : ''} ${className}`} style={style} xmlns="http://www.w3.org/2000/svg">
+            <rect x="25" y="20" width="110" height="245" rx="20" fill="#92400e" opacity=".25" />
+            <rect x="18" y="55" width="12" height="35" rx="4" fill="#1f2937" /><rect x="130" y="55" width="12" height="35" rx="4" fill="#1f2937" />
+            <rect x="18" y="205" width="12" height="35" rx="4" fill="#1f2937" /><rect x="130" y="205" width="12" height="35" rx="4" fill="#1f2937" />
+            <rect x="26" y="12" width="108" height="245" rx="18" fill="var(--color-amber-400, #fbbf24)" stroke="#b45309" strokeWidth="3" />
+            <rect x="35" y="32" width="90" height="35" rx="7" fill="#244658" />
+            <rect x="44" y="82" width="72" height="134" rx="10" fill="#fcd34d" stroke="#d97706" strokeWidth="2" />
+            {[85, 118, 151, 184].map(y => <g key={y}><rect x="30" y={y} width="9" height="24" rx="2" fill="#244658" /><rect x="121" y={y} width="9" height="24" rx="2" fill="#244658" /></g>)}
+            <rect x="40" y="231" width="80" height="12" rx="3" fill="#244658" />
+            <rect x="32" y="19" width="14" height="7" rx="2" fill="#fef3c7" /><rect x="114" y="19" width="14" height="7" rx="2" fill="#fef3c7" />
+        </svg>
+    )
     return (
         <svg
             viewBox="0 0 335.34 603.48"

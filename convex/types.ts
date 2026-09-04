@@ -18,7 +18,8 @@ export const roleValidator = v.union(
     v.literal("allocator"),
     v.literal("dispatcher"),
     v.literal("viewer"),
-    v.literal("operator")
+    v.literal("operator"),
+    v.literal("bus_driver")
 );
 
 // Use DismissalRole from role-utils for consistency
@@ -164,7 +165,7 @@ export type Student = Doc<"students">;
  */
 export interface StudentWithCar {
     student: Student;
-    carNumber: number;
+    carNumber: number | string;
     hasCarAssigned: boolean;
     siblings: Student[]; // Other students with same car number
 }
@@ -194,7 +195,7 @@ export type QueueEntry = Doc<"dismissalQueue">;
  */
 export interface CarData {
     id: string;
-    carNumber: number;
+    carNumber: number | string;
     lane: Lane;
     position: number;
     assignedTime: Date;
@@ -296,7 +297,7 @@ export interface DailyDismissalSummary {
  * Car pickup history
  */
 export interface CarPickupHistory {
-    carNumber: number;
+    carNumber: number | string;
     pickupTimes: Array<{
         date: string;
         time: number;
@@ -320,7 +321,7 @@ export interface StudentFormData {
     birthday: string;
     grade: Grade | string; // Allow custom grades
     campusLocation: string;
-    carNumber: number;
+    carNumber: number | string;
     avatarUrl?: string;
     avatarStorageId?: Id<"_storage">;
 }
@@ -393,7 +394,7 @@ export interface CampusFormData {
  * Queue entry input
  */
 export interface QueueEntryInput {
-    carNumber: number;
+    carNumber: number | string;
     campus: string;
     lane: Lane;
 }
@@ -454,7 +455,7 @@ export interface StudentSearchFilters {
     searchTerm?: string;
     campus?: string;
     grade?: string;
-    carNumber?: number;
+    carNumber?: number | string;
     hasCarAssigned?: boolean;
     isActive?: boolean;
 }
@@ -466,7 +467,7 @@ export interface QueueFilters {
     campus: string;
     lane?: Lane;
     status?: QueueStatus;
-    carNumber?: number;
+    carNumber?: number | string;
 }
 
 /**
@@ -476,7 +477,7 @@ export interface HistoryFilters {
     campus?: string;
     dateFrom?: string;
     dateTo?: string;
-    carNumber?: number;
+    carNumber?: number | string;
     minWaitTime?: number;
     maxWaitTime?: number;
 }
@@ -510,7 +511,7 @@ export interface QueueUpdateEvent {
     type: "car_added" | "car_removed" | "position_changed";
     campus: string;
     lane: Lane;
-    carNumber: number;
+    carNumber: number | string;
     position?: number;
     timestamp: number;
 }

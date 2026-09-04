@@ -1,5 +1,6 @@
 import { GenericDatabaseReader, GenericDatabaseWriter } from "convex/server";
 import { DataModel } from "../_generated/dataModel";
+import { normalizeVehicleIdentifier } from "../../lib/vehicle";
 
 // ============================================================================
 // Data Validation Constants
@@ -26,7 +27,7 @@ export function isSameDayUTC(ts1: number, ts2: number): boolean {
 
 export interface DismissalRecord {
   _id: string;
-  carNumber: number;
+  carNumber: number | string;
   campusLocation: string;
   queuedAt: number;
   completedAt: number;
@@ -328,7 +329,7 @@ export async function calculateTopArrivalsForMonth(
   }
 
   // Contador de apariciones en top 5 diario
-  const carStats: Record<number, { count: number; studentNames: string[]; firstQueuedAt: number }> = {};
+  const carStats: Record<string, { count: number; studentNames: string[]; firstQueuedAt: number }> = {};
 
   for (const date in recordsByDate) {
     const dayRecords = recordsByDate[date]
@@ -358,7 +359,7 @@ export async function calculateTopArrivalsForMonth(
     })
     .slice(0, 5)
     .map(([carNumber, stat], index) => ({
-      carNumber: Number(carNumber),
+      carNumber: normalizeVehicleIdentifier(carNumber),
       studentNames: stat.studentNames,
       queuedAt: stat.firstQueuedAt, // Para cumplir con el validador del schema
       position: index + 1,

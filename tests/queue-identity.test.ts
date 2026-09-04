@@ -30,15 +30,20 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
             dismissalQueue: queue,
             students: new Map([['student-A', student]]),
             users: new Map([['user', { _id: 'user', clerkId: 'clerk', role: 'principal', assignedCampuses: ['campus-id'], isActive: true }]]),
-            campusSettings: new Map([['campus-id', { _id: 'campus-id', campusName: 'campus' }]]),
+            campusSettings: new Map([['campus-id', { _id: 'campus-id', campusName: 'campus', timezone: 'America/New_York' }]]),
             dismissalHistory: new Map<string, Row>(),
+            studentDismissals: new Map<string, Row>(),
+            auditLogs: new Map<string, Row>(),
         };
         const ctx = {
             auth: { getUserIdentity: async () => ({ subject: 'clerk' }) },
             db: {
                 query(table: keyof typeof tables) {
                     let rows: Row[] = [...tables[table].values()];
-                    const index = { eq(field: string, value: unknown) { rows = rows.filter(row => row[field] === value); return index; } };
+                    const index = {
+                        eq(field: string, value: unknown) { rows = rows.filter(row => row[field] === value); return index; },
+                        gte(field: string, value: string) { rows = rows.filter(row => String(row[field]) >= value); return index; },
+                    };
                     const query = {
                         withIndex(_name: string, select: (q: typeof index) => unknown) { select(index); return query; },
                         filter(select: (q: { field: (key: string) => unknown; eq: (a: unknown, b: unknown) => boolean; gt: (a: unknown, b: unknown) => boolean }) => boolean) {
@@ -46,6 +51,7 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
                             return query;
                         },
                         collect: async () => rows,
+                        take: async (count: number) => rows.slice(0, count),
                         first: async () => rows[0] ?? null,
                         unique: async () => rows[0] ?? null,
                     };
@@ -57,10 +63,10 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
                     queue.set(id, { ...queue.get(id), ...fields });
                 },
                 delete: async (id: string) => { queue.delete(id); tables.students.delete(id); },
-                insert: async (table: string, row: Row) => {
-                    assert.equal(table, 'dismissalHistory', 'Reordering must not recreate vehicles');
-                    const id = `history-${tables.dismissalHistory.size}`;
-                    tables.dismissalHistory.set(id, row);
+                insert: async (table: keyof typeof tables, row: Row) => {
+                    assert.notEqual(table, 'dismissalQueue', 'Reordering must not recreate vehicles');
+                    const id = `${table === 'dismissalHistory' ? 'history' : table}-${tables[table].size}`;
+                    (tables[table] as Map<string, Row>).set(id, { ...row, _id: id });
                     return id;
                 },
             },

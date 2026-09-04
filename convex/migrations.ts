@@ -4,12 +4,38 @@ import { DataModel } from "./_generated/dataModel";
 import { Id } from "./_generated/dataModel";
 import { internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { operationalDate } from "../lib/operational-day";
 
 export const migrations = new Migrations<DataModel>(components.migrations, {
   migrationsLocationPrefix: "migrations:",
 });
 
 export const run = migrations.runner();
+
+// Run once during the cutoff rollout, before resuming student departure operations.
+// Older history/audit logs remain untouched; never merge conflicting daily records.
+export const alignStudentDismissalDates = migrations.define({
+  table: "studentDismissals",
+  migrateOne: async (ctx, record) => {
+    const date = operationalDate(record.updatedAt);
+    if (record.date === date) return;
+    const today = operationalDate();
+    if (record.date < today && date < today) return;
+    const local = await ctx.db.query("studentDismissals")
+      .withIndex("by_campusId_date_studentId", q =>
+        q.eq("campusId", record.campusId).eq("date", date).eq("studentId", record.studentId),
+      ).first();
+    const earlyPickup = record.status === "picked_up_early"
+      ? await ctx.db.query("studentDismissals")
+        .withIndex("by_studentId_date_status", q =>
+          q.eq("studentId", record.studentId).eq("date", date).eq("status", "picked_up_early"),
+        ).first()
+      : null;
+    if (local || earlyPickup)
+      throw new Error(`Review conflicting dismissal dates before migrating ${record._id}`);
+    return { date };
+  },
+});
 
 /**
  * Migration: Convert assignedCampuses from campus names (strings) to campus IDs

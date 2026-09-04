@@ -4,10 +4,12 @@
  * Handles CRUD operations and webhook sync
  */
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query, mutation, internalMutation, action, internalQuery, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { type Doc, Id } from "./_generated/dataModel";
+import { normalizeVehicleIdentifier } from "../lib/vehicle";
+import { validateUserAccess } from "./helpers";
 
 // ============================================================================
 // AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
@@ -17,9 +19,9 @@ import { Id } from "./_generated/dataModel";
  * Generate upload URL for avatar image (Step 1 of 3)
  */
 export const generateAvatarUploadUrl = mutation({
+    args: {},
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        await validateUserAccess(ctx, MANAGEMENT_ROLES);
 
         return await ctx.storage.generateUploadUrl();
     },
@@ -35,13 +37,13 @@ export const saveAvatarStorageId = mutation({
         storageId: v.id("_storage"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user: actor } = await validateUserAccess(ctx, MANAGEMENT_ROLES);
 
         const user = await ctx.db.get(args.userId);
         if (!user) {
             throw new Error("User not found");
         }
+        ensureCanUpdateUser(actor, user);
 
         // Delete old avatar if exists
         if (user.avatarStorageId) {
@@ -62,35 +64,18 @@ export const saveAvatarStorageId = mutation({
 });
 
 /**
- * Delete avatar storage file (for cleaning up unused uploads)
- */
-export const deleteAvatarStorage = mutation({
-    args: { storageId: v.id("_storage") },
-    handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        try {
-            await ctx.storage.delete(args.storageId);
-        } catch {
-            // Don't throw - storage might already be deleted
-        }
-    },
-});
-
-/**
  * Delete avatar from storage and user record
  */
 export const deleteAvatar = mutation({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        const { user: actor } = await validateUserAccess(ctx, MANAGEMENT_ROLES);
 
         const user = await ctx.db.get(args.userId);
         if (!user) {
             throw new Error("User not found");
         }
+        ensureCanUpdateUser(actor, user);
 
         // Delete from storage if exists
         if (user.avatarStorageId) {
@@ -115,39 +100,11 @@ export const getAvatarUrl = query({
         storageId: v.id("_storage")
     },
     handler: async (ctx, args) => {
+        await validateUserAccess(ctx);
         try {
             return await ctx.storage.getUrl(args.storageId);
         } catch {
             return null;
-        }
-    }
-});
-
-/**
- * Get multiple avatar URLs efficiently for batch operations
- * Use sparingly to avoid performance issues - prefer individual queries
- */
-export const getBatchAvatarUrls = query({
-    args: {
-        storageIds: v.array(v.id("_storage"))
-    },
-    handler: async (ctx, args) => {
-        try {
-            const urls: Record<string, string | null> = {};
-
-            // Process each storage ID individually to avoid Promise.all performance issues
-            for (const storageId of args.storageIds) {
-                try {
-                    const url = await ctx.storage.getUrl(storageId);
-                    urls[storageId] = url;
-                } catch {
-                    urls[storageId] = null;
-                }
-            }
-
-            return urls;
-        } catch {
-            return {};
         }
     }
 });
@@ -157,6 +114,7 @@ export const getBatchAvatarUrls = query({
 // ============================================================================
 
 const ROLE_VALUES = [
+  "bus_driver",
   "viewer",
   "dispatcher", 
   "allocator",
@@ -167,6 +125,7 @@ const ROLE_VALUES = [
 ] as const;
 
 const roleValidator = v.union(
+  v.literal("bus_driver"),
   v.literal("viewer"),
   v.literal("dispatcher"),
   v.literal("allocator"),
@@ -182,37 +141,6 @@ const MANAGEMENT_ROLES: Role[] = ["principal", "admin", "superadmin"];
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Require that the current user has one of the allowed roles
- * Throws error if not authenticated or insufficient permissions
- */
-export async function requireRoles(
-  ctx: any,
-  allowedRoles: Role[]
-): Promise<{ userId: Id<"users">; user: any; role: Role }> {
-  const identity = await ctx.auth.getUserIdentity();
-  
-  if (!identity) {
-    throw new Error("Authentication required");
-  }
-
-  const user = await userByClerkId(ctx, identity.subject);
-  
-  if (!user) {
-    throw new Error("User not found in database");
-  }
-
-  const userRole = user.role as Role;
-
-  if (!allowedRoles.includes(userRole)) {
-    throw new Error(
-      `Insufficient permissions. Required: ${allowedRoles.join(", ")}. You have: ${userRole}`
-    );
-  }
-
-  return { userId: user._id, user, role: userRole };
-}
 
 /**
  * Get user by Clerk ID
@@ -234,6 +162,7 @@ function isPrincipalLikeRole(role: string | undefined): boolean {
 
 function canPrincipalCrudRole(role: string | undefined): boolean {
   return (
+    role === "bus_driver" ||
     role === "operator" ||
     role === "allocator" ||
     role === "dispatcher" ||
@@ -255,6 +184,15 @@ function hasCampusOverlap(
   if (!sourceCampuses?.length || !targetCampuses?.length) return false;
   const sourceSet = new Set(sourceCampuses);
   return targetCampuses.some((campusId) => sourceSet.has(campusId));
+}
+
+// The caller's active management role is validated before checking the resource.
+function ensureCanUpdateUser(actor: Doc<"users">, target: Doc<"users">) {
+  if (isSuperadminRole(actor.role)) return;
+  ensurePrincipalCrudTarget(actor.role, target.role);
+  if (!hasCampusOverlap(actor.assignedCampuses, target.assignedCampuses)) {
+    throw new Error("Cannot update users outside your assigned campuses");
+  }
 }
 
 function ensureCampusScopeForManagement(
@@ -327,7 +265,7 @@ export const getCurrentProfile = query({
 });
 
 /**
- * List all users (admin/superadmin only)
+ * List users within the active management user's campus scope
  */
 export const listUsers = query({
   args: {
@@ -336,33 +274,8 @@ export const listUsers = query({
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   handler: async (ctx, args) => {
-    // Check authentication first
-    const identity = await ctx.auth.getUserIdentity();
-    
-    if (!identity) {
-      // Return empty array when not authenticated (graceful degradation)
-      return [];
-    }
-
-    // Get user from database
-    const user = await userByClerkId(ctx, identity.subject);
-    
-    if (!user) {
-      // User not found in database
-      return [];
-    }
-
-    // Check if user has required role
-    if (!MANAGEMENT_ROLES.includes(user.role as Role)) {
-      // Insufficient permissions - return empty array
-      return [];
-    }
-
-    // User is authenticated and authorized - proceed with query
-    let usersQuery = ctx.db.query("users");
-
-    // Apply filters
-    const users = await usersQuery.collect();
+    const { user } = await validateUserAccess(ctx, MANAGEMENT_ROLES);
+    const users = await ctx.db.query("users").collect();
     const scopedUsers = isSuperadminRole(user.role)
       ? users
       : users.filter((candidate) =>
@@ -375,33 +288,6 @@ export const listUsers = query({
       if (args.status && candidate.status !== args.status) return false;
       return true;
     });
-  }
-});
-
-/**
- * Get user by ID
- */
-export const getUserById = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    return user;
-  }
-});
-
-/**
- * Get user by Clerk ID (public query)
- */
-export const getUserByClerkId = query({
-  args: { clerkId: v.string() },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    return await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .first();
   }
 });
 
@@ -419,11 +305,11 @@ export const getUserByClerkIdInternal = internalQuery({
 });
 
 // ============================================================================
-// INTERNAL MUTATIONS (Called by webhooks only)
+// INTERNAL MUTATIONS (Shared by Clerk actions and verified webhooks)
 // ============================================================================
 
 /**
- * Upsert user from Clerk webhook
+ * Upsert user from Clerk's API response or a verified webhook
  * Idempotent operation that handles create/update and temp user merging
  * Schedules avatar sync to Clerk if avatarStorageId is present
  */
@@ -431,16 +317,31 @@ export const upsertFromClerk = internalMutation({
   args: { data: v.any() },
   handler: async (ctx, { data }) => {
     const clerkId = data.id;
+    if (typeof clerkId !== "string" || !clerkId)
+      throw new Error("Missing Clerk user ID");
+    const deleted = await ctx.db.query("deletedClerkUsers")
+      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId)).unique();
+    if (deleted) return null;
+    const clerkUpdatedAt = data.updated_at;
+    if (!Number.isSafeInteger(clerkUpdatedAt) || clerkUpdatedAt < 0)
+      throw new Error("Missing or invalid Clerk user updated_at");
+    const existingByClerkId = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+      .first();
+    if (existingByClerkId?.clerkUpdatedAt !== undefined &&
+        clerkUpdatedAt <= existingByClerkId.clerkUpdatedAt)
+      return existingByClerkId._id;
     
     // Extract user data from Clerk payload
     const email = 
       data.email_addresses?.[0]?.email_address ||
-      data.primary_email_address ||
-      `user_${clerkId}@temp.clerk`;
+      data.primary_email_address || undefined;
+    const username = data.username || undefined;
     
     const firstName = data.first_name || "";
     const lastName = data.last_name || "";
-    const fullName = `${firstName} ${lastName}`.trim() || email;
+    const fullName = `${firstName} ${lastName}`.trim() || username || email || "";
     const imageUrl = data.image_url || data.profile_image_url || "";
     
     // Extract metadata
@@ -448,16 +349,11 @@ export const upsertFromClerk = internalMutation({
     const role = extractRoleFromMetadata(data);
     const assignedCampuses = publicMetadata.assignedCampuses || (publicMetadata.campusId ? [publicMetadata.campusId] : []);
     const phone = publicMetadata.phone || undefined;
+    const busNumber = role === "bus_driver" ? normalizeVehicleIdentifier(publicMetadata.busNumber ?? "") : undefined;
     const avatarStorageId = publicMetadata.avatarStorageId || undefined;
     const status = publicMetadata.status || "active";
 
     console.log(`📝 Upserting user: ${email} (${clerkId}) with role: ${role}${avatarStorageId ? ' with avatar' : ''}`);
-
-    // 1. Check if user exists by clerkId
-    const existingByClerkId = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
-      .first();
 
     let userId: any;
     let isNewUser = false;
@@ -467,16 +363,19 @@ export const upsertFromClerk = internalMutation({
       // Build update object - only include avatarStorageId if it's explicitly provided
       const updates: any = {
         email,
+        username,
         firstName,
         lastName,
         fullName,
         imageUrl,
         phone,
+        busNumber,
         assignedCampuses,
         role,
         status,
         isActive: status === "active",
         updatedAt: Date.now(),
+        clerkUpdatedAt,
       };
       
       // Only update avatarStorageId if it's explicitly provided in publicMetadata
@@ -491,26 +390,29 @@ export const upsertFromClerk = internalMutation({
     }
     // 2. Check for temp user merge by email
     else {
-      const existingByEmail = await ctx.db
+      const existingByEmail = email ? await ctx.db
         .query("users")
         .withIndex("by_email", (q) => q.eq("email", email))
-        .first();
+        .first() : null;
 
       if (existingByEmail && existingByEmail.clerkId.startsWith("temp_")) {
         // Merge: replace temp clerkId with real one
         // Build update object - preserve existing avatarStorageId unless explicitly provided
         const updates: any = {
           clerkId, // Replace temp_ with real Clerk ID
+          username,
           firstName,
           lastName,
           fullName,
           imageUrl,
           phone,
+          busNumber,
           assignedCampuses,
           role,
           status,
           isActive: status === "active",
           updatedAt: Date.now(),
+          clerkUpdatedAt,
         };
         
         // Only update avatarStorageId if it's explicitly provided in publicMetadata
@@ -526,11 +428,13 @@ export const upsertFromClerk = internalMutation({
         userId = await ctx.db.insert("users", {
           clerkId,
           email,
+          username,
           firstName,
           lastName,
           fullName,
           imageUrl,
           phone,
+          busNumber,
           avatarStorageId,
           assignedCampuses,
           role,
@@ -538,6 +442,7 @@ export const upsertFromClerk = internalMutation({
           isActive: status === "active",
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          clerkUpdatedAt,
         });
         
         console.log(`✅ Created new user: ${userId}`);
@@ -560,13 +465,17 @@ export const upsertFromClerk = internalMutation({
 });
 
 /**
- * Delete user from Clerk webhook
+ * Shared deletion for the Clerk action and verified webhooks
  * Removes avatar from storage and deletes user record
  */
 export const deleteFromClerk = internalMutation({
   args: { clerkUserId: v.string() },
   handler: async (ctx, { clerkUserId }) => {
     console.log(`🗑️ Deleting user: ${clerkUserId}`);
+    // Deletion is terminal for this Clerk ID, even when it precedes user.created.
+    const deleted = await ctx.db.query("deletedClerkUsers")
+      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkUserId)).unique();
+    if (!deleted) await ctx.db.insert("deletedClerkUsers", { clerkId: clerkUserId });
 
     const user = await ctx.db
       .query("users")
@@ -598,27 +507,13 @@ export const deleteFromClerk = internalMutation({
  * Check if user has management permissions (principal/admin/superadmin) for actions
  * Returns the caller's user object if authorized
  */
-async function checkManagementPermissions(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Authentication required");
-  }
-  
-  // Get user from database by clerkId using internal query
-  const user = await ctx.runQuery(internal.users.getUserByClerkIdInternal, { 
-    clerkId: identity.subject 
-  });
-  
-  if (!user) {
-    throw new Error("User not found in database");
-  }
-  
-  if (!MANAGEMENT_ROLES.includes(user.role as Role)) {
-    throw new Error("Only principal/admin/superadmin can perform this action");
-  }
-  
-  return user;
-}
+export const checkManagementPermissions = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = await validateUserAccess(ctx, MANAGEMENT_ROLES);
+    return user;
+  },
+});
 
 // ============================================================================
 // ACTIONS (Call Clerk API)
@@ -626,27 +521,39 @@ async function checkManagementPermissions(ctx: any) {
 
 /**
  * Create user in Clerk with role assignment
- * Sends invitation email and syncs via webhook
+ * Persists the Clerk user in Convex before reporting success
  * Includes avatarStorageId in public_metadata for Convex Storage sync
  */
 export const createUserWithClerk = action({
   args: {
-    email: v.string(),
+    email: v.optional(v.string()),
+    username: v.optional(v.string()),
+    password: v.optional(v.string()),
     firstName: v.string(),
     lastName: v.string(),
     role: roleValidator,
     assignedCampuses: v.array(v.id("campusSettings")), // Required: at least one campus
     phone: v.optional(v.string()),
+    busNumber: v.optional(v.union(v.number(), v.string())),
     avatarStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     // Check permissions
-    const actor = await checkManagementPermissions(ctx);
+    const actor = await ctx.runQuery(internal.users.checkManagementPermissions, {});
     ensureCampusScopeForManagement(actor, args.assignedCampuses);
     if (!isSuperadminRole(actor.role) && args.role === "superadmin") {
       throw new Error("Only superadmin can create superadmin users");
     }
     ensurePrincipalCrudTarget(actor.role, args.role);
+    const busNumber = args.role === "bus_driver" ? normalizeVehicleIdentifier(args.busNumber ?? "") : undefined;
+    if (args.role === "bus_driver" && !args.assignedCampuses.length) throw new Error("A campus is required for the driver");
+    const username = args.username?.trim();
+    const email = args.email?.trim();
+    if (args.role === "bus_driver" && !username) {
+      throw new ConvexError("A username is required for the driver.");
+    }
+    if (!username && !email) throw new ConvexError("An email or username is required.");
+    if (username && !args.password) throw new ConvexError("A password is required with a username.");
 
     // Get Clerk secret key
     const clerkSecretKey = process.env.CLERK_SECRET_KEY;
@@ -662,6 +569,7 @@ export const createUserWithClerk = action({
         role: args.role,
         assignedCampuses: args.assignedCampuses,
         status: "active",
+        busNumber,
       };
       
       // Include phone if provided
@@ -682,54 +590,63 @@ export const createUserWithClerk = action({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email_address: [args.email],
+          email_address: email ? [email] : undefined,
+          username,
+          password: args.password,
           first_name: args.firstName,
           last_name: args.lastName,
           public_metadata: publicMetadata,
-          skip_password_checks: true,
-          skip_password_requirement: true,
+          skip_password_requirement: args.password ? undefined : true,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Clerk API error: ${response.status} - ${error}`);
+        const error = await response.json();
+        throw new ConvexError(error.errors?.[0]?.long_message || error.errors?.[0]?.message || "Clerk could not create the user.");
       }
 
       const clerkUser = await response.json();
       console.log(`✅ Created user in Clerk: ${clerkUser.id}${args.avatarStorageId ? ' (with avatar)' : ''}`);
-
-      // Create invitation
-      const inviteResponse = await fetch("https://api.clerk.com/v1/invitations", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${clerkSecretKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email_address: args.email,
-          public_metadata: {
-            role: args.role,
-            assignedCampuses: args.assignedCampuses,
-          },
-          redirect_url: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/sign-in",
-        }),
-      });
-
-      if (!inviteResponse.ok) {
-        console.warn("Failed to send invitation:", await inviteResponse.text());
-      } else {
-        console.log(`📧 Invitation sent to: ${args.email}`);
+      try {
+        await ctx.runMutation(internal.users.upsertFromClerk, { data: clerkUser });
+      } catch {
+        throw new ConvexError("The account was created in Clerk, but could not be saved in the app. Do not create it again; contact an administrator to synchronize it.");
       }
 
-      // Webhook will handle Convex sync
+      // Username-only accounts sign in with their supplied password, not an invitation.
+      if (email) {
+        const inviteResponse = await fetch("https://api.clerk.com/v1/invitations", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email_address: email,
+            public_metadata: {
+              role: args.role,
+              assignedCampuses: args.assignedCampuses,
+              busNumber,
+            },
+            redirect_url: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/sign-in",
+          }),
+        });
+
+        if (!inviteResponse.ok) {
+          console.warn("Failed to send invitation:", await inviteResponse.text());
+        } else {
+          console.log(`📧 Invitation sent to: ${email}`);
+        }
+      }
+
       return {
         success: true,
         clerkUserId: clerkUser.id,
-        message: "User created in Clerk. Invitation sent. Waiting for webhook sync...",
+        message: "User created and synchronized.",
       };
       
     } catch (error) {
+      if (error instanceof ConvexError) throw error;
       const err = error as Error;
       console.error("❌ Error creating user:", err.message);
       throw new Error(`Failed to create user: ${err.message}`);
@@ -739,23 +656,25 @@ export const createUserWithClerk = action({
 
 /**
  * Update user in Clerk
- * Updates metadata and syncs via webhook
+ * Updates metadata and synchronizes the result before reporting success
  * Preserves or updates avatarStorageId in public_metadata for Convex Storage sync
  */
 export const updateUserWithClerk = action({
   args: {
     clerkUserId: v.string(),
+    username: v.optional(v.string()),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     role: v.optional(roleValidator),
     assignedCampuses: v.optional(v.array(v.id("campusSettings"))),
     phone: v.optional(v.string()),
+    busNumber: v.optional(v.union(v.number(), v.string())),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     avatarStorageId: v.optional(v.union(v.id("_storage"), v.null())), // Allow null to remove avatar
   },
   handler: async (ctx, args) => {
     // Check permissions
-    const actor = await checkManagementPermissions(ctx);
+    const actor = await ctx.runQuery(internal.users.checkManagementPermissions, {});
     const targetUser = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
       clerkId: args.clerkUserId,
     });
@@ -763,6 +682,9 @@ export const updateUserWithClerk = action({
     if (!targetUser) {
       throw new Error("Target user not found");
     }
+    const targetRole = args.role ?? targetUser.role;
+    const busNumber = targetRole === "bus_driver" ? normalizeVehicleIdentifier(args.busNumber ?? targetUser.busNumber ?? "") : null;
+    if (targetRole === "bus_driver" && !(args.assignedCampuses ?? targetUser.assignedCampuses).length) throw new Error("A campus is required for the driver");
 
     if (
       targetUser.role === "superadmin" &&
@@ -772,14 +694,8 @@ export const updateUserWithClerk = action({
       throw new Error("Superadmin role cannot be changed");
     }
 
+    ensureCanUpdateUser(actor, targetUser);
     if (!isSuperadminRole(actor.role)) {
-      ensurePrincipalCrudTarget(actor.role, targetUser.role);
-      if (targetUser.role === "superadmin") {
-        throw new Error("Only superadmin can update superadmin users");
-      }
-      if (!hasCampusOverlap(actor.assignedCampuses, targetUser.assignedCampuses)) {
-        throw new Error("Cannot update users outside your assigned campuses");
-      }
       if (args.role === "superadmin") {
         throw new Error("Only superadmin can grant superadmin role");
       }
@@ -820,6 +736,10 @@ export const updateUserWithClerk = action({
       
       if (args.firstName) updateData.first_name = args.firstName;
       if (args.lastName) updateData.last_name = args.lastName;
+      if (args.username !== undefined) {
+        if (!args.username.trim()) throw new ConvexError("Username cannot be empty.");
+        updateData.username = args.username.trim();
+      }
 
       // Merge with existing public_metadata to preserve avatarStorageId and other fields
       const publicMetadata: any = {
@@ -830,6 +750,7 @@ export const updateUserWithClerk = action({
       if (args.role) publicMetadata.role = args.role;
       if (args.assignedCampuses !== undefined) publicMetadata.assignedCampuses = args.assignedCampuses;
       if (args.phone !== undefined) publicMetadata.phone = args.phone;
+      publicMetadata.busNumber = busNumber;
       if (args.status) publicMetadata.status = args.status;
       
       // Handle avatarStorageId updates (Convex → Clerk sync)
@@ -861,21 +782,26 @@ export const updateUserWithClerk = action({
       );
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Clerk API error: ${response.status} - ${error}`);
+        const error = await response.json();
+        throw new ConvexError(error.errors?.[0]?.long_message || error.errors?.[0]?.message || "Clerk could not update the user.");
       }
 
       const updatedUser = await response.json();
       console.log(`✅ Updated user in Clerk: ${updatedUser.id}`);
+      try {
+        await ctx.runMutation(internal.users.upsertFromClerk, { data: updatedUser });
+      } catch {
+        throw new ConvexError("The account was updated in Clerk, but could not be saved in the app. Contact an administrator to synchronize it.");
+      }
 
-      // Webhook will handle Convex sync
       return {
         success: true,
         clerkUserId: updatedUser.id,
-        message: "User updated in Clerk. Waiting for webhook sync...",
+        message: "User updated and synchronized.",
       };
       
     } catch (error) {
+      if (error instanceof ConvexError) throw error;
       const err = error as Error;
       console.error("❌ Error updating user:", err.message);
       throw new Error(`Failed to update user: ${err.message}`);
@@ -885,7 +811,7 @@ export const updateUserWithClerk = action({
 
 /**
  * Delete user from Clerk
- * Removes from Clerk and syncs deletion via webhook
+ * Synchronizes deletion in Convex before reporting success
  */
 export const deleteUserWithClerk = action({
   args: {
@@ -893,7 +819,7 @@ export const deleteUserWithClerk = action({
   },
   handler: async (ctx, args) => {
     // Check permissions
-    const actor = await checkManagementPermissions(ctx);
+    const actor = await ctx.runQuery(internal.users.checkManagementPermissions, {});
     const targetUser = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
       clerkId: args.clerkUserId,
     });
@@ -930,21 +856,28 @@ export const deleteUserWithClerk = action({
         }
       );
 
-      if (!response.ok) {
+      // A retry may find Clerk already deleted the user before Convex synchronized.
+      if (!response.ok && response.status !== 404) {
         const error = await response.text();
         throw new Error(`Clerk API error: ${response.status} - ${error}`);
       }
 
-      console.log(`✅ Deleted user from Clerk: ${args.clerkUserId}`);
+      try {
+        await ctx.runMutation(internal.users.deleteFromClerk, {
+          clerkUserId: args.clerkUserId,
+        });
+      } catch {
+        throw new ConvexError("The account was deleted in Clerk, but could not be removed from the app. Retry the deletion to finish synchronizing it.");
+      }
 
-      // Webhook will handle Convex cleanup
       return {
         success: true,
         clerkUserId: args.clerkUserId,
-        message: "User deleted from Clerk. Waiting for webhook sync...",
+        message: "User deleted and synchronized.",
       };
       
     } catch (error) {
+      if (error instanceof ConvexError) throw error;
       const err = error as Error;
       console.error("❌ Error deleting user:", err.message);
       throw new Error(`Failed to delete user: ${err.message}`);
@@ -1051,6 +984,12 @@ export const updateClerkProfileImage = action({
     avatarStorageId: v.union(v.id("_storage"), v.null()), // null to remove image
   },
   handler: async (ctx, args) => {
+    const actor = await ctx.runQuery(internal.users.checkManagementPermissions, {});
+    const target = await ctx.runQuery(internal.users.getUserByClerkIdInternal, {
+      clerkId: args.clerkUserId,
+    });
+    if (!target) throw new Error("Target user not found");
+    ensureCanUpdateUser(actor, target);
     const clerkSecretKey = process.env.CLERK_SECRET_KEY;
     if (!clerkSecretKey) {
       throw new Error("CLERK_SECRET_KEY not configured");
@@ -1157,7 +1096,7 @@ export const createTempUser = mutation({
   },
   handler: async (ctx, args) => {
     // Check permissions
-    const { user: actor } = await requireRoles(ctx, ["principal", "admin", "superadmin"]);
+    const { user: actor } = await validateUserAccess(ctx, MANAGEMENT_ROLES);
     ensureCampusScopeForManagement(actor, args.assignedCampuses);
     if (!isSuperadminRole(actor.role) && args.role === "superadmin") {
       throw new Error("Only superadmin can create superadmin users");

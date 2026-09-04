@@ -2,23 +2,19 @@
 
 import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
+import { DAILY_RESET_UTC } from "../lib/operational-day";
 
 const crons = cronJobs();
 
 /**
- * Automatically clear all queues at midnight every day
+ * Automatically clear the previous day's queues at the shared daily cutoff
  * and aggregate dashboard metrics for the previous operational day.
  * This ensures a fresh start each morning for all campuses.
- * 
- * Time: 00:00 Eastern Time (ET) = 05:00 UTC
- * Note: Adjust hourUTC based on your timezone
- * - EST (UTC-5): hourUTC: 5
- * - EDT (UTC-4): hourUTC: 4
- * - CST (UTC-6): hourUTC: 6, etc.
+ * 05:00 UTC is midnight EST / 01:00 EDT, not local midnight year-round.
  */
 crons.daily(
     "clear all queues at midnight",
-    { hourUTC: 5, minuteUTC: 0 }, // Midnight ET (adjust based on your timezone)
+    DAILY_RESET_UTC,
     internal.queue.scheduledClearAllQueues
 );
 

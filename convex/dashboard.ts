@@ -22,7 +22,7 @@ type DashboardAccessCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "aut
 
 interface DashboardTopArrivalRecord {
   topArrivals?: Array<{
-    carNumber: number;
+    carNumber: number | string;
     queuedAt: number;
     studentNames?: string[];
     appearances?: number;
@@ -189,9 +189,9 @@ function getCurrentMonthKey(): string {
 
 function aggregateGlobalTopArrivals(records: DashboardTopArrivalRecord[]) {
   const byCar: Record<
-    number,
+    string,
     {
-      carNumber: number;
+      carNumber: number | string;
       queuedAt: number;
       studentNames: string[];
       appearances: number;

@@ -1,4 +1,59 @@
 {
+  "transport": {
+    "driverCreated": "Chofer de bus creado",
+    "username": "Nombre de usuario",
+    "password": "Contraseña",
+    "driverCredentials": "El chofer ingresa con usuario y contraseña. Comparte estas credenciales de forma segura; no se envía una invitación por correo.",
+    "driver": "Chofer de bus",
+    "createDriver": "Crear chofer de bus",
+    "editDriver": "Editar chofer de bus",
+    "identifier": "Número o placa",
+    "invalidIdentifier": "Introduce un número o placa válido (máximo 20 caracteres).",
+    "bus": "Bus",
+    "campus": "Sede",
+    "drivers": "Choferes de bus",
+    "earlyPickups": "Recogidas anticipadas",
+    "student": "Estudiante",
+    "vehicle": "Vehículo",
+    "actions": "Acciones",
+    "correctDeparture": "Corregir",
+    "correctDepartureFor": "Corregir salida de {name}",
+    "departureCorrectionDescription": "El estudiante volverá a Pendiente. Esto no devuelve su vehículo a la carretera ni elimina el historial de salida. Se registrarán la corrección y su motivo.",
+    "pickupCorrectionDescription": "Cancela esta recogida anticipada y devuelve al estudiante a Pendiente. Se registrarán la corrección y su motivo.",
+    "noDepartures": "No hay estudiantes de esta sede con salida registrada hoy.",
+    "moreDepartures": "Sin coincidencias entre las salidas cargadas. Carga más para seguir buscando.",
+    "departureCampus": "Salida registrada en {campus}",
+    "loadMore": "Cargar más",
+    "pickupDescription": "Registra recogidas anticipadas y consulta los estudiantes que ya salieron hoy.",
+    "loading": "Cargando…",
+    "saveError": "No se pudo guardar. Inténtalo de nuevo.",
+    "notInQueue": "El bus no está en la carretera. Puedes consultar la lista; el registro de subida se habilita cuando llegue.",
+    "noStudents": "No hay estudiantes asignados a este bus en esta sede.",
+    "noAssignment": "No tienes una sede activa o un bus asignado. Contacta al colegio.",
+    "markBoarded": "Subió",
+    "boardingStatus": "Estado de embarque",
+    "boardingProgress": "Han subido {boarded} de {total} estudiantes esperados",
+    "notTraveling": "No viaja",
+    "undo": "Marcar pendiente",
+    "reason": "Motivo",
+    "save": "Guardar",
+    "collectedBy": "Recogido por",
+    "searchStudents": "Buscar estudiantes por nombre",
+    "searchStudentsHint": "Escribe al menos 2 caracteres para buscar.",
+    "noResults": "Sin coincidencias. Prueba otro nombre.",
+    "correctionReason": "Motivo de la corrección",
+    "optionalNote": "Observación (opcional)",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "recordedToday": "Registradas hoy",
+    "status": {
+      "pending": "Pendiente",
+      "boarded": "Subió al bus",
+      "not_traveling": "No viaja · no esperar",
+      "picked_up_early": "Recogida anticipada · no esperar",
+      "departed": "Ya salió"
+    }
+  },
   "common": {
     "language": "Idioma",
     "english": "English",
@@ -12,6 +67,8 @@
     "birthdayMessage": "Feliz cumpleaños"
   },
   "navigation": {
+    "busDrivers": "Choferes de bus",
+    "bus": "Mi bus",
     "university": "Dismissal App",
     "dashboard": "Inicio",
     "navigation": "Navegación",
@@ -115,6 +172,10 @@
           {
             "title": "Personal",
             "url": "/management/staff"
+          },
+          {
+            "title": "Choferes de bus",
+            "url": "/management/bus-drivers"
           },
           {
             "title": "Estudiantes",
@@ -333,7 +394,7 @@
     "title": "Estudiantes",
     "subtitle": "Administra y visualiza todos los estudiantes del sistema",
     "search": {
-      "placeholder": "Buscar estudiantes por nombre o número de carro..."
+      "placeholder": "Buscar por nombre, número de vehículo o placa..."
     },
     "filters": {
       "campus": {
@@ -399,7 +460,7 @@
           "placeholder": "Selecciona campus"
         },
         "carNumber": {
-          "label": "Número de Auto"
+          "label": "Número o placa"
         },
         "avatarUrl": {
           "label": "URL del Avatar"

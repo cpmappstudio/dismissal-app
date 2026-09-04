@@ -10,8 +10,10 @@ export interface StudentData {
 }
 
 export interface CarData {
+    vehicleType?: 'car' | 'bus'
+    timezone?: string
     id: string
-    carNumber: number
+    carNumber: number | string
     lane: 'left' | 'right'
     position: number
     assignedTime: Date

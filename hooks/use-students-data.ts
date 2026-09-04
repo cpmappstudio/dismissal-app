@@ -11,7 +11,7 @@ interface StudentFilters {
     grade?: Grade
     limit?: number
     offset?: number
-    carNumber?: number
+    carNumber?: number | string
     hasCarAssigned?: boolean
 }
 
@@ -34,7 +34,7 @@ export function useStudentsData(filters: StudentFilters) {
 /**
  * Hook para obtener estudiantes por número de carro
  */
-export function useStudentsByCarNumber(carNumber: number, campusId: Id<"campusSettings">) {
+export function useStudentsByCarNumber(carNumber: number | string, campusId: Id<"campusSettings">) {
     return useQuery(api.students.getByCarNumber, {
         carNumber,
         campusId

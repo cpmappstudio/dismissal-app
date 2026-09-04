@@ -9,8 +9,12 @@ import {
     repositionLaneCars,
     userHasAccessToCampusAsync,
     validateUserAccess,
+    getStudentsByCarNumber,
 } from "./helpers";
 import { canAllocate, canDispatch } from "../lib/role-utils";
+import { normalizeVehicleIdentifier, vehicleColorIndex } from "../lib/vehicle";
+import { isBus, recordDeparture, rosterStudents } from "./studentDismissals";
+import { operationalDate } from "../lib/operational-day";
 
 /**
  * Helper to get campus ID by name
@@ -37,35 +41,7 @@ async function getAccessibleCampusNames(db: any, user: any, role: string): Promi
     );
 }
 
-/**
- * Helper functions
- */
-async function getStudentsByCarNumber(db: any, carNumber: number, campusId: Id<"campusSettings">) {
-    if (carNumber === 0) return [];
-
-    // Get all students with this car number using by_car_number index
-    const allStudentsWithCar = await db
-        .query("students")
-        .withIndex("by_car_number", (q: any) => q.eq("carNumber", carNumber))
-        .filter((q: any) => q.eq(q.field("isActive"), true))
-        .collect();
-
-    // First, try to find in the current campus
-    const studentsInCampus = allStudentsWithCar.filter((s: any) =>
-        s.campuses?.includes(campusId)
-    );
-
-    // If found in current campus, return immediately
-    if (studentsInCampus.length > 0) {
-        return studentsInCampus;
-    }
-
-    // If not found in current campus, return all students with this car number
-    // This allows calling cars from any campus to any campus
-    return allStudentsWithCar;
-}
-
-async function isCarInQueue(db: any, carNumber: number, campus: string): Promise<boolean> {
+async function isCarInQueue(db: any, carNumber: number | string, campus: string): Promise<boolean> {
     // Check if car is in queue across ALL campuses (not just current campus)
     // This prevents the same car from being in multiple campus queues simultaneously
     const existing = await db
@@ -95,12 +71,12 @@ async function getNextPosition(db: any, campus: string, lane: string): Promise<n
     return maxPosition + 1;
 }
 
-function generateCarColor(carNumber: number): string {
+function generateCarColor(carNumber: number | string): string {
     const colors = [
         '#3b82f6', '#10b981', '#ef4444', '#8b5cf6',
         '#f97316', '#06b6d4', '#84cc16', '#f59e0b'
     ];
-    return colors[carNumber % colors.length];
+    return colors[vehicleColorIndex(carNumber) % colors.length];
 }
 
 function studentToSummary(student: any) {
@@ -130,11 +106,13 @@ async function clearCarFromQueue(
 
     // Create history entry
     await db.insert("dismissalHistory", {
+        vehicleType: entry.vehicleType ?? "car",
+        completionReason: "cleared",
         carNumber: entry.carNumber,
         campusLocation: entry.campusLocation,
         lane: entry.lane,
-        studentIds: entry.students.map((s: any) => s.studentId),
-        studentNames: entry.students.map((s: any) => s.name),
+        studentIds: entry.vehicleType === "bus" ? [] : entry.students.map((s: any) => s.studentId),
+        studentNames: entry.vehicleType === "bus" ? [] : entry.students.map((s: any) => s.name),
         queuedAt: entry.assignedTime,
         completedAt: now,
         waitTimeSeconds,
@@ -179,11 +157,24 @@ export const getCurrentQueue = query({
                 )
                 .collect();
 
-            const leftLane = entries
+            const campusId = await getCampusIdByName(ctx.db, args.campus);
+            const date = operationalDate();
+            const displayedEntries = await Promise.all(entries.map(async entry => {
+                const bus = await isBus(ctx.db, entry.carNumber);
+                return {
+                    ...entry,
+                    vehicleType: bus ? "bus" as const : "car" as const,
+                    students: bus && campusId
+                        ? (await rosterStudents(ctx.db, entry.carNumber, campusId, date)).map(studentToSummary)
+                        : entry.students,
+                };
+            }));
+
+            const leftLane = displayedEntries
                 .filter(e => e.lane === "left")
                 .sort((a, b) => a.position - b.position);
 
-            const rightLane = entries
+            const rightLane = displayedEntries
                 .filter(e => e.lane === "right")
                 .sort((a, b) => a.position - b.position);
 
@@ -226,7 +217,7 @@ export const getCurrentQueue = query({
  */
 export const addCar = mutation({
     args: {
-        carNumber: v.number(),
+        carNumber: v.union(v.number(), v.string()),
         campus: v.string(),
         lane: laneValidator
     },
@@ -242,7 +233,9 @@ export const addCar = mutation({
                 message: "Campus is required"
             };
         }
-        if (args.carNumber <= 0) {
+        try {
+            args.carNumber = normalizeVehicleIdentifier(args.carNumber);
+        } catch {
             return {
                 success: false,
                 error: "INVALID_CAR_NUMBER",
@@ -269,8 +262,11 @@ export const addCar = mutation({
             };
         }
 
-        // Get students for this car (searches across all campuses)
-        const students = await getStudentsByCarNumber(ctx.db, args.carNumber, campusId);
+        // Buses use the same campus roster for arrival, display and dispatch.
+        const bus = await isBus(ctx.db, args.carNumber);
+        const students = bus
+            ? await rosterStudents(ctx.db, args.carNumber, campusId, operationalDate())
+            : await getStudentsByCarNumber(ctx.db, args.carNumber, campusId);
         if (students.length === 0) {
             return {
                 success: false,
@@ -284,6 +280,7 @@ export const addCar = mutation({
 
         // Add to queue
         const queueId = await ctx.db.insert("dismissalQueue", {
+            vehicleType: bus ? "bus" : "car",
             carNumber: args.carNumber,
             campusLocation: args.campus,
             lane: args.lane,
@@ -325,14 +322,17 @@ export const removeCar = mutation({
 
         // Calculate wait time
         const waitTimeSeconds = Math.floor((Date.now() - entry.assignedTime) / 1000);
+        const departure = await recordDeparture(ctx, entry, user);
 
         // Create history entry
         await ctx.db.insert("dismissalHistory", {
+            vehicleType: departure.vehicleType,
+            completionReason: "dispatched",
             carNumber: entry.carNumber,
             campusLocation: entry.campusLocation,
             lane: entry.lane,
-            studentIds: entry.students.map((s: any) => s.studentId),
-            studentNames: entry.students.map((s: any) => s.name),
+            studentIds: departure.students.map(s => s.studentId),
+            studentNames: departure.students.map(s => s.name),
             queuedAt: entry.assignedTime,
             completedAt: Date.now(),
             waitTimeSeconds,
@@ -360,7 +360,7 @@ export const removeCar = mutation({
  */
 export const checkCarInQueue = query({
     args: {
-        carNumber: v.number(),
+        carNumber: v.union(v.number(), v.string()),
         campus: v.string()
     },
     handler: async (ctx, args) => {
@@ -645,27 +645,24 @@ export const getCarCountsByCampus = query({
 });
 
 /**
- * Scheduled function to clear all queues at midnight (internal only)
+ * Scheduled function to clear previous operational days' queues (internal only)
  * This is called by the cron job to reset queues daily
  */
 export const scheduledClearAllQueues = internalMutation({
     args: {},
     handler: async (ctx) => {
         const now = Date.now();
-        const currentDate = new Date(now);
-        // Midnight cron closes the previous operational day.
-        const processingDate = new Date(
-            currentDate.getTime() - 24 * 60 * 60 * 1000
-        )
-            .toISOString()
-            .split('T')[0];
+        const today = operationalDate(now);
+        const processingDate = operationalDate(now - 24 * 60 * 60 * 1000);
         const processingMonth = processingDate.substring(0, 7);
 
         // Get all distinct campuses that have cars in queue
-        const allEntries = await ctx.db
+        const waitingEntries = await ctx.db
             .query("dismissalQueue")
             .filter(q => q.eq(q.field("status"), "waiting"))
             .collect();
+        // A delayed/retried cron must not clear arrivals from the new day.
+        const allEntries = waitingEntries.filter(entry => operationalDate(entry.assignedTime) < today);
 
         // Get unique campus locations
         const campuses = [...new Set(allEntries.map(entry => entry.campusLocation))];

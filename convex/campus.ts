@@ -41,8 +41,12 @@ function assertCampusAccess(
 /**
  * Generate upload URL for campus logo
  */
-export const generateUploadUrl = mutation(async (ctx) => {
-    return await ctx.storage.generateUploadUrl();
+export const generateUploadUrl = mutation({
+    args: {},
+    handler: async ctx => {
+        await validateUserAccess(ctx, ["superadmin", "principal", "admin"]);
+        return await ctx.storage.generateUploadUrl();
+    },
 });
 
 /**
@@ -51,6 +55,7 @@ export const generateUploadUrl = mutation(async (ctx) => {
 export const getLogoUrl = query({
     args: { storageId: v.id("_storage") },
     handler: async (ctx, args) => {
+        await validateUserAccess(ctx);
         return await ctx.storage.getUrl(args.storageId);
     },
 });
@@ -462,7 +467,7 @@ export const getStats = query({
                 .collect();
 
             // Students with assigned cars
-            const studentsWithCars = activeStudents.filter(s => s.carNumber > 0);
+            const studentsWithCars = activeStudents.filter(s => s.carNumber !== 0);
 
             // Unique car numbers
             const uniqueCarNumbers = new Set(studentsWithCars.map(s => s.carNumber));
@@ -506,6 +511,7 @@ export const getOptions = query({
                 id: campus._id, // Campus ID for database operations
                 value: campus.campusName, // For backward compatibility
                 label: campus.campusName,
+                timezone: campus.timezone,
                 isActive: campus.isActive
             }));
         } catch {

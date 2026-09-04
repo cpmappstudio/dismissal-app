@@ -13,7 +13,7 @@ export interface DashboardMetric {
 }
 
 export interface TopArrival {
-  carNumber: number;
+  carNumber: number | string;
   queuedAt: number;
   studentNames: string[];
   position: number;

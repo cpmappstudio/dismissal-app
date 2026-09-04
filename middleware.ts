@@ -37,6 +37,7 @@ const DEFAULT_REDIRECTS: Record<DismissalRole, string> = {
   allocator: '/operators',
   dispatcher: '/operators',
   viewer: '/operators/viewer',
+  bus_driver: '/bus',
 }
 
 // Definición de permisos por rol - más restrictivo
@@ -78,6 +79,9 @@ const ROLE_PERMISSIONS: Record<DismissalRole, {
   },
   viewer: {
     allowed: ['/operators/viewer']
+  },
+  bus_driver: {
+    allowed: ['/bus']
   }
 }
 

@@ -22,6 +22,7 @@ import {
     canDispatch
 } from "../lib/role-utils";
 import { CAR_COLORS } from "./types";
+import { vehicleColorIndex } from "../lib/vehicle";
 
 // Type aliases for cleaner function signatures
 type DbReader = QueryCtx["db"] | DatabaseReader;
@@ -81,6 +82,11 @@ export async function validateUserAccess(
 
     // Clerk webhooks sync this role; custom JWT claims are not required.
     const role = user.role ?? "viewer";
+
+    // New restricted roles must explicitly opt into an endpoint's policy.
+    if (role === "bus_driver" && !requiredRoles?.includes("bus_driver")) {
+        throw new Error("This action is not available to bus drivers");
+    }
 
     if (requiredRoles && !requiredRoles.includes(role)) {
         throw new Error(`Requires role: ${requiredRoles.join(' or ')}`);
@@ -179,8 +185,9 @@ export function userCanDispatch(
  */
 export async function getStudentsByCarNumber(
     db: DbReader,
-    carNumber: number,
-    campusId: Id<"campusSettings">
+    carNumber: number | string,
+    campusId: Id<"campusSettings">,
+    fallbackToOtherCampuses = true,
 ): Promise<Doc<"students">[]> {
     if (carNumber === 0) return [];
 
@@ -197,7 +204,7 @@ export async function getStudentsByCarNumber(
     );
 
     // If found in current campus, return immediately
-    if (studentsInCampus.length > 0) {
+    if (studentsInCampus.length > 0 || !fallbackToOtherCampuses) {
         return studentsInCampus;
     }
 
@@ -236,7 +243,7 @@ export async function getStudentWithCarInfo(
     if (!student) return null;
 
     const studentCampusId = student.campuses[0];
-    const siblings = student.carNumber > 0 && studentCampusId
+    const siblings = student.carNumber !== 0 && studentCampusId
         ? await getStudentsByCarNumber(db, student.carNumber, studentCampusId)
             .then(students => students.filter(s => s._id !== studentId))
         : [];
@@ -244,7 +251,7 @@ export async function getStudentWithCarInfo(
     return {
         student,
         carNumber: student.carNumber,
-        hasCarAssigned: student.carNumber > 0,
+        hasCarAssigned: student.carNumber !== 0,
         siblings
     };
 }
@@ -336,7 +343,7 @@ export async function getNextPosition(
  */
 export async function isCarInQueue(
     db: DbReader,
-    carNumber: number,
+    carNumber: number | string,
     campus: string
 ): Promise<boolean> {
     // Check across ALL campuses, not just the current one
@@ -399,9 +406,9 @@ export function queueEntryToCarData(entry: QueueEntry): CarData {
 /**
  * Generate car color based on car number
  */
-export function generateCarColor(carNumber: number): string {
+export function generateCarColor(carNumber: number | string): string {
     const colors: readonly string[] = CAR_COLORS;
-    return colors[carNumber % colors.length];
+    return colors[vehicleColorIndex(carNumber) % colors.length];
 }
 
 // ============================================================================
@@ -491,7 +498,7 @@ export async function getDailyDismissalSummary(
  */
 export async function getCarPickupHistory(
     db: DbReader,
-    carNumber: number,
+    carNumber: number | string,
     campus: string,
     daysBack: number = 30
 ): Promise<CarPickupHistory> {

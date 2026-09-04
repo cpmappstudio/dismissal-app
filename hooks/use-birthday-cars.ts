@@ -3,7 +3,7 @@ import type { CarData } from '@/components/dismissal/types'
 
 interface BirthdayCarResult {
     carId: string
-    carNumber: number
+    carNumber: number | string
     studentsWithBirthday: {
         id: string
         name: string

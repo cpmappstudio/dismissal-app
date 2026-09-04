@@ -11,6 +11,7 @@ const roles: [DismissalRole | null, boolean, boolean][] = [
     ['principal', true, true],
     ['superadmin', true, true],
     ['viewer', false, false],
+    ['bus_driver', false, false],
     [null, false, false],
 ];
 

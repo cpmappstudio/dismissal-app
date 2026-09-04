@@ -14,8 +14,9 @@ import { Car } from "./car";
 import { BirthdayDecoration } from "./birthday-decoration";
 import { useTranslations } from "next-intl";
 import { CarData } from "./types";
-import { LANE_COLORS } from "./constants";
+import { BUS_COLORS, LANE_COLORS } from "./constants";
 import { formatTime } from "./utils";
+import { BusRoster } from "./bus-roster";
 
 // Internal component to handle student display logic
 interface StudentInfoProps {
@@ -96,6 +97,7 @@ export const CarCard = React.memo<CarCardProps>(
     hasBirthdayToday = false,
   }) => {
     const t = useTranslations("dismissal");
+    const [open, setOpen] = React.useState(false);
 
     // Helper function to check if a student has birthday today
     const checkStudentBirthday = React.useCallback(
@@ -127,14 +129,13 @@ export const CarCard = React.memo<CarCardProps>(
     //     return `${car.students[0].name} +${car.students.length - 1} más`
     // }, [car.students])
 
-    // Get lane colors from constants
-    const laneColors = LANE_COLORS[lane];
+    const vehicleColors = car.vehicleType === "bus" ? BUS_COLORS : LANE_COLORS[lane];
 
     return (
       <div
         className={`relative z-30 ${isViewerMode ? "flex flex-col items-center justify-center max-md:mx-2 md:mx-4 lg:mx-6 xl:mx-8 max-md:mt-0 md:mt-2 lg:mt-0" : "flex justify-center"}`}
       >
-        <Drawer>
+        <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
             {isViewerMode ? (
               /* Viewer Mode Layout - Redesigned for large screens */
@@ -147,7 +148,7 @@ export const CarCard = React.memo<CarCardProps>(
                 )}
 
                 <div
-                  className={`info ${laneColors.badge} flex flex-col rounded-2xl py-2 px-3 w-full mb-1}`}
+                  className={`info ${vehicleColors.badge} flex flex-col rounded-2xl py-2 px-3 w-full mb-1}`}
                 >
                   {/* Top row: Avatars (left) and Car Number Badge (right) */}
                   <div className="flex justify-between items-start w-full mb-1">
@@ -167,7 +168,7 @@ export const CarCard = React.memo<CarCardProps>(
                                 .join(" ") || car.students[0].name
                             }
                             size="sm"
-                            className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                            className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${vehicleColors.background} border-2 border-white shadow-lg`}
                           />
                           {checkStudentBirthday(car.students[0]) && (
                             <div className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full p-1">
@@ -195,7 +196,7 @@ export const CarCard = React.memo<CarCardProps>(
                                       .join(" ") || student.name
                                   }
                                   size="sm"
-                                  className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${laneColors.background} border-2 border-white shadow-lg`}
+                                  className={`w-7 h-7 md:w-9 md:h-9 xl:w-11 xl:h-11 ${vehicleColors.background} border-2 border-white shadow-lg`}
                                 />
                                 {checkStudentBirthday(student) && (
                                   <div
@@ -221,7 +222,7 @@ export const CarCard = React.memo<CarCardProps>(
                     </div>
 
                     {/* Right side - Car Number Badge */}
-                    <div className="text-white font-bold items-center rounded-full z-50 flex px-2 py-1 md:px-2.5 md:py-1">
+                    <div className="font-bold items-center rounded-full z-50 flex px-2 py-1 md:px-2.5 md:py-1">
                       {showRemoveButton && (
                         <button
                           onClick={(e) => {
@@ -242,13 +243,14 @@ export const CarCard = React.memo<CarCardProps>(
 
                   {/* Bottom row: Student Names - Centered */}
                   <div className="w-full px-1 flex justify-start">
-                    <StudentInfo students={car.students} t={t} />
+                    {car.vehicleType === "bus" ? <span className="font-bold">{t("car.students")} ({car.students.length})</span> : <StudentInfo students={car.students} t={t} />}
                   </div>
                 </div>
 
                 {/* SVG Car - CENTER - Optimized size - Closer to text */}
                 <Car
                   size="viewer"
+                  vehicleType={car.vehicleType}
                   color={hasBirthdayToday ? "#D4AF37" : "#A6A6A6"}
                   className="!filter max-md:!-mt-2 md:!-mt-8"
                   isViewer={isViewerMode}
@@ -267,6 +269,7 @@ export const CarCard = React.memo<CarCardProps>(
                 {/* SVG Car with dynamic color */}
                 <Car
                   size="lg"
+                  vehicleType={car.vehicleType}
                   // color={car.imageColor}
                   color={hasBirthdayToday ? "#F59E0B" : "#A6A6A6"}
                   className="filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-200"
@@ -275,7 +278,7 @@ export const CarCard = React.memo<CarCardProps>(
 
                 {/* Combined Car Number Badge and Remove Button */}
                 <div
-                  className={`absolute -top-2 -right-2 ${laneColors.badge} text-white text-sm font-bold rounded-full shadow-lg z-50 flex items-center`}
+                  className={`absolute -top-2 -right-2 ${vehicleColors.badge} text-sm font-bold rounded-full shadow-lg z-50 flex items-center`}
                 >
                   {showRemoveButton && (
                     <button
@@ -300,14 +303,14 @@ export const CarCard = React.memo<CarCardProps>(
             )}
           </DrawerTrigger>
 
-          <DrawerContent>
+          <DrawerContent className="max-h-[90dvh] overflow-y-auto">
             <div className="mx-auto w-full max-w-md">
               <DrawerHeader>
                 <DrawerTitle
-                  className={`text-2xl font-black ${laneColors.textColor} flex items-center gap-2`}
+                  className={`text-2xl font-black ${vehicleColors.textColor} flex items-center gap-2`}
                 >
                   <div
-                    className={`${laneColors.badge} text-white px-3 py-1 rounded-lg text-xl`}
+                    className={`${vehicleColors.badge} px-3 py-1 rounded-lg text-xl`}
                   >
                     #{car.carNumber}
                   </div>
@@ -327,7 +330,9 @@ export const CarCard = React.memo<CarCardProps>(
                             </div> */}
 
                 {/* Students Section */}
-                <div className="space-y-3">
+                {car.vehicleType === "bus" && !isViewerMode ? (
+                  open && car.timezone && <BusRoster campus={car.campus} carNumber={car.carNumber} timezone={car.timezone} />
+                ) : <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-gray-600" />
                     <h3 className="text-lg font-semibold">
@@ -361,7 +366,7 @@ export const CarCard = React.memo<CarCardProps>(
                                 student.name
                               }
                               size="md"
-                              className={`w-12 h-12 ${laneColors.background}`}
+                              className={`w-12 h-12 ${vehicleColors.background}`}
                             />
                             {studentHasBirthday && (
                               <div className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full p-1">
@@ -390,7 +395,7 @@ export const CarCard = React.memo<CarCardProps>(
                       );
                     })}
                   </div>
-                </div>
+                </div>}
               </div>
             </div>
           </DrawerContent>

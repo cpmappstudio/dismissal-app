@@ -55,11 +55,11 @@ function context(user: Partial<Doc<'users'>> | null, authenticated = true, campu
 
 test('Every public queue mutation enforces its role before touching queue data', async () => {
     for (const action of actions) {
-        for (const role of ['viewer', 'allocator', 'dispatcher', 'operator', 'principal', 'admin', 'superadmin', undefined] as const) {
+        for (const role of ['bus_driver', 'viewer', 'allocator', 'dispatcher', 'operator', 'principal', 'admin', 'superadmin', undefined] as const) {
             const allowed = action.roles.includes(role ?? 'viewer');
             await assert.rejects(
                 async () => action.run(context({ role, isActive: true })),
-                (error: unknown) => allowed ? error === reachedQueue : error instanceof Error && /Not authorized/.test(error.message),
+                (error: unknown) => allowed ? error === reachedQueue : error instanceof Error && /Not authorized|not available/.test(error.message),
                 `${action.name}: ${role ?? 'missing role'}`,
             );
         }

@@ -1,10 +1,23 @@
 // convex/students.ts
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { gradeValidator } from "./types";
 import { Id } from "./_generated/dataModel";
-import { repositionLaneCars, userHasAccessToCampusById, validateUserAccess } from "./helpers";
+import { normalizeVehicleIdentifier } from "../lib/vehicle";
+import { assertNotBoarded } from "./studentDismissals";
+import { getStudentsByCarNumber, repositionLaneCars, userHasAccessToCampusById, validateUserAccess } from "./helpers";
+
+const STUDENT_MANAGEMENT_ROLES = ["principal", "admin", "superadmin"] as const;
+
+async function getManagedStudent(ctx: MutationCtx, studentId: Id<"students">) {
+    const { user, role } = await validateUserAccess(ctx, [...STUDENT_MANAGEMENT_ROLES]);
+    const student = await ctx.db.get(studentId);
+    if (!student) throw new Error("Student not found");
+    if (!student.campuses.some(campusId => userHasAccessToCampusById(user, campusId, role)))
+        throw new Error("No access to this student");
+    return student;
+}
 
 // ============================================================================
 // AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
@@ -14,9 +27,9 @@ import { repositionLaneCars, userHasAccessToCampusById, validateUserAccess } fro
  * Generate upload URL for avatar image (Step 1 of 3)
  */
 export const generateAvatarUploadUrl = mutation({
+    args: {},
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
+        await validateUserAccess(ctx, [...STUDENT_MANAGEMENT_ROLES]);
 
         return await ctx.storage.generateUploadUrl();
     },
@@ -31,13 +44,7 @@ export const saveAvatarStorageId = mutation({
         storageId: v.id("_storage"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const student = await ctx.db.get(args.studentId);
-        if (!student) {
-            throw new Error("Student not found");
-        }
+        const student = await getManagedStudent(ctx, args.studentId);
 
         // Delete old avatar if exists
         if (student.avatarStorageId) {
@@ -55,35 +62,12 @@ export const saveAvatarStorageId = mutation({
 });
 
 /**
- * Delete avatar storage file (for cleaning up unused uploads)
- */
-export const deleteAvatarStorage = mutation({
-    args: { storageId: v.id("_storage") },
-    handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        try {
-            await ctx.storage.delete(args.storageId);
-        } catch {
-            // Don't throw - storage might already be deleted
-        }
-    },
-});
-
-/**
  * Delete avatar from storage and student record
  */
 export const deleteAvatar = mutation({
     args: { studentId: v.id("students") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const student = await ctx.db.get(args.studentId);
-        if (!student) {
-            throw new Error("Student not found");
-        }
+        const student = await getManagedStudent(ctx, args.studentId);
 
         // Delete from storage if exists
         if (student.avatarStorageId) {
@@ -111,6 +95,7 @@ export const getAvatarUrl = query({
         storageId: v.id("_storage")
     },
     handler: async (ctx, args) => {
+        await validateUserAccess(ctx);
         try {
             return await ctx.storage.getUrl(args.storageId);
         } catch {
@@ -120,67 +105,6 @@ export const getAvatarUrl = query({
 });
 
 /**
- * Get multiple avatar URLs efficiently for batch operations
- * Use sparingly to avoid performance issues - prefer individual queries
- */
-export const getBatchAvatarUrls = query({
-    args: {
-        storageIds: v.array(v.id("_storage"))
-    },
-    handler: async (ctx, args) => {
-        try {
-            const urls: Record<string, string | null> = {};
-
-            // Process each storage ID individually to avoid Promise.all performance issues
-            for (const storageId of args.storageIds) {
-                try {
-                    const url = await ctx.storage.getUrl(storageId);
-                    urls[storageId] = url;
-                } catch {
-                    urls[storageId] = null;
-                }
-            }
-
-            return urls;
-        } catch {
-            return {};
-        }
-    }
-});
-
-// ============================================================================
-// EXISTING STUDENT FUNCTIONS
-// ============================================================================
-
-/**
- * Helper function to get students by car number
- * Searches across ALL campuses since car numbers are unique globally
- */
-async function getStudentsByCarNumber(db: any, carNumber: number, campusId?: Id<"campusSettings">) {
-    if (carNumber === 0) return [];
-
-    // Get all students with this car number
-    const allStudents = await db
-        .query("students")
-        .withIndex("by_car_number", (q: any) =>
-            q.eq("carNumber", carNumber)
-        )
-        .collect();
-
-    // If campusId provided, filter to that campus first
-    if (campusId) {
-        const studentsInCampus = allStudents.filter((s: any) => 
-            s.campuses?.includes(campusId)
-        );
-        if (studentsInCampus.length > 0) {
-            return studentsInCampus;
-        }
-    }
-
-    return allStudents;
-}
-
-/**
  * List students with filtering options
  */
 export const list = query({
@@ -188,7 +112,7 @@ export const list = query({
         campus: v.optional(v.string()),
         grade: v.optional(v.string()),
         search: v.optional(v.string()),
-        carNumber: v.optional(v.number()),
+        carNumber: v.optional(v.union(v.number(), v.string())),
         hasCarAssigned: v.optional(v.boolean()),
         limit: v.optional(v.number()),
         offset: v.optional(v.number())
@@ -255,7 +179,7 @@ export const list = query({
 
             if (args.hasCarAssigned !== undefined) {
                 students = students.filter((s: any) =>
-                    args.hasCarAssigned ? s.carNumber > 0 : s.carNumber === 0
+                    args.hasCarAssigned ? s.carNumber !== 0 : s.carNumber === 0
                 );
             }
 
@@ -314,7 +238,7 @@ export const get = query({
         }
 
         // Get siblings (other students with same car number)
-        const siblings = student.carNumber > 0 ?
+        const siblings = student.carNumber !== 0 ?
             await getStudentsByCarNumber(ctx.db, student.carNumber, student.campuses?.[0])
                 .then((students: any[]) => students.filter((s: any) => s._id !== student._id)) :
             [];
@@ -336,7 +260,7 @@ export const create = mutation({
         birthday: v.string(),
         grade: gradeValidator,
         campuses: v.array(v.id("campusSettings")),
-        carNumber: v.optional(v.number()),
+        carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
     },
@@ -364,10 +288,7 @@ export const create = mutation({
         }
 
         // Validate car number
-        const carNumber = args.carNumber || 0;
-        if (carNumber < 0) {
-            throw new Error("Car number cannot be negative");
-        }
+        const carNumber = normalizeVehicleIdentifier(args.carNumber ?? 0, true);
 
         // Create full name
         const fullName = `${args.firstName.trim()} ${args.lastName.trim()}`;
@@ -402,7 +323,7 @@ export const update = mutation({
         birthday: v.optional(v.string()),
         grade: v.optional(gradeValidator),
         campuses: v.optional(v.array(v.id("campusSettings"))),
-        carNumber: v.optional(v.number()),
+        carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
     },
@@ -430,6 +351,10 @@ export const update = mutation({
             }
         }
 
+        const changesVehicle = args.carNumber !== undefined && normalizeVehicleIdentifier(args.carNumber, true) !== student.carNumber;
+        const changesCampuses = args.campuses !== undefined && (args.campuses.length !== student.campuses.length || args.campuses.some(id => !student.campuses.includes(id)));
+        if (changesVehicle || changesCampuses) await assertNotBoarded(ctx.db, student);
+
         // If updating avatar storage, delete the old one first
         if (args.avatarStorageId !== undefined && student.avatarStorageId &&
             student.avatarStorageId !== args.avatarStorageId) {
@@ -450,8 +375,7 @@ export const update = mutation({
         if (args.grade !== undefined) updates.grade = args.grade;
         if (args.campuses !== undefined) updates.campuses = args.campuses;
         if (args.carNumber !== undefined) {
-            if (args.carNumber < 0) throw new Error("Car number cannot be negative");
-            updates.carNumber = args.carNumber;
+            updates.carNumber = normalizeVehicleIdentifier(args.carNumber, true);
         }
         if (args.avatarUrl !== undefined) updates.avatarUrl = args.avatarUrl;
         if (args.avatarStorageId !== undefined) updates.avatarStorageId = args.avatarStorageId;
@@ -491,6 +415,7 @@ export const deleteStudent = mutation({
         }
 
         let carRemovedFromQueue = false;
+        await assertNotBoarded(ctx.db, student);
 
         // Delete avatar from storage if exists
         if (student.avatarStorageId) {
@@ -503,7 +428,7 @@ export const deleteStudent = mutation({
 
         // Check if this student's car is currently in any queue
         const studentCampusId = student.campuses[0];
-        if (student.carNumber > 0 && studentCampusId) {
+        if (student.carNumber !== 0 && studentCampusId) {
             // Get campus name for dismissalQueue lookup (queue uses campusName as string)
             const campusSettings = await ctx.db.get(studentCampusId);
             const campusName = campusSettings?.campusName;
@@ -538,11 +463,13 @@ export const deleteStudent = mutation({
                     let removedByUser = queueEntry.addedBy;
 
                     await ctx.db.insert("dismissalHistory", {
+                        vehicleType: queueEntry.vehicleType ?? "car",
+                        completionReason: "cleared",
                         carNumber: queueEntry.carNumber,
                         campusLocation: queueEntry.campusLocation,
                         lane: queueEntry.lane,
-                        studentIds: queueEntry.students.map((s: any) => s.studentId),
-                        studentNames: queueEntry.students.map((s: any) => s.name),
+                        studentIds: queueEntry.vehicleType === "bus" ? [] : queueEntry.students.map((s: any) => s.studentId),
+                        studentNames: queueEntry.vehicleType === "bus" ? [] : queueEntry.students.map((s: any) => s.name),
                         queuedAt: queueEntry.assignedTime,
                         completedAt: Date.now(),
                         waitTimeSeconds,
@@ -608,6 +535,7 @@ export const deleteMultipleStudents = mutation({
             }
 
             // Delete avatar from storage if exists
+            await assertNotBoarded(ctx.db, student);
             if (student.avatarStorageId) {
                 try {
                     await ctx.storage.delete(student.avatarStorageId);
@@ -621,7 +549,7 @@ export const deleteMultipleStudents = mutation({
             const carKey = `${student.carNumber}-${studentCampusId}`;
 
             // Check if this student's car is currently in any queue (only once per car)
-            if (student.carNumber > 0 && studentCampusId && !processedCars.has(carKey)) {
+            if (student.carNumber !== 0 && studentCampusId && !processedCars.has(carKey)) {
                 processedCars.add(carKey);
 
                 // Get campus name for dismissalQueue lookup (queue uses campusName as string)
@@ -657,11 +585,13 @@ export const deleteMultipleStudents = mutation({
                         const waitTimeSeconds = Math.floor((Date.now() - queueEntry.assignedTime) / 1000);
 
                         await ctx.db.insert("dismissalHistory", {
+                            vehicleType: queueEntry.vehicleType ?? "car",
+                            completionReason: "cleared",
                             carNumber: queueEntry.carNumber,
                             campusLocation: queueEntry.campusLocation,
                             lane: queueEntry.lane,
-                            studentIds: queueEntry.students.map((s: any) => s.studentId),
-                            studentNames: queueEntry.students.map((s: any) => s.name),
+                            studentIds: queueEntry.vehicleType === "bus" ? [] : queueEntry.students.map((s: any) => s.studentId),
+                            studentNames: queueEntry.vehicleType === "bus" ? [] : queueEntry.students.map((s: any) => s.name),
                             queuedAt: queueEntry.assignedTime,
                             completedAt: Date.now(),
                             waitTimeSeconds,
@@ -714,7 +644,7 @@ export const deleteMultipleStudents = mutation({
 export const assignCarNumber = mutation({
     args: {
         studentId: v.id("students"),
-        carNumber: v.number()
+        carNumber: v.union(v.number(), v.string())
     },
     handler: async (ctx, args) => {
         const { user, role } = await validateUserAccess(ctx, ["principal", "admin", "superadmin"]);
@@ -731,13 +661,12 @@ export const assignCarNumber = mutation({
             throw new Error("No access to this student");
         }
 
-        if (args.carNumber < 0) {
-            throw new Error("Car number cannot be negative");
-        }
+        const carNumber = normalizeVehicleIdentifier(args.carNumber, true);
+        if (carNumber !== student.carNumber) await assertNotBoarded(ctx.db, student);
 
         // Update car number
         await ctx.db.patch(args.studentId, {
-            carNumber: args.carNumber
+            carNumber
         });
 
         return args.studentId;
@@ -765,6 +694,7 @@ export const removeCarNumber = mutation({
         }
 
         // Remove car assignment
+        await assertNotBoarded(ctx.db, student);
         await ctx.db.patch(args.studentId, {
             carNumber: 0
         });
@@ -779,7 +709,7 @@ export const removeCarNumber = mutation({
  */
 export const getByCarNumber = query({
     args: {
-        carNumber: v.number(),
+        carNumber: v.union(v.number(), v.string()),
         campusId: v.id("campusSettings")
     },
     handler: async (ctx, args) => {
