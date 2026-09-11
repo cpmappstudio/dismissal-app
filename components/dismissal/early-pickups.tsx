@@ -29,6 +29,7 @@ function PickupList({
   timezone: string;
 }) {
   const t = useTranslations("transport");
+  const bt = useTranslations("buses");
   const date = useOperationalDate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
@@ -103,12 +104,14 @@ function PickupList({
                   <Combobox.Item
                     key={student.id}
                     value={student.id}
-                    disabled={!!student.state?.dropoff || student.state?.status === "departed" || student.state?.status === "picked_up_early"}
+                    disabled={!!student.state?.dropoff || student.state?.status === "boarded" || student.state?.status === "departed" || student.state?.status === "picked_up_early"}
                     className="cursor-default rounded-sm px-2 py-2 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-50"
                   >
                     <span className="block font-medium">{student.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {student.grade} · {student.carNumber || "—"}
+                      {student.grade}
+                      {!!student.carNumber && <> · {bt("car")}: {student.carNumber}</>}
+                      {!!student.busNumber && <> · {bt("bus")}: {student.busNumber}</>}
                       {student.state && <> · {t(`status.${student.state.status}`)}</>}
                     </span>
                   </Combobox.Item>

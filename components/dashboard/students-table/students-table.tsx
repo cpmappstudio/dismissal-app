@@ -185,7 +185,8 @@ export function StudentsTable() {
         student.carNumber !== 0 &&
         student.carNumber.toString().toLowerCase().includes(searchTerm);
 
-      return nameMatch || carNumberMatch;
+      const busMatch = !!student.busNumber && String(student.busNumber).toLowerCase().includes(searchTerm);
+      return nameMatch || carNumberMatch || busMatch;
     },
     [],
   );
@@ -216,6 +217,7 @@ export function StudentsTable() {
         lastName: string;
         birthday: string;
         carNumber: number | string;
+        busNumber?: number | string;
         grade: string;
         campuses: Id<"campusSettings">[];
         avatarUrl?: string;
@@ -233,6 +235,7 @@ export function StudentsTable() {
           lastName: student.lastName,
           birthday: student.birthday,
           carNumber: student.carNumber,
+          busNumber: student.busNumber,
           grade: student.grade as Grade,
           campusId: campusId,
           campusLocation: campusName || "Unknown",
@@ -332,7 +335,7 @@ export function StudentsTable() {
           campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
-          vehicleType: studentData.vehicleType,
+          busNumber: studentData.busNumber ?? 0,
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: studentData.avatarStorageId,
         });
@@ -370,7 +373,7 @@ export function StudentsTable() {
           campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
-          vehicleType: studentData.vehicleType,
+          busNumber: studentData.busNumber ?? 0,
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: newAvatarId || undefined,
         });

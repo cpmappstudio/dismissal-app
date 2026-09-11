@@ -96,6 +96,7 @@ export function StudentFormDialog({
                 firstName: student.firstName,
                 lastName: student.lastName,
                 carNumber: student.carNumber?.toString() || "",
+                busNumber: student.busNumber ? String(student.busNumber) : "",
                 grade: student.grade,
                 campusId: student.campusId,
                 avatarUrl: student.avatarUrl || "",
@@ -106,6 +107,7 @@ export function StudentFormDialog({
             firstName: "",
             lastName: "",
             carNumber: "",
+            busNumber: "",
             grade: "" as Grade | "",
             campusId: "" as Id<"campusSettings"> | "",
             avatarUrl: "",
@@ -122,9 +124,6 @@ export function StudentFormDialog({
 
     const [formData, setFormData] = React.useState(initialFormData)
     const buses = useQuery(api.buses.options, open ? { forDriver: false } : "skip")
-    const [chosenType, setChosenType] = React.useState<"car" | "bus" | null>(null)
-    React.useEffect(() => { if (open) setChosenType(null) }, [open, student?.id])
-    const vehicleType = chosenType ?? (buses?.some(bus => String(bus.identifier) === initialFormData.carNumber) ? "bus" : "car")
     const availableBuses = buses?.filter(bus => formData.campusId && bus.campusIds.includes(formData.campusId))
 
     // Reset form when student changes or dialog opens
@@ -266,7 +265,7 @@ export function StudentFormDialog({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!buses || isSubmitting) return
-        if (vehicleType === "bus" && !availableBuses?.some(bus => String(bus.identifier) === formData.carNumber)) {
+        if (formData.busNumber && !availableBuses?.some(bus => String(bus.identifier) === formData.busNumber)) {
             alert(bt("select")); return
         }
 
@@ -313,7 +312,7 @@ export function StudentFormDialog({
                     day: '2-digit'
                 }),
                 carNumber: normalizeVehicleIdentifier(formData.carNumber, true),
-                vehicleType,
+                busNumber: normalizeVehicleIdentifier(formData.busNumber, true),
                 grade: formData.grade as Grade,
                 campusId: formData.campusId as Id<"campusSettings">,
                 campusLocation: campusName,
@@ -561,12 +560,6 @@ export function StudentFormDialog({
 
                         {/* Car Number Section */}
                         <div className="space-y-2">
-                            <Label>{bt('vehicleType')}</Label>
-                            <Select value={vehicleType} disabled={!buses} onValueChange={(value: "car" | "bus") => { setChosenType(value); updateFormData("carNumber", "") }}>
-                                <SelectTrigger className="w-full" aria-label={bt('vehicleType')}><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="car">{bt('car')}</SelectItem><SelectItem value="bus">{bt('bus')}</SelectItem></SelectContent>
-                            </Select>
-                            {vehicleType === "bus" ? <BusSelect buses={availableBuses} value={formData.carNumber} onChange={value => updateFormData("carNumber", value)} disabled={!formData.campusId} /> : <>
                             <Label htmlFor="carNumber" className="text-sm font-medium">{t('createDialog.fields.carNumber.label')}</Label>
                             <Input
                                 id="carNumber"
@@ -578,7 +571,13 @@ export function StudentFormDialog({
                                 placeholder="0"
                                 className="h-10"
                             />
-                            </>}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{bt('bus')}</Label>
+                            <div className="flex items-start gap-2">
+                                <div className="min-w-0 flex-1"><BusSelect buses={availableBuses} value={formData.busNumber} onChange={value => updateFormData("busNumber", value)} disabled={!formData.campusId} /></div>
+                                {formData.busNumber && <Button type="button" size="icon" variant="outline" aria-label={bt('removeAssignment')} onClick={() => updateFormData("busNumber", "")}><X className="size-4" /></Button>}
+                            </div>
                         </div>
 
                         {/* Legacy Avatar URL (for compatibility) */}

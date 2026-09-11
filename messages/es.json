@@ -1,5 +1,6 @@
 {
   "buses": {
+    "removeAssignment": "Quitar asignación de bus",
     "select": "Selecciona un bus",
     "noneAvailable": "No hay buses disponibles. Crea primero un bus para la sede.",
     "vehicleType": "Transporte",
@@ -18,6 +19,8 @@
     "identifierHint": "Este identificador vincula estudiantes, choferes y Road; no se puede cambiar desde aquí."
   },
   "transport": {
+    "alreadyPickedUp": "Ya fue recogido — no disponible para esta recogida",
+    "pickedUpCount": "Ya recogidos: {count}",
     "dateNavigation": "Fecha de asistencia",
     "today": "Hoy",
     "previousDay": "Fecha anterior con registros",

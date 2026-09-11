@@ -161,7 +161,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
             lane: "left" | "right";
             position: number;
             assignedTime: number;
-            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string; avatarStorageId?: Id<"_storage">;  birthday?: string }>;
+            students: Array<{ studentId: string; name: string; grade: string; avatarUrl?: string; avatarStorageId?: Id<"_storage">; birthday?: string; pickup?: { status: string; vehicleIdentifier?: number | string } | null }>;
             campusLocation: string;
             carColor: string;
         }): CarData => {
@@ -180,6 +180,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                     imageUrl: s.avatarUrl,
                     avatarStorageId: s.avatarStorageId,
                     birthday: s.birthday,
+                    pickup: s.pickup,
                 })),
                 campus: entry.campusLocation,
                 imageColor: entry.carColor

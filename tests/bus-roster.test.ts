@@ -25,7 +25,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const roster = {
         canEdit: true,
         students: ['pending', 'boarded', 'not_traveling', 'picked_up_early', 'departed'].map((status, index) => ({
-            id: String(index), name: `Student ${index}`, grade: '4th',
+            id: String(index), name: `Student ${index}`, grade: '4th', otherPickup: false,
             state: { status, revision: 1, updatedAt: 1788512400000,
                 boarding: undefined as undefined | { at: number; byName: string },
                 dropoff: undefined as undefined | { at: number; byName: string },
@@ -186,7 +186,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     }
     roster.students[0].state.status = 'boarded';
     assert.equal(counterText(), 'students (3/3)', 'Boarding increases the numerator without changing the total');
-    roster.students.push({ id: 'new', name: 'New student', grade: '4th', state: null! });
+    roster.students.push({ id: 'new', name: 'New student', grade: '4th', otherPickup: false, state: null! });
     assert.equal(counterText(), 'students (3/4)', 'A student without a daily state is expected');
     roster.students[3].state.status = 'pending';
     assert.equal(counterText(), 'students (3/5)', 'Correcting an early pickup restores the student to the total');
@@ -222,6 +222,10 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     recordedDates.splice(0);
     assert.equal(dateButton('previousDay').disabled, true);
     assert.equal(dateButton('nextDay').disabled, true);
+    roster.students[1].otherPickup = true;
+    assert.equal(counterText(), 'students (1/3)', 'A pickup by another vehicle does not count as on this bus');
+    assert.equal(render(false).some(node => node.type === components.BoardingControls && node.props.studentId === '1'), false);
+    assert.ok(render(false).some(node => String(node.props.children).includes('alreadyPickedUp')));
     roster.canEdit = false;
     assert.equal(render(false).some(node => node.type === components.BoardingControls), false);
     roster.students.splice(0);

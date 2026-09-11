@@ -11,6 +11,102 @@ import { deleteUserWithClerk } from "./users";
 
 const modules = import.meta.glob("./**/*.ts");
 
+test.each(["car", "bus", "early", "not_traveling"])("dual assignments share pickup state: %s goes first", async first => {
+  const { t, ids, operator, driver, date, rosterArgs } = await setup("ABC-123");
+  await t.run(ctx => ctx.db.patch(ids.operator, { role: "principal" }));
+  const studentId = ids.students[0];
+  await operator.mutation(api.students.update, { studentId, carNumber: 20, busNumber: "ABC-123" });
+  expect((await operator.query(api.students.get, { id: studentId }))!.student).toMatchObject({ carNumber: 20, busNumber: "ABC-123" });
+  const car = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: 20, lane: "left" });
+  const change = { campus: "School", date, studentId, expectedRevision: 0 };
+  if (first === "car") {
+    await operator.mutation(api.queue.removeCar, { queueId: car.queueId! });
+  } else if (first === "bus") {
+    await driver.mutation(api.studentDismissals.setStatus, { ...change, status: "boarded" });
+    const queue = await operator.query(api.queue.getCurrentQueue, { campus: "School" });
+    expect(queue.leftLane[0].students[0].pickup).toMatchObject({ status: "boarded", vehicleIdentifier: "ABC-123" });
+    await operator.mutation(api.queue.removeCar, { queueId: car.queueId! });
+    await driver.mutation(api.studentDismissals.setDropoff, { ...change, expectedRevision: 1, droppedOff: true });
+  } else {
+    await operator.mutation(api.studentDismissals.setStatus, { ...change,
+      status: first === "early" ? "picked_up_early" : "not_traveling", reason: "Parent today", collectedBy: "Parent",
+    });
+    await operator.mutation(api.queue.removeCar, { queueId: car.queueId! });
+  }
+  const history = await t.run(ctx => ctx.db.query("dismissalHistory").collect());
+  expect(history[0].studentIds).toEqual(first === "car" || first === "not_traveling" ? [studentId] : []);
+  const row = (await driver.query(api.studentDismissals.getRoster, rosterArgs)).students.find(s => s.id === studentId)!;
+  expect(row.state?.status).toBe(first === "bus" ? "boarded" : first === "early" ? "picked_up_early" : "departed");
+  if (first === "car" || first === "not_traveling") expect(row.otherPickup).toBe(true);
+  await expect(driver.mutation(api.studentDismissals.setStatus, { ...change, status: "boarded" })).rejects.toThrow("updated by someone else");
+  await expect(driver.mutation(api.studentDismissals.setStatus, { ...change, expectedRevision: row.state!.revision, status: "boarded" })).rejects.toThrow();
+  const repeat = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: 20, lane: "left" });
+  await operator.mutation(api.queue.removeCar, { queueId: repeat.queueId! });
+  expect((await t.run(ctx => ctx.db.query("dismissalHistory").collect()))[1].studentIds).toEqual([]);
+  expect((await t.run(ctx => ctx.db.query("studentDismissals").collect())).filter(s => s.studentId === studentId)).toHaveLength(1);
+});
+
+test("simultaneous car departure and bus boarding cannot both collect a dual-assigned student", async () => {
+  const { t, ids, operator, driver, date } = await setup("ABC-123");
+  await t.run(ctx => ctx.db.patch(ids.operator, { role: "principal" }));
+  await operator.mutation(api.students.update, { studentId: ids.students[0], carNumber: 20, busNumber: "ABC-123" });
+  const car = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: 20, lane: "left" });
+  await Promise.allSettled([
+    operator.mutation(api.queue.removeCar, { queueId: car.queueId! }),
+    driver.mutation(api.studentDismissals.setStatus, { campus: "School", date, studentId: ids.students[0], status: "boarded", expectedRevision: 0 }),
+  ]);
+  const states = await t.run(ctx => ctx.db.query("studentDismissals").collect());
+  expect(states).toHaveLength(1);
+  const departures = await t.run(ctx => ctx.db.query("dismissalHistory").collect());
+  const collectedByCar = departures.some(h => h.studentIds.includes(ids.students[0]));
+  expect(collectedByCar).toBe(states[0].vehicleIdentifier === 20);
+  expect(states[0].revision).toBe(1);
+});
+
+test("Road bus dispatch excludes a car pickup and the next day restores both assignments", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.UTC(2026, 8, 11, 15));
+  try {
+    const { t, ids, operator, driver, date, rosterArgs } = await setup("ABC-123");
+    await t.run(ctx => ctx.db.patch(ids.operator, { role: "principal" }));
+    await operator.mutation(api.students.update, { studentId: ids.students[0], carNumber: 20, busNumber: "ABC-123" });
+    const car = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: 20, lane: "left" });
+    const bus = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: "ABC-123", lane: "right" });
+    await operator.mutation(api.queue.removeCar, { queueId: car.queueId! });
+    for (const studentId of ids.students.slice(1)) await driver.mutation(api.studentDismissals.setStatus, { campus: "School", date, studentId, status: "boarded", expectedRevision: 0 });
+    await operator.mutation(api.queue.removeCar, { queueId: bus.queueId! });
+    const history = await t.run(ctx => ctx.db.query("dismissalHistory").collect());
+    expect(history[1].studentIds).toEqual(ids.students.slice(1));
+    expect(history.flatMap(h => h.studentIds).filter(id => id === ids.students[0])).toHaveLength(1);
+    vi.setSystemTime(nextOperationalDay());
+    const today = await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: operationalDate() });
+    expect(today.students.every(s => !s.state)).toBe(true);
+    expect((await driver.query(api.studentDismissals.getRoster, rosterArgs)).students.every(s => s.state?.status === "departed")).toBe(true);
+    expect((await operator.query(api.students.get, { id: ids.students[0] }))!.student).toMatchObject({ carNumber: 20, busNumber: "ABC-123" });
+  } finally { vi.useRealTimers(); }
+});
+
+test("a car pickup at another campus blocks the bus until the departure is corrected", async () => {
+  const { t, ids, operator, driver, date, rosterArgs } = await setup("ABC-123");
+  await t.run(ctx => ctx.db.patch(ids.operator, { role: "principal", assignedCampuses: [ids.campus, ids.otherCampus] }));
+  await operator.mutation(api.students.update, { studentId: ids.students[0], carNumber: 20, busNumber: "ABC-123" });
+  const car = await operator.mutation(api.queue.addCar, { campus: "Other", carNumber: 20, lane: "left" });
+  await operator.mutation(api.queue.removeCar, { queueId: car.queueId! });
+  const read = async () => (await driver.query(api.studentDismissals.getRoster, rosterArgs)).students.find(s => s.id === ids.students[0])!;
+  const row = await read();
+  expect(row.otherPickup).toBe(true);
+  await expect(driver.mutation(api.studentDismissals.setStatus, {
+    campus: "School", date, studentId: ids.students[0], status: "boarded", expectedRevision: row.state!.revision,
+  })).rejects.toThrow("already departed");
+  await operator.mutation(api.studentDismissals.correctDeparture, {
+    campus: "School", date, departureId: row.state!._id, expectedRevision: row.state!.revision, reason: "Wrong student",
+  });
+  await driver.mutation(api.studentDismissals.setStatus, {
+    campus: "School", date, studentId: ids.students[0], status: "boarded", expectedRevision: (await read()).state?.revision ?? 0,
+  });
+  expect((await read()).state?.vehicleIdentifier).toBe("ABC-123");
+});
+
 test.each([false, true])("bus boarding and drop-off keep separate records with Road=%s", async useRoad => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(Date.UTC(2026, 8, 10, 15));
@@ -234,7 +330,7 @@ test("departure correction checks role, active principal, campus, date, reason a
   }
 });
 
-test("departed table follows student membership and correction never undoes another campus's early pickup", async () => {
+test("departed table follows student membership and correction preserves a legacy early pickup", async () => {
   const { t, ids, operator, date, rosterArgs } = await setup();
   await t.run(async ctx => {
     await ctx.db.patch(ids.driver, { isActive: false });
@@ -243,8 +339,16 @@ test("departed table follows student membership and correction never undoes anot
   });
   const arrival = await operator.mutation(api.queue.addCar, { campus: "Other", carNumber: "ABC-123", lane: "left" });
   await operator.mutation(api.queue.removeCar, { queueId: arrival.queueId! });
-  await operator.mutation(api.studentDismissals.setStatus, {
-    campus: "School", date, studentId: ids.students[0], status: "picked_up_early", collectedBy: "Parent", expectedRevision: 0,
+  await expect(operator.mutation(api.studentDismissals.setStatus, {
+    campus: "School", date, studentId: ids.students[0], status: "picked_up_early", collectedBy: "Parent", expectedRevision: 1,
+  })).rejects.toThrow("already departed");
+  // Historical duplicates must remain correctable; new writes no longer allow them.
+  await t.run(async ctx => {
+    await ctx.db.insert("studentDismissals", {
+      campusId: ids.campus, date, studentId: ids.students[0], studentName: "Sofia Martinez",
+      status: "picked_up_early", collectedBy: "Parent", revision: 1,
+      updatedAt: Date.now(), updatedBy: ids.operator, updatedByName: "Operator",
+    });
   });
   const paginationOpts = { numItems: 10, cursor: null };
   expect((await operator.query(api.studentDismissals.listRecordedDepartures, { campus: "School", date, paginationOpts })).page.map(r => r.studentId)).toEqual([ids.students[0], ids.students[0]]);
@@ -373,7 +477,8 @@ test.each(["dispatch", "undo"])("legacy boarding survives another student's loca
   expect(before.students.map(s => s.id)).toEqual([ids.students[0]]);
   expect(before.students.filter(s => s.id === ids.students[0])).toHaveLength(1);
 
-  await operator.mutation(api.students.assignCarNumber, { studentId: ids.otherStudent, carNumber: "ABC-123" });
+  await t.run(ctx => ctx.db.insert("buses", { identifier: "ABC-123", name: "Bus", campusIds: [ids.campus, ids.otherCampus], createdAt: Date.now(), updatedAt: Date.now() }));
+  await operator.mutation(api.students.update, { studentId: ids.otherStudent, busNumber: "ABC-123" });
   const roster = await driver.query(api.studentDismissals.getRoster, args);
   expect(roster).toEqual(await operator.query(api.studentDismissals.getRoster, args));
   expect(roster.students.map(s => s.id).sort()).toEqual([ids.otherStudent, ids.students[0]].sort());
@@ -623,7 +728,7 @@ test.each(["Pacific/Honolulu", "Asia/Tokyo"])("boarding guard uses the shared da
   }
 });
 
-test("a confirmed early pickup overrides a boarding at another campus for assignment edits", async () => {
+test("an early pickup cannot override a boarding at another campus without correcting it first", async () => {
   const { t, ids, operator, date } = await setup();
   await t.run(async ctx => {
     await ctx.db.patch(ids.otherStudent, { carNumber: 0 });
@@ -633,6 +738,12 @@ test("a confirmed early pickup overrides a boarding at another campus for assign
   await operator.mutation(api.queue.addCar, { campus: "Other", carNumber: "ABC-123", lane: "left" });
   await operator.mutation(api.studentDismissals.setStatus, {
     campus: "Other", date, studentId: ids.students[0], status: "boarded", expectedRevision: 0,
+  });
+  await expect(operator.mutation(api.studentDismissals.setStatus, {
+    campus: "School", date, studentId: ids.students[0], status: "picked_up_early", collectedBy: "Parent", expectedRevision: 1,
+  })).rejects.toThrow("already boarded");
+  await operator.mutation(api.studentDismissals.setStatus, {
+    campus: "Other", date, studentId: ids.students[0], status: "pending", expectedRevision: 1,
   });
   await operator.mutation(api.studentDismissals.setStatus, {
     campus: "School", date, studentId: ids.students[0], status: "picked_up_early", collectedBy: "Parent", expectedRevision: 0,

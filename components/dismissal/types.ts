@@ -1,6 +1,7 @@
 import { Id } from "@/convex/_generated/dataModel"
 
 export interface StudentData {
+    pickup?: { status: string; vehicleIdentifier?: number | string } | null
     id: string
     name: string
     grade?: string

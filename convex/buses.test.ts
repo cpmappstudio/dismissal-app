@@ -3,10 +3,52 @@ import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
-import { ensureDriverBus } from "./buses";
+import { ensureDriverBus, studentTransport } from "./buses";
 import { isBus } from "./studentDismissals";
 
 const modules = import.meta.glob("./**/*.ts");
+
+test("car and bus assignments coexist, validate campus coverage and can be removed independently", async () => {
+  const { t, ids, principal } = await setup();
+  const busId = await principal.mutation(api.buses.save, { identifier: 123, name: "Bus", campusIds: [ids.campuses[0]] });
+  const args = { firstName: "Ana", lastName: "Test", birthday: "01/01/2015", grade: "4th" as const, campuses: [ids.campuses[0]], carNumber: 20, busNumber: 123 };
+  const id = await principal.mutation(api.students.create, args);
+  const read = async () => (await principal.query(api.students.get, { id }))!.student;
+  expect(await read()).toMatchObject({ carNumber: 20, busNumber: 123 });
+  expect((await principal.query(api.studentDismissals.searchPickupStudents, { campus: "A", date: "2026-09-11", search: "Ana" })).students[0]).toMatchObject({ carNumber: 20, busNumber: 123 });
+  expect((await principal.query(api.students.list, {})).students.find(s => s._id === id)).toMatchObject({ carNumber: 20, busNumber: 123 });
+  await expect(principal.mutation(api.students.update, { studentId: id, busNumber: "MISSING" })).rejects.toThrow("existing bus");
+  await expect(principal.mutation(api.students.assignCarNumber, { studentId: id, carNumber: 123 })).rejects.toThrow("belongs to a bus");
+  await expect(principal.mutation(api.buses.save, { identifier: 20, name: "Wrong", campusIds: [ids.campuses[0]] })).rejects.toThrow("assigned to a car");
+  await t.run(ctx => ctx.db.patch(ids.principal, { role: "superadmin" }));
+  await expect(principal.mutation(api.students.update, { studentId: id, campuses: [ids.campuses[1]] })).rejects.toThrow("not available");
+  const bus = (await t.run(ctx => ctx.db.get(busId)))!;
+  await expect(principal.mutation(api.buses.save, { busId, identifier: 123, name: "Bus", campusIds: [ids.campuses[1]], expectedUpdatedAt: bus.updatedAt })).rejects.toThrow("Reassign students");
+  await principal.mutation(api.students.removeCarNumber, { studentId: id });
+  expect(await read()).toMatchObject({ carNumber: 0, busNumber: 123 });
+  await principal.mutation(api.students.assignCarNumber, { studentId: id, carNumber: 21 });
+  await principal.mutation(api.students.update, { studentId: id, busNumber: 0 });
+  expect(await read()).toMatchObject({ carNumber: 21, busNumber: 0 });
+});
+
+test("legacy transport migration preserves assignments and historical records idempotently", async () => {
+  const { t, ids, principal } = await setup();
+  await principal.mutation(api.buses.save, { identifier: 123, name: "Bus", campusIds: [ids.campuses[0]] });
+  const args = { firstName: "Ana", lastName: "Test", birthday: "01/01/2015", grade: "4th" as const, campuses: [ids.campuses[0]] };
+  const busStudent = await principal.mutation(api.students.create, { ...args, carNumber: 123, vehicleType: "bus" });
+  const carStudent = await principal.mutation(api.students.create, { ...args, carNumber: 20 });
+  expect((await principal.query(api.students.get, { id: busStudent }))!.student).toMatchObject({ carNumber: 0, busNumber: 123 });
+  for (const [id, transport] of [[busStudent, { carNumber: 0, busNumber: 123 }], [carStudent, { carNumber: 20, busNumber: 0 }]] as const) {
+    await t.run(async ctx => {
+      const old = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, await studentTransport(ctx.db, old));
+      const migrated = (await ctx.db.get(id))!;
+      expect(migrated).toMatchObject(transport);
+      expect(await studentTransport(ctx.db, migrated)).toEqual(transport);
+    });
+  }
+  expect((await principal.query(api.students.getByCarNumber, { carNumber: 123, campusId: ids.campuses[0] })).map(s => s._id)).toEqual([busStudent]);
+});
 
 test("student bus assignments require a registered bus covering the student's campus; car numbers stay unchanged", async () => {
   const { t, ids, principal } = await setup();
@@ -137,7 +179,8 @@ test("direct assignments and bus edits cannot bypass campus coverage", async () 
       studentId,
       carNumber: "BUS-1",
     }),
-  ).rejects.toThrow("not available");
+  ).rejects.toThrow("belongs to a bus");
+  await expect(principal.mutation(api.students.update, { studentId, busNumber: "BUS-1" })).rejects.toThrow("not available");
   await expect(
     principal.mutation(api.buses.save, {
       identifier: 20,
@@ -153,9 +196,9 @@ test("direct assignments and bus edits cannot bypass campus coverage", async () 
     campusIds: ids.campuses,
     expectedUpdatedAt: bus.updatedAt,
   });
-  await principal.mutation(api.students.assignCarNumber, {
+  await principal.mutation(api.students.update, {
     studentId,
-    carNumber: "BUS-1",
+    busNumber: "BUS-1",
   });
   const updated = (await t.run((ctx) => ctx.db.get(busId)))!;
   await expect(

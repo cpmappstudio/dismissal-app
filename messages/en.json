@@ -1,5 +1,6 @@
 {
   "buses": {
+    "removeAssignment": "Remove bus assignment",
     "select": "Select a bus",
     "noneAvailable": "No buses available. Create a bus for the campus first.",
     "vehicleType": "Transport",
@@ -18,6 +19,8 @@
     "identifierHint": "This identifier links students, drivers and Road and cannot be changed here."
   },
   "transport": {
+    "alreadyPickedUp": "Already picked up — unavailable for this pickup",
+    "pickedUpCount": "Already picked up: {count}",
     "dateNavigation": "Attendance date",
     "today": "Today",
     "previousDay": "Previous date with records",

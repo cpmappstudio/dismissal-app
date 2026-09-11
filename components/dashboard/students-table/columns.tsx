@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 
 export const useColumns = (): ColumnDef<Student>[] => {
     const t = useTranslations('studentsManagement')
+    const bt = useTranslations('buses')
 
     return [
         {
@@ -109,11 +110,14 @@ export const useColumns = (): ColumnDef<Student>[] => {
                 </Button>
             ),
             cell: ({ row }) => {
-                const carNumber = row.getValue("carNumber") as number
+                const carNumber = row.getValue("carNumber") as number | string
                 return (
+                    <div className="flex flex-wrap gap-1">
                     <Badge variant={carNumber === 0 ? "outline" : "secondary"} className="font-mono tracking-wider text-xs">
-                        {carNumber === 0 ? "N/A" : carNumber}
+                        {bt('car')}: {carNumber === 0 ? "—" : carNumber}
                     </Badge>
+                    {!!row.original.busNumber && <Badge variant="secondary" className="font-mono tracking-wider text-xs">{bt('bus')}: {row.original.busNumber}</Badge>}
+                    </div>
                 )
             },
         },

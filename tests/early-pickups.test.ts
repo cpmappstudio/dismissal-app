@@ -58,9 +58,10 @@ test('pickup combobox selects without submitting, preserves revisions and clears
         compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
     });
     const students = [
-        { id: 'sofia', name: 'Sofia', grade: '5th', carNumber: 123, state: { status: 'pending', revision: 3 } },
-        { id: 'ana', name: 'Ana', grade: '5th', carNumber: 123, state: { status: 'picked_up_early', revision: 1 } },
+        { id: 'sofia', name: 'Sofia', grade: '5th', carNumber: 20, busNumber: 123, state: { status: 'pending', revision: 3 } },
+        { id: 'ana', name: 'Ana', grade: '5th', carNumber: 0, busNumber: 123, state: { status: 'picked_up_early', revision: 1 } },
         { id: 'carlos', name: 'Carlos', grade: '5th', carNumber: 123, state: { status: 'departed', revision: 1 } },
+        { id: 'luis', name: 'Luis', grade: '5th', carNumber: 20, busNumber: 123, state: { status: 'boarded', revision: 1 } },
     ];
     const state: unknown[] = [];
     let cursor = 0;
@@ -99,7 +100,13 @@ test('pickup combobox selects without submitting, preserves revisions and clears
     assert.equal(render().filter(node => node.type === 'RecordedDepartures').length, 1, 'The search and the unified table share the same screen');
     assert.equal(root().filter, null, 'Convex results must not be filtered again on the client');
     const items = render().filter(node => node.type === 'ComboboxItem');
-    assert.deepEqual(items.map(node => node.props.disabled), [false, true, true]);
+    assert.deepEqual(items.map(node => node.props.disabled), [false, true, true, true]);
+    function text(node: React.ReactNode): string {
+        return React.Children.toArray(node).map(child => React.isValidElement<{ children?: React.ReactNode }>(child) ? text(child.props.children) : String(child)).join('');
+    }
+    assert.match(text(items[0]), /car: 20 · bus: 123/);
+    assert.match(text(items[1]), /bus: 123/);
+    assert.doesNotMatch(text(items[1]), /car:/);
     (root().onValueChange as (id: string) => void)('sofia');
     assert.equal(root().value, 'sofia');
     assert.equal(mutations.length, 0, 'Choosing a student must not record a pickup');

@@ -97,6 +97,7 @@ export const CarCard = React.memo<CarCardProps>(
     hasBirthdayToday = false,
   }) => {
     const t = useTranslations("dismissal");
+    const transport = useTranslations("transport");
     const [open, setOpen] = React.useState(false);
 
     // Helper function to check if a student has birthday today
@@ -242,8 +243,9 @@ export const CarCard = React.memo<CarCardProps>(
                   </div>
 
                   {/* Bottom row: Student Names - Centered */}
-                  <div className="w-full px-1 flex justify-start">
+                  <div className="w-full px-1 flex flex-col items-start gap-1">
                     {car.vehicleType === "bus" ? <span className="font-bold">{t("car.students")} ({car.students.length})</span> : <StudentInfo students={car.students} t={t} />}
+                    {car.students.some(s => s.pickup) && <span className="block text-xs">{transport("pickedUpCount", { count: car.students.filter(s => s.pickup).length })}</span>}
                   </div>
                 </div>
 
@@ -354,7 +356,7 @@ export const CarCard = React.memo<CarCardProps>(
                       return (
                         <div
                           key={student.id}
-                          className={`flex items-center gap-3 p-3 border rounded-lg ${studentHasBirthday ? "bg-yellow-50 border-yellow-200" : "bg-white"}`}
+                          className={`flex items-center gap-3 p-3 border rounded-lg ${student.pickup ? "bg-sky-50 border-sky-300" : studentHasBirthday ? "bg-yellow-50 border-yellow-200" : "bg-white"}`}
                         >
                           <div className="relative">
                             <StudentAvatar
@@ -390,6 +392,7 @@ export const CarCard = React.memo<CarCardProps>(
                               <GraduationCap className="h-3 w-3" />
                               {student.grade || `${t("car.grade")} 5`}
                             </div>
+                            {student.pickup && <p className="text-xs text-muted-foreground">{transport(`status.${student.pickup.status}`)}{student.pickup.vehicleIdentifier ? ` · ${student.pickup.vehicleIdentifier}` : ""}</p>}
                           </div>
                         </div>
                       );

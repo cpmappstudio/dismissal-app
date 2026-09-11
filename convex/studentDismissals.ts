@@ -14,7 +14,7 @@ import {
   type VehicleIdentifier,
 } from "../lib/vehicle";
 import { operationalDate } from "../lib/operational-day";
-import { isBus } from "./buses";
+import { isBus, studentTransport } from "./buses";
 export { isBus } from "./buses";
 
 const rosterRoles: DismissalRole[] = [
@@ -71,20 +71,24 @@ export async function getDailyState(
   date: string,
   studentId: Id<"students">,
 ) {
-  // An early pickup means "do not wait" at every campus, even with a local state.
-  const earlyPickup = await db
+  // One pickup per operational day, shared by every assigned vehicle and campus.
+  // Keep campus records/history; reuse their occupied state rather than a second ledger.
+  const records = await db
     .query("studentDismissals")
     .withIndex("by_studentId_date_status", (q) =>
-      q.eq("studentId", studentId).eq("date", date).eq("status", "picked_up_early"),
+      q.eq("studentId", studentId).eq("date", date),
     )
-    .unique();
-  if (earlyPickup) return earlyPickup;
-  return db
-    .query("studentDismissals")
-    .withIndex("by_campusId_date_studentId", (q) =>
-      q.eq("campusId", campusId).eq("date", date).eq("studentId", studentId),
-    )
-    .unique();
+    .take(201);
+  if (records.length > 200) throw new Error("Too many daily student records");
+  return records.find(r => r.status === "picked_up_early")
+    ?? records.find(r => r.status === "departed")
+    ?? records.find(r => r.status === "boarded")
+    ?? records.find(r => r.campusId === campusId)
+    ?? null;
+}
+
+export function pickedUp(state: Doc<"studentDismissals"> | null) {
+  return !!state && ["boarded", "departed", "picked_up_early"].includes(state.status);
 }
 
 export async function assertNotBoarded(
@@ -223,6 +227,7 @@ export const getRoster = query({
       students: await Promise.all(
         rows.map(async ({ student, ...row }) => ({
           ...row,
+          otherPickup: pickedUp(row.state) && (row.state!.vehicleIdentifier !== identifier || row.state!.campusId !== campus._id),
           grade: student?.grade ?? "",
           avatarUrl: student?.avatarStorageId
             ? await ctx.storage.getUrl(student.avatarStorageId)
@@ -258,7 +263,7 @@ export const searchPickupStudents = query({
             id: s._id,
             name: s.fullName,
             grade: s.grade,
-            carNumber: s.carNumber,
+            ...await studentTransport(ctx.db, s),
             state: await getDailyState(ctx.db, campus._id, args.date, s._id),
           })),
       ),
@@ -339,16 +344,17 @@ async function editableStudent(ctx: MutationCtx, args: {
     throw new Error("The operational day changed. Refresh the list");
   const student = await ctx.db.get(args.studentId);
   if (!student?.isActive) throw new Error("Student does not belong to this campus");
-  const bus = student.carNumber !== 0 && await isBus(ctx.db, student.carNumber);
+  const { busNumber } = await studentTransport(ctx.db, student);
+  const bus = !!busNumber;
   if (!student.campuses.includes(campus._id) && (
-    !bus || !(await rosterStudents(ctx.db, student.carNumber, campus._id, args.date)).some(s => s._id === student._id)
+    !bus || !(await rosterStudents(ctx.db, busNumber, campus._id, args.date)).some(s => s._id === student._id)
   )) throw new Error("Student does not belong to this campus");
-  if (role === "bus_driver" && (!bus || user.busNumber !== student.carNumber))
+  if (role === "bus_driver" && (!bus || user.busNumber !== busNumber))
     throw new Error("Student does not belong to your bus");
   const previous = await getDailyState(ctx.db, campus._id, args.date, student._id);
   if ((previous?.revision ?? 0) !== args.expectedRevision)
     throw new Error("The student was updated by someone else. Review the latest state");
-  return { user, role, campus, student, bus, previous };
+  return { user, role, campus, student, bus, busNumber, previous };
 }
 
 export const setDropoff = mutation({
@@ -357,9 +363,9 @@ export const setDropoff = mutation({
     expectedRevision: v.number(), droppedOff: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const { user, student, bus, previous } = await editableStudent(ctx, args);
+    const { user, campus, bus, busNumber, previous } = await editableStudent(ctx, args);
     if (!bus || !previous || previous.vehicleType !== "bus" ||
-      previous.vehicleIdentifier !== student.carNumber ||
+      previous.vehicleIdentifier !== busNumber || previous.campusId !== campus._id ||
       (previous.status !== "boarded" && previous.status !== "departed"))
       throw new Error("The student must be on this bus before recording a drop-off");
     if (!!previous.dropoff === args.droppedOff) return null;
@@ -386,12 +392,14 @@ export const setStatus = mutation({
     collectedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { user, role, campus, student, bus, previous } = await editableStudent(ctx, args);
+    const { user, role, campus, student, bus, busNumber, previous } = await editableStudent(ctx, args);
     if (args.status === "picked_up_early" && !student.campuses.includes(campus._id))
       throw new Error("Student does not belong to this campus");
     if (previous?.dropoff) throw new Error("Undo the bus drop-off before changing attendance");
     if (previous?.status === "departed")
       throw new Error("The student has already departed");
+    if (previous?.status === "boarded" && (args.status === "picked_up_early" || previous.vehicleIdentifier !== busNumber || previous.campusId !== campus._id))
+      throw new Error("The student already boarded a vehicle. Correct the original boarding first");
     if (
       role === "bus_driver" &&
       (args.status === "picked_up_early" ||
@@ -425,7 +433,8 @@ export const setStatus = mutation({
         campusId: campus._id,
         date: args.date,
         status: args.status,
-        vehicleIdentifier: student.carNumber || undefined,
+        // For early pickups this is the scheduled vehicle, retained for roster history.
+        vehicleIdentifier: busNumber || student.carNumber || undefined,
         vehicleType: bus ? "bus" : "car",
         reason,
         collectedBy:
@@ -466,20 +475,22 @@ export async function recordDeparture(
       date,
       student.studentId,
     );
-    if (bus && (!previous || previous.status === "pending"))
+    if (bus && (!previous || previous.status === "pending" ||
+      (previous.status === "not_traveling" && previous.vehicleIdentifier !== entry.carNumber)))
       throw new Error(
         "Resolve all pending students in the bus list before dispatching",
       );
     if (
       previous &&
-      (previous.dropoff || ["picked_up_early", "not_traveling", "departed"].includes(previous.status))
+      (previous.dropoff || ["picked_up_early", "departed"].includes(previous.status) ||
+        (previous.status === "not_traveling" && previous.vehicleIdentifier === entry.carNumber))
     )
       continue;
     if (
       previous?.status === "boarded" &&
-      previous.vehicleIdentifier !== entry.carNumber
+      (previous.vehicleIdentifier !== entry.carNumber || previous.campusId !== campus._id)
     )
-      throw new Error("A student boarded another vehicle");
+      continue;
     departing.push(student);
     await writeDailyState(
       ctx,

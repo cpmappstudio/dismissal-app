@@ -261,14 +261,14 @@ export function BusRoster({
   ).length;
   const boardedCount = roster.students.filter(
     (student) =>
-      !student.state?.dropoff &&
+      !student.otherPickup && !student.state?.dropoff &&
       (student.state?.status === "boarded" ||
         student.state?.status === "departed"),
   ).length;
   const expectedCount =
     pendingCount +
     boardedCount +
-    roster.students.filter((student) => student.state?.dropoff).length;
+    roster.students.filter((student) => !student.otherPickup && student.state?.dropoff).length;
   const boardingProgressLabel = t("boardingProgress", {
     boarded: boardedCount,
     total: expectedCount,
@@ -370,7 +370,7 @@ export function BusRoster({
                   </p>
                 </div>
               </div>
-              {isToday && roster.canEdit && (
+              {isToday && roster.canEdit && !student.otherPickup && (
                 <BoardingControls
                   studentId={student.id}
                   campus={campus}
@@ -380,6 +380,7 @@ export function BusRoster({
               )}
               {student.state && status !== "pending" && (
                 <div className="col-span-2 space-y-1 break-words text-xs text-muted-foreground">
+                  {student.otherPickup && <p>{t("alreadyPickedUp")}{student.state.vehicleIdentifier ? ` · ${student.state.vehicleIdentifier}` : ""}</p>}
                   {student.state.collectedBy && (
                     <p>
                       {t("collectedBy")}: {student.state.collectedBy}

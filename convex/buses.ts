@@ -8,7 +8,7 @@ import {
   type DatabaseReader,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { validateUserAccess, userHasAccessToCampusById } from "./helpers";
+import { validateUserAccess, userHasAccessToCampusById, assignedVehicleStudents } from "./helpers";
 import {
   normalizeVehicleIdentifier,
   type VehicleIdentifier,
@@ -47,13 +47,26 @@ export async function validateStudentVehicle(
 ) {
   const bus = identifier ? await getBusByIdentifier(db, identifier) : null;
   if (type === "bus" && !bus) throw new Error("Select an existing bus");
-  if (type === "car" && bus)
+  if (type === "car" && (bus || (identifier && await isBus(db, identifier))))
     throw new Error("This identifier belongs to a bus. Select Bus instead.");
   if (
     bus &&
     (!campuses.length || campuses.some((id) => !bus.campusIds.includes(id)))
   )
     throw new Error("The bus is not available for the student's campuses");
+}
+
+// Compatibility while existing bus-only assignments are migrated out of carNumber.
+export async function studentTransport(db: DatabaseReader, student: Pick<Doc<"students">, "carNumber" | "busNumber">, legacyBusNumbers?: ReadonlySet<VehicleIdentifier>) {
+  if (student.busNumber !== undefined) return { carNumber: student.carNumber, busNumber: student.busNumber };
+  return student.carNumber && (legacyBusNumbers ? legacyBusNumbers.has(student.carNumber) : await isBus(db, student.carNumber))
+    ? { carNumber: 0, busNumber: student.carNumber }
+    : { carNumber: student.carNumber, busNumber: 0 };
+}
+
+export async function validateStudentTransport(db: DatabaseReader, carNumber: VehicleIdentifier, busNumber: VehicleIdentifier, campuses: Id<"campusSettings">[]) {
+  await validateStudentVehicle(db, carNumber, campuses, "car");
+  if (busNumber) await validateStudentVehicle(db, busNumber, campuses, "bus");
 }
 
 export const options = query({
@@ -140,12 +153,7 @@ export async function ensureDriverBus(ctx: MutationCtx, driver: Doc<"users">) {
   const identifier = normalizeVehicleIdentifier(driver.busNumber);
   const existing = await getBusByIdentifier(ctx.db, identifier);
   const drivers = await activeDrivers(ctx.db, identifier);
-  const students = await ctx.db
-    .query("students")
-    .withIndex("by_car_number", (q) => q.eq("carNumber", identifier))
-    .take(201);
-  if (students.length > 200)
-    throw new Error("Too many students assigned to this vehicle");
+  const students = await assignedVehicleStudents(ctx.db, identifier);
   const campusIds = [
     ...new Set([
       ...(existing?.campusIds ?? []),
@@ -264,12 +272,9 @@ export const save = mutation({
     }
     // Bus coverage must remain valid for existing assignments, including when
     // registering an identifier previously used as a regular vehicle.
-    const students = await ctx.db
-      .query("students")
-      .withIndex("by_car_number", (q) => q.eq("carNumber", identifier))
-      .take(201);
-    if (students.length > 200)
-      throw new Error("Too many students assigned to this vehicle");
+    const students = await assignedVehicleStudents(ctx.db, identifier);
+    if (!bus && students.some(s => s.isActive && s.busNumber !== undefined && s.carNumber === identifier))
+      throw new Error("This identifier is assigned to a car. Choose a different bus identifier");
     if (
       students.some(
         (student) =>

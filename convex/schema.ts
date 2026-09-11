@@ -104,6 +104,7 @@ export default defineSchema({
 
     // Car assignment
     carNumber: v.union(v.number(), v.string()), // 0 = no car assigned
+    busNumber: v.optional(v.union(v.number(), v.string())), // 0 = no bus; absent = legacy assignment
 
     // Additional info
     avatarUrl: v.optional(v.string()),
@@ -118,6 +119,7 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_car_number", ["carNumber"])
+    .index("by_busNumber", ["busNumber"])
     .index("by_full_name", ["fullName"])
     .index("by_active", ["isActive"])
     .searchIndex("search_fullName", { searchField: "fullName", filterFields: ["isActive"] }),

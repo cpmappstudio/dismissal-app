@@ -3,10 +3,10 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { gradeValidator } from "./types";
-import { Id } from "./_generated/dataModel";
+import { Id, type Doc } from "./_generated/dataModel";
 import { normalizeVehicleIdentifier } from "../lib/vehicle";
 import { assertNotBoarded } from "./studentDismissals";
-import { validateStudentVehicle } from "./buses";
+import { validateStudentVehicle, validateStudentTransport, studentTransport } from "./buses";
 import { getStudentsByCarNumber, repositionLaneCars, userHasAccessToCampusById, validateUserAccess } from "./helpers";
 
 const STUDENT_MANAGEMENT_ROLES = ["principal", "admin", "superadmin"] as const;
@@ -200,9 +200,18 @@ export const list = query({
             const offset = args.offset || 0;
             const limit = args.limit || 10000; // Límite muy alto por defecto
             const paginatedStudents = students.slice(offset, offset + limit);
+            // Compatibility only: load legacy bus identities once, not once per student.
+            const legacyBusNumbers = new Set<number | string>();
+            if (paginatedStudents.some((s: Doc<"students">) => s.busNumber === undefined)) {
+                const buses = await ctx.db.query("buses").take(201);
+                const drivers = await ctx.db.query("users").withIndex("by_role", q => q.eq("role", "bus_driver")).take(201);
+                if (buses.length > 200 || drivers.length > 200) throw new Error("Migrate legacy student transport assignments first");
+                buses.forEach(b => legacyBusNumbers.add(b.identifier));
+                drivers.filter(d => d.isActive && d.status !== "inactive" && d.busNumber).forEach(d => legacyBusNumbers.add(d.busNumber!));
+            }
 
             return {
-                students: paginatedStudents,
+                students: await Promise.all(paginatedStudents.map(async (student: Doc<"students">) => ({ ...student, ...await studentTransport(ctx.db, student, legacyBusNumbers) }))),
                 total: students.length,
                 hasMore: offset + limit < students.length,
                 authState: "authenticated"
@@ -245,7 +254,7 @@ export const get = query({
             [];
 
         return {
-            student,
+            student: { ...student, ...await studentTransport(ctx.db, student) },
             siblings
         };
     }
@@ -262,6 +271,7 @@ export const create = mutation({
         grade: gradeValidator,
         campuses: v.array(v.id("campusSettings")),
         vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
+        busNumber: v.optional(v.union(v.number(), v.string())),
         carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
@@ -291,7 +301,9 @@ export const create = mutation({
 
         // Validate car number
         const carNumber = normalizeVehicleIdentifier(args.carNumber ?? 0, true);
-        await validateStudentVehicle(ctx.db, carNumber, args.campuses, args.vehicleType);
+        const busNumber = args.busNumber === undefined ? undefined : normalizeVehicleIdentifier(args.busNumber, true);
+        if (busNumber === undefined) await validateStudentVehicle(ctx.db, carNumber, args.campuses, args.vehicleType);
+        else await validateStudentTransport(ctx.db, carNumber, busNumber, args.campuses);
 
         // Create full name
         const fullName = `${args.firstName.trim()} ${args.lastName.trim()}`;
@@ -305,6 +317,7 @@ export const create = mutation({
             grade: args.grade,
             campuses: args.campuses,
             carNumber,
+            busNumber,
             avatarUrl: args.avatarUrl,
             avatarStorageId: args.avatarStorageId,
             isActive: true,
@@ -327,6 +340,7 @@ export const update = mutation({
         grade: v.optional(gradeValidator),
         campuses: v.optional(v.array(v.id("campusSettings"))),
         vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
+        busNumber: v.optional(v.union(v.number(), v.string())),
         carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
@@ -355,9 +369,17 @@ export const update = mutation({
             }
         }
 
-        const changesVehicle = args.carNumber !== undefined && normalizeVehicleIdentifier(args.carNumber, true) !== student.carNumber;
-        if (args.carNumber !== undefined || args.campuses !== undefined || args.vehicleType !== undefined)
-            await validateStudentVehicle(ctx.db, normalizeVehicleIdentifier(args.carNumber ?? student.carNumber, true), args.campuses ?? student.campuses, args.vehicleType);
+        const currentTransport = await studentTransport(ctx.db, student);
+        const separate = args.busNumber !== undefined || student.busNumber !== undefined;
+        const transport = separate ? {
+            carNumber: normalizeVehicleIdentifier(args.carNumber ?? currentTransport.carNumber, true),
+            busNumber: normalizeVehicleIdentifier(args.busNumber ?? currentTransport.busNumber, true),
+        } : { carNumber: normalizeVehicleIdentifier(args.carNumber ?? student.carNumber, true) };
+        const changesVehicle = transport.carNumber !== student.carNumber || ("busNumber" in transport && transport.busNumber !== currentTransport.busNumber);
+        if (args.carNumber !== undefined || args.busNumber !== undefined || args.campuses !== undefined || args.vehicleType !== undefined) {
+            if (transport.busNumber !== undefined) await validateStudentTransport(ctx.db, transport.carNumber, transport.busNumber, args.campuses ?? student.campuses);
+            else await validateStudentVehicle(ctx.db, transport.carNumber, args.campuses ?? student.campuses, args.vehicleType);
+        }
         const changesCampuses = args.campuses !== undefined && (args.campuses.length !== student.campuses.length || args.campuses.some(id => !student.campuses.includes(id)));
         if (changesVehicle || changesCampuses) await assertNotBoarded(ctx.db, student);
 
@@ -380,9 +402,7 @@ export const update = mutation({
         if (args.birthday !== undefined) updates.birthday = args.birthday;
         if (args.grade !== undefined) updates.grade = args.grade;
         if (args.campuses !== undefined) updates.campuses = args.campuses;
-        if (args.carNumber !== undefined) {
-            updates.carNumber = normalizeVehicleIdentifier(args.carNumber, true);
-        }
+        Object.assign(updates, transport);
         if (args.avatarUrl !== undefined) updates.avatarUrl = args.avatarUrl;
         if (args.avatarStorageId !== undefined) updates.avatarStorageId = args.avatarStorageId;
 
@@ -668,12 +688,13 @@ export const assignCarNumber = mutation({
         }
 
         const carNumber = normalizeVehicleIdentifier(args.carNumber, true);
-        await validateStudentVehicle(ctx.db, carNumber, student.campuses);
+        const { busNumber } = await studentTransport(ctx.db, student);
+        await validateStudentVehicle(ctx.db, carNumber, student.campuses, "car");
         if (carNumber !== student.carNumber) await assertNotBoarded(ctx.db, student);
 
         // Update car number
         await ctx.db.patch(args.studentId, {
-            carNumber
+            carNumber, busNumber,
         });
 
         return args.studentId;
@@ -703,7 +724,7 @@ export const removeCarNumber = mutation({
         // Remove car assignment
         await assertNotBoarded(ctx.db, student);
         await ctx.db.patch(args.studentId, {
-            carNumber: 0
+            ...await studentTransport(ctx.db, student), carNumber: 0,
         });
 
         return args.studentId;

@@ -183,6 +183,17 @@ export function userCanDispatch(
  * Car numbers are unique across all campuses, so we search globally
  * First tries the current campus, then searches all campuses if needed
  */
+export async function assignedVehicleStudents(db: DatabaseReader, identifier: number | string) {
+    if (!identifier) return [];
+    const [cars, buses] = await Promise.all([
+        db.query("students").withIndex("by_car_number", q => q.eq("carNumber", identifier)).take(201),
+        db.query("students").withIndex("by_busNumber", q => q.eq("busNumber", identifier)).take(201),
+    ]);
+    const students = [...new Map([...cars, ...buses].map(s => [s._id, s])).values()];
+    if (students.length > 200) throw new Error("Too many students assigned to this vehicle");
+    return students;
+}
+
 export async function getStudentsByCarNumber(
     db: DbReader,
     carNumber: number | string,
@@ -192,11 +203,7 @@ export async function getStudentsByCarNumber(
     if (carNumber === 0) return [];
 
     // Query by car number and filter by campus
-    const allStudentsWithCar = await db
-        .query("students")
-        .withIndex("by_car_number", q => q.eq("carNumber", carNumber))
-        .filter(q => q.eq(q.field("isActive"), true))
-        .collect();
+    const allStudentsWithCar = (await assignedVehicleStudents(db, carNumber)).filter(s => s.isActive);
 
     // First, try to find in the current campus
     const studentsInCampus = allStudentsWithCar.filter(s =>

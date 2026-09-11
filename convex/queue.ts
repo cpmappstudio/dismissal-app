@@ -13,7 +13,7 @@ import {
 } from "./helpers";
 import { canAllocate, canDispatch } from "../lib/role-utils";
 import { normalizeVehicleIdentifier, vehicleColorIndex } from "../lib/vehicle";
-import { isBus, recordDeparture, rosterStudents } from "./studentDismissals";
+import { isBus, recordDeparture, rosterStudents, getDailyState, pickedUp } from "./studentDismissals";
 import { operationalDate } from "../lib/operational-day";
 
 /**
@@ -161,12 +161,16 @@ export const getCurrentQueue = query({
             const date = operationalDate();
             const displayedEntries = await Promise.all(entries.map(async entry => {
                 const bus = await isBus(ctx.db, entry.carNumber);
+                const students = bus && campusId
+                    ? (await rosterStudents(ctx.db, entry.carNumber, campusId, date)).map(studentToSummary)
+                    : entry.students;
                 return {
                     ...entry,
                     vehicleType: bus ? "bus" as const : "car" as const,
-                    students: bus && campusId
-                        ? (await rosterStudents(ctx.db, entry.carNumber, campusId, date)).map(studentToSummary)
-                        : entry.students,
+                    students: await Promise.all(students.map(async student => {
+                        const state = campusId ? await getDailyState(ctx.db, campusId, date, student.studentId) : null;
+                        return { ...student, pickup: pickedUp(state) ? { status: state!.status, vehicleIdentifier: state!.vehicleIdentifier } : null };
+                    })),
                 };
             }));
 
