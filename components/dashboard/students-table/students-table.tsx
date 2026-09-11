@@ -332,6 +332,7 @@ export function StudentsTable() {
           campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
+          vehicleType: studentData.vehicleType,
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: studentData.avatarStorageId,
         });
@@ -346,6 +347,7 @@ export function StudentsTable() {
           t("alerts.createError.title"),
           t("alerts.createError.message"),
         );
+        throw new Error(t("alerts.createError.message"));
       }
     },
     [createStudent, showAlert, t],
@@ -368,6 +370,7 @@ export function StudentsTable() {
           campuses: [studentData.campusId],
           birthday: studentData.birthday,
           carNumber: studentData.carNumber,
+          vehicleType: studentData.vehicleType,
           avatarUrl: studentData.avatarUrl,
           avatarStorageId: newAvatarId || undefined,
         });
@@ -393,6 +396,7 @@ export function StudentsTable() {
           t("alerts.updateError.title"),
           t("alerts.updateError.message"),
         );
+        throw new Error(t("alerts.updateError.message"));
       }
     },
     [selectedStudent, updateStudent, deleteAvatar, showAlert, t],

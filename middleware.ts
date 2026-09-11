@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 import { getLocaleFromPathname } from './lib/locale-setup'
-import { canAccessOperators, extractRoleFromMetadata } from './lib/role-utils'
+import { canAccessOperators, extractRoleFromMetadata, isManagementRole } from './lib/role-utils'
 import type { DismissalRole } from './lib/role-utils'
 
 const intlMiddleware = createIntlMiddleware(routing)
@@ -117,6 +117,7 @@ const getPathWithoutLocale = (pathname: string): string => {
 const canAccessRoute = (userRole: DismissalRole, path: string): boolean => {
   // Exact match: access to the shared road must not grant access to every subroute.
   if (path === '/operators') return canAccessOperators(userRole)
+  if (path === '/operators/buses' || path.startsWith('/operators/buses/')) return isManagementRole(userRole)
 
   const permissions = ROLE_PERMISSIONS[userRole]
 

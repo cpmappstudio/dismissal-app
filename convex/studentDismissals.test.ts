@@ -11,6 +11,142 @@ import { deleteUserWithClerk } from "./users";
 
 const modules = import.meta.glob("./**/*.ts");
 
+test.each([false, true])("bus boarding and drop-off keep separate records with Road=%s", async useRoad => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.UTC(2026, 8, 10, 15));
+  try {
+    const { t, ids, driver, operator, date, rosterArgs } = await setup("ABC-123");
+    const args = { campus: "School", date, studentId: ids.students[0] };
+    await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: 0, droppedOff: true })).rejects.toThrow("must be on this bus");
+    await driver.mutation(api.studentDismissals.setStatus, { ...args, expectedRevision: 0, status: "boarded" });
+    const read = async () => (await driver.query(api.studentDismissals.getRoster, rosterArgs)).students.find(s => s.id === args.studentId)!.state!;
+    const boarding = (await read()).boarding;
+    expect(boarding).toEqual({ at: Date.now(), by: ids.driver, byName: "Driver" });
+    if (useRoad) {
+      for (const studentId of ids.students.slice(1)) await driver.mutation(api.studentDismissals.setStatus, {
+        campus: "School", date, studentId, status: "not_traveling", expectedRevision: 0, reason: "Absent",
+      });
+      vi.setSystemTime(Date.now() + 60000);
+      const arrival = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: "ABC-123", lane: "left" });
+      await operator.mutation(api.queue.removeCar, { queueId: arrival.queueId! });
+      expect((await read()).status).toBe("departed");
+      await t.run(ctx => ctx.db.patch(ids.operator, { role: "principal" }));
+      await expect(operator.mutation(api.students.assignCarNumber, { studentId: args.studentId, carNumber: 20 })).rejects.toThrow("pending");
+    }
+    const before = await read();
+    const history = await t.run(ctx => ctx.db.query("dismissalHistory").collect());
+    vi.setSystemTime(Date.now() + 3600000);
+    await operator.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: before.revision, droppedOff: true });
+    const after = await read();
+    expect(after.boarding).toEqual(boarding);
+    expect(after.status).toBe(before.status);
+    expect(after.departure).toEqual(before.departure);
+    expect(after.dropoff).toEqual({ at: Date.now(), by: ids.operator, byName: "Operator" });
+    expect(await t.run(ctx => ctx.db.query("dismissalHistory").collect())).toEqual(history);
+    await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: before.revision, droppedOff: false })).rejects.toThrow("updated by someone else");
+    await expect(driver.mutation(api.studentDismissals.setStatus, { ...args, expectedRevision: after.revision, status: "pending" })).rejects.toThrow("Undo the bus drop-off");
+    if (useRoad) await expect(operator.mutation(api.studentDismissals.correctDeparture, {
+      campus: "School", date, departureId: after._id, expectedRevision: after.revision, reason: "Wrong departure",
+    })).rejects.toThrow("Undo the bus drop-off");
+    await driver.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: after.revision, droppedOff: false });
+    const undone = await read();
+    expect(undone.dropoff).toBeUndefined();
+    expect(undone.boarding).toEqual(boarding);
+    expect(undone.departure).toEqual(before.departure);
+    await driver.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: undone.revision, droppedOff: true });
+    const audit = await t.run(ctx => ctx.db.query("auditLogs").collect());
+    expect(audit.some(log => log.action === "student_dismissal_updated" && log.details?.after?.dropoff?.by === ids.operator)).toBe(true);
+    vi.setSystemTime(nextOperationalDay());
+    expect((await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: operationalDate() })).students.every(s => !s.state)).toBe(true);
+    const historical = await read();
+    expect(historical.dropoff).toBeDefined();
+    expect(historical.boarding).toEqual(boarding);
+    await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, expectedRevision: historical.revision, droppedOff: false })).rejects.toThrow("day changed");
+  } finally { vi.useRealTimers(); }
+});
+
+test("drop-off enforces role, activity, bus ownership, campus and attendance state", async () => {
+  const { t, ids, driver, operator, date } = await setup("ABC-123");
+  const args = { campus: "School", date, studentId: ids.students[0], expectedRevision: 0, droppedOff: true };
+  await expect(t.mutation(api.studentDismissals.setDropoff, args)).rejects.toThrow();
+  await driver.mutation(api.studentDismissals.setStatus, { campus: "School", date, studentId: ids.students[0], expectedRevision: 0, status: "boarded" });
+  const read = () => t.run(ctx => ctx.db.query("studentDismissals").withIndex("by_campusId_date_studentId", q => q.eq("campusId", ids.campus).eq("date", date).eq("studentId", ids.students[0])).unique());
+  args.expectedRevision = 1;
+  for (const role of ["viewer", "allocator"] as const) {
+    await t.run(ctx => ctx.db.patch(ids.operator, { role }));
+    await expect(operator.mutation(api.studentDismissals.setDropoff, args)).rejects.toThrow();
+  }
+  await t.run(ctx => ctx.db.patch(ids.driver, { isActive: false }));
+  await expect(driver.mutation(api.studentDismissals.setDropoff, args)).rejects.toThrow();
+  await t.run(ctx => ctx.db.patch(ids.driver, { isActive: true, busNumber: 20 }));
+  await expect(driver.mutation(api.studentDismissals.setDropoff, args)).rejects.toThrow("your bus");
+  await t.run(ctx => ctx.db.patch(ids.driver, { busNumber: "ABC-123" }));
+  await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, campus: "Other" })).rejects.toThrow();
+  expect((await read())?.dropoff).toBeUndefined();
+  await driver.mutation(api.studentDismissals.setStatus, { campus: "School", date, studentId: ids.students[1], expectedRevision: 0, status: "not_traveling", reason: "Absent" });
+  await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, studentId: ids.students[1] })).rejects.toThrow("must be on this bus");
+  await t.run(ctx => ctx.db.patch(ids.operator, { role: "operator" }));
+  await operator.mutation(api.studentDismissals.setStatus, { campus: "School", date, studentId: ids.students[2], expectedRevision: 0, status: "picked_up_early", collectedBy: "Parent" });
+  await expect(driver.mutation(api.studentDismissals.setDropoff, { ...args, studentId: ids.students[2] })).rejects.toThrow("must be on this bus");
+});
+
+test("Road does not dispatch students who already got off the bus", async () => {
+  const { t, ids, driver, operator, date } = await setup("ABC-123");
+  for (const studentId of ids.students) await driver.mutation(api.studentDismissals.setStatus, {
+    campus: "School", date, studentId, expectedRevision: 0,
+    status: studentId === ids.students[0] ? "boarded" : "not_traveling", reason: "Absent",
+  });
+  await driver.mutation(api.studentDismissals.setDropoff, { campus: "School", date, studentId: ids.students[0], expectedRevision: 1, droppedOff: true });
+  const before = await t.run(ctx => ctx.db.query("studentDismissals").collect());
+  const arrival = await operator.mutation(api.queue.addCar, { campus: "School", carNumber: "ABC-123", lane: "left" });
+  await operator.mutation(api.queue.removeCar, { queueId: arrival.queueId! });
+  expect(await t.run(ctx => ctx.db.query("studentDismissals").collect())).toEqual(before);
+  expect((await t.run(ctx => ctx.db.query("dismissalHistory").collect()))[0].studentIds).toEqual([]);
+});
+
+test.each(["boarded", "departed"] as const)("legacy %s records can record drop-off without inventing boarding times", async status => {
+  const { t, ids, driver, date, rosterArgs } = await setup("ABC-123");
+  const oldTimestamp = Date.now() - 60000;
+  await t.run(ctx => ctx.db.insert("studentDismissals", {
+    studentId: ids.students[0], studentName: "Sofia Martinez", campusId: ids.campus, date, status,
+    vehicleIdentifier: "ABC-123", vehicleType: "bus", updatedAt: oldTimestamp,
+    updatedBy: ids.operator, updatedByName: "Operator", revision: 1,
+  }));
+  await driver.mutation(api.studentDismissals.setDropoff, { campus: "School", date, studentId: ids.students[0], expectedRevision: 1, droppedOff: true });
+  const state = (await driver.query(api.studentDismissals.getRoster, rosterArgs)).students[0].state!;
+  expect(state.dropoff?.by).toBe(ids.driver);
+  if (status === "boarded") expect(state.boarding?.at).toBe(oldTimestamp);
+  else {
+    expect(state.boarding).toBeUndefined();
+    expect(state.departure?.at).toBe(oldTimestamp);
+  }
+});
+
+test.each(["principal", "admin", "superadmin"] as const)("%s can repair a legacy account without a role and assign allocator", async role => {
+  const { t, ids, operator } = await setup();
+  await t.run(async ctx => {
+    await ctx.db.patch(ids.operator, { role });
+    await ctx.db.patch(ids.driver, { role: undefined, busNumber: undefined });
+  });
+  const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+    const payload = init?.body ? JSON.parse(String(init.body)) : {};
+    return new Response(JSON.stringify({ id: "driver", updated_at: 100, ...payload }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  vi.stubEnv("CLERK_SECRET_KEY", "test-only-key");
+  try {
+    await operator.action(api.users.updateUserWithClerk, { clerkUserId: "driver", role: "allocator", assignedCampuses: [ids.campus] });
+    expect((await t.run(ctx => ctx.db.get(ids.driver)))?.role).toBe("allocator");
+    expect(await operator.query(api.users.getCurrentProfile, {})).toMatchObject({ role, isActive: true });
+    if (role !== "superadmin") {
+      await t.run(ctx => ctx.db.patch(ids.driver, { role: undefined, assignedCampuses: [ids.otherCampus] }));
+      fetchMock.mockClear();
+      await expect(operator.action(api.users.updateUserWithClerk, { clerkUserId: "driver", role: "allocator" })).rejects.toThrow("outside your assigned campuses");
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
+});
+
 test("Recorded today combines early pickups and dispatched students while preserving correction permissions", async () => {
   const { t, ids, operator, date } = await setup();
   await t.run(ctx => ctx.db.patch(ids.driver, { isActive: false }));
@@ -176,6 +312,9 @@ test("a bus identifier is global but its roster stays scoped to the selected cam
   expect((await t.run(ctx => ctx.db.query("dismissalHistory").collect()))[0]).toMatchObject({ vehicleType: "bus", studentIds: [ids.otherStudent] });
 
   // No local assignments must not expand the bus roster to all campuses.
+  await operator.mutation(api.studentDismissals.setDropoff, {
+    campus: "Other", date, studentId: ids.otherStudent, expectedRevision: 2, droppedOff: true,
+  });
   await t.run(ctx => ctx.db.patch(ids.otherStudent, { carNumber: 0 }));
   const secondArrival = await operator.mutation(api.queue.addCar, { campus: "Other", carNumber: "ABC-123", lane: "right" });
   expect(secondArrival).toMatchObject({ success: false, error: "NO_STUDENTS_FOUND" });
@@ -240,7 +379,7 @@ test.each(["dispatch", "undo"])("legacy boarding survives another student's loca
   expect(roster.students.map(s => s.id).sort()).toEqual([ids.otherStudent, ids.students[0]].sort());
   expect(roster.students.find(s => s.id === ids.students[0])?.state?.status).toBe("boarded");
   expect((await operator.query(api.queue.getCurrentQueue, { campus: "Other" })).leftLane[0].students.map(s => s.studentId).sort()).toEqual([ids.otherStudent, ids.students[0]].sort());
-  expect((await driver.query(api.studentDismissals.getRoster, { ...args, date: "2099-01-01" })).students.map(s => s.id)).toEqual([ids.otherStudent]);
+  await expect(driver.query(api.studentDismissals.getRoster, { ...args, date: "2099-01-01" })).rejects.toThrow("valid past date");
 
   if (action === "undo") {
     await driver.mutation(api.studentDismissals.setStatus, {
@@ -307,7 +446,6 @@ test.each([true, false])("early pickup remains visible across campuses and is ex
     campus: "School", date, search: "Sofia",
   })).students[0].state!;
   const beforeArrival = await operator.query(api.studentDismissals.getRoster, args);
-  expect(beforeArrival.inQueue).toBe(false);
   expect(beforeArrival.students[0].state).toEqual(recorded);
 
   const arrival = await operator.mutation(api.queue.addCar, { campus: "Other", carNumber: "ABC-123", lane: "left" });
@@ -335,7 +473,7 @@ test.each([true, false])("early pickup remains visible across campuses and is ex
   const states = await t.run(ctx => ctx.db.query("studentDismissals").collect());
   expect(states.filter(s => s.studentId === ids.students[0])).toEqual([recorded]);
   expect((await operator.query(api.studentDismissals.getRoster, args)).students[0].state).toEqual(recorded);
-  expect((await operator.query(api.studentDismissals.getRoster, { ...args, date: "2099-01-01" })).students[0].state).toBeNull();
+  await expect(operator.query(api.studentDismissals.getRoster, { ...args, date: "2099-01-01" })).rejects.toThrow("valid past date");
 });
 
 test("early pickup overrides a local state without copying it; correction stays at the recording campus", async () => {
@@ -625,7 +763,7 @@ test("management authorization rejects unauthenticated, missing and non-manageme
 });
 
 test("driver creation uses username/password without email or bypassing Clerk checks, and enforces campus scope", async () => {
-  const { t, ids, operator } = await setup();
+  const { t, ids, operator } = await setup("ABC-123");
   await t.run((ctx) => ctx.db.patch(ids.operator, { role: "principal" }));
   const fetchMock = vi
     .fn<typeof fetch>()
@@ -676,12 +814,8 @@ test("driver creation uses username/password without email or bypassing Clerk ch
       busNumber: "ABC-123",
       assignedCampuses: [ids.campus],
     });
-    await expect(
-      operator.action(api.users.createUserWithClerk, {
-        ...args,
-        assignedCampuses: [ids.otherCampus],
-      }),
-    ).rejects.toThrow("outside your scope");
+    await t.run(ctx => ctx.db.insert("buses", { identifier: "OTHER", name: "Other bus", campusIds: [ids.otherCampus], createdAt: Date.now(), updatedAt: Date.now() }));
+    await expect(operator.action(api.users.createUserWithClerk, { ...args, busNumber: "OTHER" })).rejects.toThrow("No permission");
     await expect(
       operator.action(api.users.createUserWithClerk, {
         ...args,
@@ -713,7 +847,7 @@ test("driver creation uses username/password without email or bypassing Clerk ch
 
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
       ...clerkData, id: "unsynchronized-driver",
-      public_metadata: { ...clerkData.public_metadata, assignedCampuses: ["invalid-campus-id"] },
+      public_metadata: { ...clerkData.public_metadata, busNumber: "UNREGISTERED" },
     }), { status: 200 }));
     await expect(operator.action(api.users.createUserWithClerk, args)).rejects.toThrow("Do not create it again");
   } finally {
@@ -828,6 +962,7 @@ test("webhook synchronization failures return 500 for retry; valid retries are i
   try {
     expect((await send()).status).toBe(500);
     data.public_metadata.assignedCampuses = [ids.campus];
+    await t.run(ctx => ctx.db.insert("buses", { identifier: 123, name: "Bus", campusIds: [ids.campus], createdAt: Date.now(), updatedAt: Date.now() }));
     expect((await send()).status).toBe(200);
     expect((await send()).status).toBe(200);
     expect(await t.run(ctx => ctx.db.query("users").withIndex("by_clerk_id", q => q.eq("clerkId", data.id)).collect())).toHaveLength(1);
@@ -838,7 +973,7 @@ test("webhook synchronization failures return 500 for retry; valid retries are i
 });
 
 test("username-only Clerk webhooks preserve IDs, sync usernames and never invent email or store passwords", async () => {
-  const { t, ids } = await setup();
+  const { t, ids } = await setup(11);
   const data = {
     id: "username-only-driver", updated_at: 100, username: "driver_11", email_addresses: [],
     first_name: "Bus", last_name: "Driver", password: "must-not-be-stored",
@@ -878,7 +1013,7 @@ test("normal vehicles still dispatch without a checklist and exclude confirmed e
   ).toMatchObject({ vehicleType: "car", studentIds: ids.students.slice(1) });
 });
 
-async function setup() {
+async function setup(busIdentifier?: number | string) {
   const t = convexTest(schema, modules);
   const ids = await t.run(async (ctx) => {
     const campus = await ctx.db.insert("campusSettings", {
@@ -899,6 +1034,7 @@ async function setup() {
       status: "active",
       createdAt: Date.now(),
     });
+    if (busIdentifier !== undefined) await ctx.db.insert("buses", { identifier: busIdentifier, name: "Bus", campusIds: [campus], createdAt: Date.now(), updatedAt: Date.now() });
     const operator = await ctx.db.insert("users", {
       clerkId: "operator",
       role: "operator",
@@ -962,7 +1098,117 @@ test("identifiers preserve numeric assignments and normalize plates without acce
   );
 });
 
-test("early pickup before arrival, shared roster, boarding, conflict detection and dispatch survive queue deletion", async () => {
+test("roster date navigation skips gaps and stays scoped to the bus and campus", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.parse("2026-09-10T16:00:00Z"));
+  try {
+    const { t, ids, driver, rosterArgs } = await setup("ABC-123");
+    expect(await driver.query(api.studentDismissals.getRoster, rosterArgs)).toMatchObject({ previousDate: null, nextDate: null });
+    await t.run(async ctx => {
+      const state = {
+        studentId: ids.students[0], studentName: "Sofia", campusId: ids.campus,
+        vehicleIdentifier: "ABC-123", status: "boarded" as const,
+        revision: 1, updatedBy: ids.driver, updatedByName: "Driver", updatedAt: Date.now(),
+      };
+      for (const date of ["2026-08-27", "2026-09-01", "2026-09-08"])
+        await ctx.db.insert("studentDismissals", { ...state, date });
+      await ctx.db.insert("studentDismissals", { ...state, studentId: ids.students[1], date: "2026-09-01" });
+      await ctx.db.insert("studentDismissals", { ...state, date: "2026-09-09", campusId: ids.otherCampus });
+      await ctx.db.insert("studentDismissals", { ...state, date: "2026-09-09", vehicleIdentifier: "OTHER" });
+    });
+    for (const [date, previousDate, nextDate] of [
+      ["2026-09-10", "2026-09-08", null],
+      ["2026-09-08", "2026-09-01", null],
+      ["2026-09-01", "2026-08-27", "2026-09-08"],
+      ["2026-08-27", null, "2026-09-01"],
+    ] as const) {
+      expect(await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date })).toMatchObject({ previousDate, nextDate });
+    }
+    await driver.mutation(api.studentDismissals.setStatus, { campus: "School", date: rosterArgs.date, studentId: ids.students[0], status: "boarded", expectedRevision: 0 });
+    expect(await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: "2026-09-08" })).toMatchObject({ nextDate: "2026-09-10" });
+  } finally { vi.useRealTimers(); }
+});
+
+test("bus history uses recorded membership and names, survives reassignment/deletion and stays read-only", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.parse("2026-09-10T16:00:00Z"));
+  try {
+    const { t, ids, operator, driver, date, rosterArgs } = await setup("ABC-123");
+    const args = { campus: "School", date, expectedRevision: 0 };
+    await driver.mutation(api.studentDismissals.setStatus, { ...args, studentId: ids.students[0], status: "boarded" });
+    await driver.mutation(api.studentDismissals.setStatus, { ...args, studentId: ids.students[1], status: "not_traveling", reason: "Absent" });
+    await operator.mutation(api.studentDismissals.setStatus, { ...args, studentId: ids.students[2], status: "picked_up_early", collectedBy: "Parent" });
+    vi.setSystemTime(Date.parse("2026-09-11T16:00:00Z"));
+    await t.run(async ctx => {
+      await ctx.db.patch(ids.students[0], { fullName: "New name", carNumber: 99, campuses: [ids.otherCampus] });
+      await ctx.db.delete(ids.students[1]);
+      await ctx.db.patch(ids.otherStudent, { campuses: [ids.campus] });
+    });
+    const history = await driver.query(api.studentDismissals.getRoster, rosterArgs);
+    expect(history.canEdit).toBe(false);
+    expect(history.students).toHaveLength(3);
+    expect(history.students.find(s => s.id === ids.students[0])).toMatchObject({ name: "Sofia Martinez", state: { status: "boarded", vehicleIdentifier: "ABC-123" } });
+    expect(history.students.find(s => s.id === ids.students[1])).toMatchObject({ name: "Ana Lopez", state: { status: "not_traveling", reason: "Absent" } });
+    expect(history.students.some(s => s.id === ids.otherStudent)).toBe(false);
+    expect((await operator.query(api.studentDismissals.getRoster, rosterArgs)).students).toEqual(history.students);
+    await expect(driver.mutation(api.studentDismissals.setStatus, { ...args, studentId: ids.students[2], expectedRevision: 1, status: "pending" })).rejects.toThrow("day changed");
+    expect((await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: "2026-09-09" })).students).toEqual([]);
+    expect((await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: "2026-09-11" })).students.map(s => s.id).sort()).toEqual([ids.students[2], ids.otherStudent].sort());
+    for (const invalid of ["2026-02-30", "2026-09-12", "invalid"]) {
+      await expect(driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: invalid })).rejects.toThrow("valid past date");
+    }
+    await expect(driver.query(api.studentDismissals.getRoster, { ...rosterArgs, carNumber: 99 })).rejects.toThrow("not your bus");
+    await expect(driver.query(api.studentDismissals.getRoster, { ...rosterArgs, campus: "Other" })).rejects.toThrow("No access");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("a registered bus can operate and reset daily without ever entering Road", async () => {
+  vi.useFakeTimers();
+  const cutoff = Date.parse("2026-09-11T05:00:00Z");
+  vi.setSystemTime(cutoff - 1);
+  try {
+    const { t, ids, operator, driver, date, rosterArgs } = await setup("ABC-123");
+    const change = { campus: "School", date, studentId: ids.students[0], expectedRevision: 0 };
+    await driver.mutation(api.studentDismissals.setStatus, { ...change, status: "boarded" });
+    expect((await operator.query(api.studentDismissals.getRoster, rosterArgs)).students[0].state?.status).toBe("boarded");
+    await operator.mutation(api.studentDismissals.setStatus, { ...change, status: "pending", expectedRevision: 1 });
+    await driver.mutation(api.studentDismissals.setStatus, { ...change, status: "boarded", expectedRevision: 2 });
+    await driver.mutation(api.studentDismissals.setStatus, {
+      ...change, studentId: ids.students[1], status: "not_traveling", reason: "Absent",
+    });
+    await operator.mutation(api.studentDismissals.setStatus, {
+      ...change, studentId: ids.students[2], status: "picked_up_early", collectedBy: "Parent",
+    });
+    const previous = await driver.query(api.studentDismissals.getRoster, rosterArgs);
+    expect(previous.students.map(s => s.state?.status)).toEqual(["boarded", "not_traveling", "picked_up_early"]);
+    expect(await t.run(ctx => ctx.db.query("dismissalQueue").collect())).toHaveLength(0);
+    expect(await t.run(ctx => ctx.db.query("dismissalHistory").collect())).toHaveLength(0);
+
+    vi.setSystemTime(cutoff);
+    const today = operationalDate();
+    expect(today).toBe("2026-09-11");
+    const fresh = await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: today });
+    expect(fresh.students.map(s => s.id)).toEqual(previous.students.map(s => s.id));
+    expect(fresh.students.every(s => s.state === null)).toBe(true);
+    await expect(driver.mutation(api.studentDismissals.setStatus, {
+      ...change, status: "pending", expectedRevision: 3,
+    })).rejects.toThrow("day changed");
+    await driver.mutation(api.studentDismissals.setStatus, { ...change, date: today, status: "boarded" });
+    const records = await t.run(ctx => ctx.db.query("studentDismissals").collect());
+    expect(records).toHaveLength(4);
+    expect(await t.mutation(internal.queue.scheduledClearAllQueues, {})).toMatchObject({ totalCarsCleared: 0 });
+    expect(await t.run(ctx => ctx.db.query("studentDismissals").collect())).toEqual(records);
+    expect((await driver.query(api.studentDismissals.getRoster, rosterArgs)).students).toEqual(previous.students);
+    expect((await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: today })).students[0].state?.status).toBe("boarded");
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("parking-lot boarding is shared with Road on arrival and preserves early pickups, conflicts and dispatch", async () => {
   const { t, ids, operator, driver, date, rosterArgs } = await setup();
   await operator.mutation(api.studentDismissals.setStatus, {
     campus: "School",
@@ -980,15 +1226,15 @@ test("early pickup before arrival, shared roster, boarding, conflict detection a
   expect(
     await t.run((ctx) => ctx.db.query("dismissalQueue").collect()),
   ).toHaveLength(0);
-  await expect(
-    driver.mutation(api.studentDismissals.setStatus, {
-      campus: "School",
-      date,
-      studentId: ids.students[1],
-      status: "boarded",
-      expectedRevision: 0,
-    }),
-  ).rejects.toThrow("not arrived");
+  await driver.mutation(api.studentDismissals.setStatus, {
+    campus: "School",
+    date,
+    studentId: ids.students[1],
+    status: "boarded",
+    expectedRevision: 0,
+  });
+  expect((await operator.query(api.studentDismissals.getRoster, rosterArgs)).students[1].state?.status).toBe("boarded");
+  expect(await t.run(ctx => ctx.db.query("dismissalQueue").collect())).toHaveLength(0);
   const arrival = await operator.mutation(api.queue.addCar, {
     campus: "School",
     carNumber: " abc-123 ",
@@ -998,13 +1244,6 @@ test("early pickup before arrival, shared roster, boarding, conflict detection a
   await expect(
     operator.mutation(api.queue.removeCar, { queueId: arrival.queueId! }),
   ).rejects.toThrow("pending");
-  await driver.mutation(api.studentDismissals.setStatus, {
-    campus: "School",
-    date,
-    studentId: ids.students[1],
-    status: "boarded",
-    expectedRevision: 0,
-  });
   await expect(
     operator.mutation(api.studentDismissals.setStatus, {
       campus: "School",
@@ -1037,7 +1276,7 @@ test("early pickup before arrival, shared roster, boarding, conflict detection a
     api.studentDismissals.getRoster,
     rosterArgs,
   );
-  expect(roster.inQueue).toBe(false);
+  expect(await t.run(ctx => ctx.db.query("dismissalQueue").collect())).toHaveLength(0);
   expect(roster.students.map((s) => s.state?.status)).toEqual([
     "picked_up_early",
     "departed",
@@ -1180,14 +1419,9 @@ test("manual queue clearing does not reset daily states, stale days are rejected
     (await driver.query(api.studentDismissals.getRoster, rosterArgs))
       .students[0].state?.status,
   ).toBe("boarded");
-  expect(
-    (
-      await driver.query(api.studentDismissals.getRoster, {
-        ...rosterArgs,
-        date: "2099-01-01",
-      })
-    ).students.every((s) => s.state === null),
-  ).toBe(true);
+  await expect(driver.query(api.studentDismissals.getRoster, {
+    ...rosterArgs, date: "2099-01-01",
+  })).rejects.toThrow("valid past date");
   await t.run((ctx) =>
     ctx.db.patch(ids.driver, { role: "viewer", busNumber: undefined }),
   );
@@ -1227,13 +1461,11 @@ test.each(["2026-01-01", "2026-09-04"])("queues and student states share the 05:
     await driver.mutation(api.studentDismissals.setStatus, {
       campus: "School", date, studentId: ids.students[1], status: "boarded", expectedRevision: 0,
     });
-    expect((await driver.query(api.studentDismissals.getRoster, rosterArgs)).inQueue).toBe(true);
     const previousStates = await t.run(ctx => ctx.db.query("studentDismissals").collect());
     vi.setSystemTime(cutoff);
     expect(operationalDate()).toBe(day);
     expect(nextOperationalDay()).toBe(cutoff + 24 * 60 * 60 * 1000);
     const roster = await driver.query(api.studentDismissals.getRoster, { ...rosterArgs, date: day });
-    expect(roster.inQueue).toBe(false);
     expect(roster.students.every(s => s.state === null)).toBe(true);
     expect((await operator.query(api.studentDismissals.searchPickupStudents, {
       campus: "School", date: day, search: "Sofia",
@@ -1257,7 +1489,7 @@ test.each(["2026-01-01", "2026-09-04"])("queues and student states share the 05:
       campus: "School", date: day, studentId: ids.students[0], status: "picked_up_early",
       collectedBy: "Parent today", expectedRevision: 0,
     });
-    expect((await driver.query(api.studentDismissals.getRoster, rosterArgs)).students[0].state?.collectedBy).toBe("Parent");
+    expect((await driver.query(api.studentDismissals.getRoster, rosterArgs)).students.find(s => s.id === ids.students[0])?.state?.collectedBy).toBe("Parent");
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
   } finally {
     vi.useRealTimers();
@@ -1309,7 +1541,7 @@ test("cutoff migration corrects live legacy dates without deleting records or re
 });
 
 test("Clerk sync preserves the normalized bus assignment and clears it on role changes", async () => {
-  const { t, ids } = await setup();
+  const { t, ids } = await setup("ABC-123");
   const data = {
     id: "driver",
     updated_at: 100,
@@ -1339,7 +1571,8 @@ test("Clerk sync preserves the normalized bus assignment and clears it on role c
 test("numeric legacy records stay compatible and plate identifiers survive dashboard aggregation", async () => {
   const { t, ids, operator } = await setup();
   await t.run(async (ctx) => {
-    const now = Date.now();
+    // Keep both history timestamps on one UTC day, including when tests run at midnight.
+    const now = Date.parse(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`);
     const history = {
       campusLocation: "School",
       lane: "left" as const,
@@ -1371,7 +1604,7 @@ test("numeric legacy records stay compatible and plate identifiers survive dashb
       position: 1,
       students: [],
       carColor: "#fff",
-      assignedTime: now,
+      assignedTime: Date.now(),
       addedBy: ids.operator,
       status: "waiting",
     });

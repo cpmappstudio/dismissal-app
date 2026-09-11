@@ -91,7 +91,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
     if (menuConfig.operators && userRole && userRole !== "bus_driver") {
       const operatorItems = menuConfig.operators.items.filter((item) =>
-        item.url === "/operators"
+        item.url === "/operators/buses" ? hasManagementAccess : item.url === "/operators"
           ? canAccessOperators(userRole)
           : userRole !== "allocator" && userRole !== "dispatcher"
       );

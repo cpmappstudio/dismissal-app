@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { BusSelect } from "@/components/dashboard/buses/bus-select";
 import Image from "next/image";
 import { Plus, Upload, X, Loader2, Save, Trash2, TriangleAlert, ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMutation, useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,7 +40,6 @@ import { normalizeVehicleIdentifier } from "@/lib/vehicle";
 import { ConvexError } from "convex/values";
 import {
   canCrudStaffRole,
-  extractRoleFromMetadata,
   getCrudStaffRoles,
   type DismissalRole,
 } from "@/lib/role-utils";
@@ -86,12 +85,13 @@ export function StaffFormDialog({
 }: StaffFormDialogProps) {
   const t = useTranslations("staffManagement");
   const bt = useTranslations("transport");
-  const { user } = useUser();
+  const { isAuthenticated } = useConvexAuth();
+  const profile = useQuery(api.users.getCurrentProfile, isAuthenticated ? {} : "skip");
   const [internalOpen, setInternalOpen] = React.useState(false);
   const [password, setPassword] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
-  const actorRole = user ? extractRoleFromMetadata(user.publicMetadata) : null;
+  const actorRole = profile?.isActive ? profile.role : null;
 
   // Ref for file input to allow resetting
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -171,7 +171,8 @@ export function StaffFormDialog({
 
   const [formData, setFormData] = React.useState(initial);
   const isDriver = driversOnly || formData.role === "bus_driver";
-  const targetRole = normalizeRole(staff?.role);
+  const buses = useQuery(api.buses.options, open && isDriver ? { forDriver: true } : "skip");
+  const targetRole = normalizeRole(staff?.role || "viewer");
   const allowedCrudRoles = React.useMemo(
     () =>
       getCrudStaffRoles(actorRole).filter(
@@ -341,9 +342,9 @@ export function StaffFormDialog({
     if (
       !formData.firstName ||
       !formData.lastName ||
-      (isDriver ? !formData.username.trim() : !formData.email) ||
+      (isDriver ? !formData.username.trim() : mode === "create" && !formData.email) ||
       !formData.role ||
-      formData.assignedCampuses.length === 0
+      (isDriver ? !buses?.some(bus => String(bus.identifier) === formData.busNumber) : formData.assignedCampuses.length === 0)
     )
       return;
 
@@ -383,7 +384,7 @@ export function StaffFormDialog({
           formData.role === "bus_driver"
             ? normalizeVehicleIdentifier(formData.busNumber)
             : undefined,
-        assignedCampuses: formData.assignedCampuses,
+        assignedCampuses: isDriver ? [] : formData.assignedCampuses,
         status: formData.status,
         avatarUrl: finalAvatarUrl,
         avatarStorageId: finalAvatarStorageId,
@@ -478,7 +479,7 @@ export function StaffFormDialog({
                     {isDriver
                       ? bt("username")
                       : t("createDialog.fields.email.label")}{" "}
-                    <span className="text-destructive">*</span>
+                    {(isDriver || mode === "create") && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="staff-identifier"
@@ -496,7 +497,8 @@ export function StaffFormDialog({
                         : t("createDialog.fields.email.placeholder")
                     }
                     disabled={formReadOnly}
-                    required
+                    readOnly={!isDriver && mode === "edit"}
+                    required={isDriver || mode === "create"}
                   />
                 </div>
                 <div className="space-y-2">
@@ -562,7 +564,7 @@ export function StaffFormDialog({
                     </Select>
                   </div>
                 )}
-                <div className="space-y-2">
+                {!isDriver && <div className="space-y-2">
                   <Label className="text-sm font-medium">
                     {t("createDialog.fields.campus.label")}{" "}
                     <span className="text-destructive">*</span>
@@ -621,33 +623,25 @@ export function StaffFormDialog({
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
+                </div>}
               </div>
 
               {formData.role === "bus_driver" && (
                 <div className="space-y-2">
-                  <Label htmlFor="busNumber">{bt("identifier")}</Label>
-                  <Input
-                    id="busNumber"
-                    value={formData.busNumber}
-                    onChange={(e) => update("busNumber", e.target.value)}
-                    required
-                    maxLength={20}
-                    disabled={formReadOnly}
-                    autoCapitalize="characters"
-                  />
+                  <Label>{bt("bus")}</Label>
+                  <BusSelect buses={buses} value={formData.busNumber} onChange={value => update("busNumber", value)} disabled={formReadOnly} />
                 </div>
               )}
-              {formReadOnly && mode === "edit" && (
+              {mode === "edit" && !staff?.role && canEditTarget && <p role="status" className="text-sm text-muted-foreground">{t("missingRole")}</p>}
+              {formReadOnly && mode === "edit" && profile !== undefined && (
                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <TriangleAlert className="h-5 w-5 text-amber-600" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      Restricted Access
+                      {t("restrictedTitle")}
                     </p>
                     <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                      Principals can only manage operator, allocator,
-                      dispatcher, and viewer accounts.
+                      {t("restrictedDescription")}
                     </p>
                   </div>
                 </div>

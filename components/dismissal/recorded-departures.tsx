@@ -134,8 +134,8 @@ export function RecordedDepartures({ campus, timezone }: { campus: string; timez
                 {record.collectedBy && <p className="text-sm">{t("collectedBy")}: {record.collectedBy}</p>}
                 {record.reason && <p className="break-words text-sm">{record.reason}</p>}
                 <p className="text-xs text-muted-foreground">
-                  {new Intl.DateTimeFormat(undefined, { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(record.updatedAt)}
-                  {" · "}{record.updatedByName}
+                  {new Intl.DateTimeFormat(undefined, { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(record.departure?.at ?? record.updatedAt)}
+                  {" · "}{record.departure?.byName ?? record.updatedByName}
                 </p>
                 {record.departureCampus !== campus && <p className="text-xs text-muted-foreground">
                   {t("departureCampus", { campus: record.departureCampus })}

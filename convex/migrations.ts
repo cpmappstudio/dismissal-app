@@ -5,12 +5,18 @@ import { Id } from "./_generated/dataModel";
 import { internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { operationalDate } from "../lib/operational-day";
+import { ensureDriverBus } from "./buses";
 
 export const migrations = new Migrations<DataModel>(components.migrations, {
   migrationsLocationPrefix: "migrations:",
 });
 
 export const run = migrations.runner();
+
+export const registerExistingBuses = migrations.define({
+  table: "users",
+  migrateOne: async (ctx, user) => { await ensureDriverBus(ctx, user); },
+});
 
 // Run once during the cutoff rollout, before resuming student departure operations.
 // Older history/audit logs remain untouched; never merge conflicting daily records.

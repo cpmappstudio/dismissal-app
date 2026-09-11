@@ -226,7 +226,7 @@ export function StaffTable({ driversOnly = false }: { driversOnly?: boolean }) {
       .map((name) => getCampusIdByName(name))
       .filter((id): id is Id<"campusSettings"> => id !== null);
 
-    if (campusIds.length === 0) {
+    if (staffData.role !== "bus_driver" && campusIds.length === 0) {
       showAlert(
         "error",
         t("alerts.createError.title"),
@@ -290,7 +290,7 @@ export function StaffTable({ driversOnly = false }: { driversOnly?: boolean }) {
       .map((name) => getCampusIdByName(name))
       .filter((id): id is Id<"campusSettings"> => id !== null);
 
-    if (campusIds.length === 0) {
+    if (staffData.role !== "bus_driver" && campusIds.length === 0) {
       showAlert(
         "error",
         t("alerts.updateError.title"),

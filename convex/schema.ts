@@ -3,7 +3,16 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const transportEvent = v.object({ at: v.number(), by: v.id("users"), byName: v.string() });
+
 export default defineSchema({
+  buses: defineTable({
+    identifier: v.union(v.number(), v.string()),
+    name: v.string(),
+    campusIds: v.array(v.id("campusSettings")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_identifier", ["identifier"]),
   /**
    * Users/workers table - Simplified for username-based auth
    */
@@ -339,6 +348,9 @@ export default defineSchema({
     vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
     reason: v.optional(v.string()),
     collectedBy: v.optional(v.string()),
+    boarding: v.optional(transportEvent),
+    dropoff: v.optional(transportEvent),
+    departure: v.optional(transportEvent),
     updatedAt: v.number(),
     updatedBy: v.id("users"),
     updatedByName: v.string(),
@@ -347,6 +359,7 @@ export default defineSchema({
     .index("by_campusId_date_studentId", ["campusId", "date", "studentId"])
     .index("by_studentId_date_status", ["studentId", "date", "status"])
     .index("by_campusId_date_vehicleIdentifier_status", ["campusId", "date", "vehicleIdentifier", "status"])
+    .index("by_campusId_vehicleIdentifier_date", ["campusId", "vehicleIdentifier", "date"])
     .index("by_campusId_date_status", ["campusId", "date", "status"])
     .index("by_date_status", ["date", "status"]),
 

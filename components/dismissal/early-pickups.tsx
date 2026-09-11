@@ -103,7 +103,7 @@ function PickupList({
                   <Combobox.Item
                     key={student.id}
                     value={student.id}
-                    disabled={student.state?.status === "departed" || student.state?.status === "picked_up_early"}
+                    disabled={!!student.state?.dropoff || student.state?.status === "departed" || student.state?.status === "picked_up_early"}
                     className="cursor-default rounded-sm px-2 py-2 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-50"
                   >
                     <span className="block font-medium">{student.name}</span>

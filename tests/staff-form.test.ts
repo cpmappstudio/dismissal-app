@@ -4,6 +4,32 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { ConvexError } from 'convex/values';
 import ts from 'typescript';
+import { canCrudStaffRole, getCrudStaffRoles } from '../lib/role-utils';
+
+test('management can edit allocators and repair missing roles using the database profile, not stale Clerk metadata', () => {
+    const file = '../components/dashboard/staff-table/staff-form-dialog.tsx';
+    const source = ts.createSourceFile(file, readFileSync(new URL(file, import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
+    const names = ['actorRole', 'normalizeRole', 'targetRole', 'canEditTarget'];
+    const declarations = new Map<string, ts.VariableDeclaration>();
+    function visit(node: ts.Node) {
+        if (ts.isVariableDeclaration(node) && names.includes(node.name.getText(source))) declarations.set(node.name.getText(source), node);
+        ts.forEachChild(node, visit);
+    }
+    visit(source);
+    const { outputText } = ts.transpileModule(names.map(name => `const ${declarations.get(name)!.getText(source)};`).join('\n') + '\ncanEditTarget;', {
+        compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    });
+    for (const role of ['principal', 'admin', 'superadmin'] as const) {
+        for (const target of ['allocator', '']) {
+            const bindings = { mode: 'edit', staff: { role: target }, profile: { role, isActive: true },
+                user: { publicMetadata: { role: 'viewer' } }, canCrudStaffRole,
+                React: { useCallback: (fn: unknown) => fn } };
+            assert.equal(runInNewContext(outputText, bindings), true);
+            assert.equal(runInNewContext(outputText, { ...bindings, profile: { role, isActive: false } }), false);
+        }
+        assert.ok(getCrudStaffRoles(role).includes('allocator'));
+    }
+});
 
 test('staff and driver lists wait for Convex authentication before querying', () => {
     const file = '../components/dashboard/staff-table/staff-table.tsx';
@@ -53,6 +79,7 @@ test('driver form waits for creation and preserves the dialog on Clerk errors', 
     let password = 'test-only-password';
     const bindings = {
         canSubmitForm: true, isSubmitting: false, isDriver: true, driversOnly: true, mode: 'create',
+        buses: [{ identifier: 11 }],
         formData: { firstName: 'Bus', lastName: 'Driver', username: 'driver_11', email: '',
             role: 'bus_driver', busNumber: '11', assignedCampuses: ['School'], status: 'active' },
         avatarFile: null, currentAvatarStorageId: null, password, ConvexError,

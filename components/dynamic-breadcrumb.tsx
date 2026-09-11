@@ -12,7 +12,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Id } from "@/convex/_generated/dataModel";
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface BreadcrumbSegment {
@@ -83,6 +83,7 @@ const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   profile: { title: "profile", fallback: "Profile" },
   bus: { title: "bus", fallback: "My bus" },
+  buses: { title: "buses", fallback: "Buses" },
   "bus-drivers": { title: "busDrivers", fallback: "Bus drivers" },
 };
 
@@ -127,6 +128,9 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
     api.campus.getById,
     campusId ? { campusId } : "skip"
   );
+  const busId = pathWithoutLocale.match(/^\/operators\/buses\/([^/]+)$/)?.[1];
+  const { isAuthenticated } = useConvexAuth();
+  const busData = useQuery(api.buses.get, busId && isAuthenticated ? { busId: busId as Id<"buses"> } : "skip");
   // Stable translation function with useCallback
   const getTranslation = useCallback(
     (key: string, fallback: string) => {
@@ -169,7 +173,9 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
 
       // Check if this part is a campus ID and replace with campus name
       let title: string;
-      if (isConvexId(part) && campusId === part) {
+      if (part === busId) {
+        title = busData?.name ?? "…";
+      } else if (isConvexId(part) && campusId === part) {
         // Show "Loading..." until campus data is loaded, then show campus name
         title = campusData?.campusName || "Loading...";
       } else {
@@ -188,7 +194,7 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
     });
 
     return segments;
-  }, [pathWithoutLocale, getTranslation, campusId, campusData]);
+  }, [pathWithoutLocale, getTranslation, campusId, campusData, busId, busData]);
 
   return (
     <Breadcrumb className="text-base">

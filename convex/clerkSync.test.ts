@@ -14,8 +14,12 @@ const active = {
 };
 const inactive = { ...active, updated_at: 200, public_metadata: { ...active.public_metadata, status: "inactive" } };
 
-function setup() {
+async function setup() {
   const t = convexTest(schema, modules);
+  await t.run(async ctx => {
+    const campus = await ctx.db.insert("campusSettings", { campusName: "School", timezone: "America/Bogota", allowMultipleStudentsPerCar: true, requireCarNumber: false, isActive: true, status: "active", createdAt: Date.now() });
+    await ctx.db.insert("buses", { identifier: 123, name: "Bus", campusIds: [campus], createdAt: Date.now(), updatedAt: Date.now() });
+  });
   vi.stubEnv("CLERK_WEBHOOK_SECRET", secret);
   vi.stubEnv("CLERK_SECRET_KEY", "test-only-key");
   // Every external request must be explicitly mocked by the test.
@@ -40,13 +44,13 @@ function setup() {
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 test("old and duplicate Clerk versions cannot undo deactivation; newer versions still apply", async () => {
-  const { t, read, send, fetchMock } = setup();
+  const { t, read, send, fetchMock } = await setup();
   await t.mutation(internal.users.upsertFromClerk, { data: inactive });
   const before = await read();
   for (const data of [active, inactive, { ...active, updated_at: 200 }]) {
     expect((await send("user.updated", data)).status).toBe(200);
     expect(await read()).toEqual(before);
-    expect(await t.run(ctx => isBus(ctx.db, 123))).toBe(false);
+    expect(await t.run(ctx => isBus(ctx.db, 123))).toBe(true);
   }
   expect(fetchMock).not.toHaveBeenCalled();
   await t.mutation(internal.users.upsertFromClerk, { data: { ...active, updated_at: 300 } });
@@ -54,7 +58,7 @@ test("old and duplicate Clerk versions cannot undo deactivation; newer versions 
 });
 
 test.each([true, false])("deletion is terminal even before user creation (existing: %s)", async (existing) => {
-  const { t, read, send, fetchMock } = setup();
+  const { t, read, send, fetchMock } = await setup();
   if (existing) await t.mutation(internal.users.upsertFromClerk, { data: active });
   for (let i = 0; i < 2; i++) expect((await send("user.deleted", { id: active.id })).status).toBe(200);
   for (const data of [active, inactive, { ...active, updated_at: 300 }]) {
@@ -64,7 +68,8 @@ test.each([true, false])("deletion is terminal even before user creation (existi
   fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
   expect((await send("user.created")).status).toBe(200);
   expect(await read()).toBeNull();
-  expect(await t.run(ctx => isBus(ctx.db, 123))).toBe(false);
+  // A registered bus survives its driver. A stale event must not create either record.
+  expect(await t.run(ctx => isBus(ctx.db, 123))).toBe(true);
   expect(await t.run(ctx => ctx.db.query("deletedClerkUsers").collect())).toHaveLength(1);
   // The username can be reused by a genuinely new Clerk account.
   await t.mutation(internal.users.upsertFromClerk, { data: { ...active, id: "new-driver" } });
@@ -72,7 +77,7 @@ test.each([true, false])("deletion is terminal even before user creation (existi
 });
 
 test("legacy users bootstrap from current Clerk state, not an old webhook or the local clock", async () => {
-  const { read, send, fetchMock, legacy } = setup();
+  const { read, send, fetchMock, legacy } = await setup();
   const id = await legacy();
   fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(inactive)));
   expect((await send("user.updated")).status).toBe(200);
@@ -83,7 +88,7 @@ test("legacy users bootstrap from current Clerk state, not an old webhook or the
 });
 
 test("temporary user merging preserves the ID and initializes the Clerk source version", async () => {
-  const { t, read } = setup();
+  const { t, read } = await setup();
   const id = await t.run(ctx => ctx.db.insert("users", {
     clerkId: "temp_driver", email: "driver@example.test", assignedCampuses: [],
     isActive: false, createdAt: Date.now(),
@@ -96,7 +101,7 @@ test("temporary user merging preserves the ID and initializes the Clerk source v
 });
 
 test("a replay for an account deleted before this fix cannot recreate it", async () => {
-  const { t, read, send, fetchMock } = setup();
+  const { t, read, send, fetchMock } = await setup();
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
   expect((await send("user.updated")).status).toBe(200);
   expect(await read()).toBeNull();
@@ -104,7 +109,7 @@ test("a replay for an account deleted before this fix cannot recreate it", async
 });
 
 test.each(["update", "delete"])("an in-flight bootstrap cannot overwrite a concurrent %s", async (change) => {
-  const { t, read, send, fetchMock, legacy } = setup();
+  const { t, read, send, fetchMock, legacy } = await setup();
   await legacy();
   fetchMock.mockImplementationOnce(async () => {
     if (change === "delete") await t.mutation(internal.users.deleteFromClerk, { clerkUserId: active.id });
@@ -117,7 +122,7 @@ test.each(["update", "delete"])("an in-flight bootstrap cannot overwrite a concu
 });
 
 test.each([401, 429, 500, "network"])("bootstrap failure %s is retryable without changing the user", async (failure) => {
-  const { read, send, fetchMock, legacy } = setup();
+  const { read, send, fetchMock, legacy } = await setup();
   await legacy();
   const before = await read();
   if (failure === "network") fetchMock.mockRejectedValueOnce(new Error("Network failure"));
@@ -127,7 +132,7 @@ test.each([401, 429, 500, "network"])("bootstrap failure %s is retryable without
 });
 
 test("missing source versions fail closed and malformed signatures never reach Clerk", async () => {
-  const { t, read, fetchMock } = setup();
+  const { t, read, fetchMock } = await setup();
   await t.mutation(internal.users.upsertFromClerk, { data: inactive });
   const before = await read();
   for (const updated_at of [undefined, null, "300", -1, 1.5]) {

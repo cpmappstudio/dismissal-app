@@ -10,6 +10,8 @@ import { internal, api } from "./_generated/api";
 import { type Doc, Id } from "./_generated/dataModel";
 import { normalizeVehicleIdentifier } from "../lib/vehicle";
 import { validateUserAccess } from "./helpers";
+import { requireBus } from "./buses";
+import { canCrudStaffRole, isPrincipalLikeRole } from "../lib/role-utils";
 
 // ============================================================================
 // AVATAR STORAGE FUNCTIONS (Following official Convex pattern)
@@ -156,24 +158,10 @@ function isSuperadminRole(role: string | undefined): boolean {
   return role === "superadmin";
 }
 
-function isPrincipalLikeRole(role: string | undefined): boolean {
-  return role === "principal" || role === "admin";
-}
-
-function canPrincipalCrudRole(role: string | undefined): boolean {
-  return (
-    role === "bus_driver" ||
-    role === "operator" ||
-    role === "allocator" ||
-    role === "dispatcher" ||
-    role === "viewer"
-  );
-}
-
-function ensurePrincipalCrudTarget(actorRole: string | undefined, targetRole: string | undefined) {
-  if (!isPrincipalLikeRole(actorRole)) return;
-  if (!canPrincipalCrudRole(targetRole)) {
-    throw new Error("Principals can only manage operator, allocator, dispatcher, and viewer users");
+function ensurePrincipalCrudTarget(actorRole: Role | undefined, targetRole: Role | undefined) {
+  if (!isPrincipalLikeRole(actorRole ?? null)) return;
+  if (!canCrudStaffRole(actorRole ?? null, targetRole ?? null)) {
+    throw new Error("Principals can only manage bus driver, operator, allocator, dispatcher, and viewer users");
   }
 }
 
@@ -189,7 +177,8 @@ function hasCampusOverlap(
 // The caller's active management role is validated before checking the resource.
 function ensureCanUpdateUser(actor: Doc<"users">, target: Doc<"users">) {
   if (isSuperadminRole(actor.role)) return;
-  ensurePrincipalCrudTarget(actor.role, target.role);
+  // Missing roles have viewer access in validateUserAccess; management may repair these legacy accounts.
+  ensurePrincipalCrudTarget(actor.role, target.role ?? "viewer");
   if (!hasCampusOverlap(actor.assignedCampuses, target.assignedCampuses)) {
     throw new Error("Cannot update users outside your assigned campuses");
   }
@@ -258,6 +247,7 @@ export const getCurrentProfile = query({
       imageUrl: identity.imageUrl || identity.pictureUrl || "",
       username: identity.username || "",
       role: user?.role || "viewer",
+      isActive: !!user?.isActive && user.status !== "inactive",
       assignedCampuses: user?.assignedCampuses || [],
       status: user?.status || "active"
     };
@@ -347,9 +337,10 @@ export const upsertFromClerk = internalMutation({
     // Extract metadata
     const publicMetadata = data.public_metadata || {};
     const role = extractRoleFromMetadata(data);
-    const assignedCampuses = publicMetadata.assignedCampuses || (publicMetadata.campusId ? [publicMetadata.campusId] : []);
+    let assignedCampuses = publicMetadata.assignedCampuses || (publicMetadata.campusId ? [publicMetadata.campusId] : []);
     const phone = publicMetadata.phone || undefined;
     const busNumber = role === "bus_driver" ? normalizeVehicleIdentifier(publicMetadata.busNumber ?? "") : undefined;
+    if (busNumber !== undefined) assignedCampuses = (await requireBus(ctx.db, busNumber)).campusIds;
     const avatarStorageId = publicMetadata.avatarStorageId || undefined;
     const status = publicMetadata.status || "active";
 
@@ -540,13 +531,14 @@ export const createUserWithClerk = action({
   handler: async (ctx, args) => {
     // Check permissions
     const actor = await ctx.runQuery(internal.users.checkManagementPermissions, {});
-    ensureCampusScopeForManagement(actor, args.assignedCampuses);
+    const bus = args.role === "bus_driver" ? await ctx.runQuery(internal.buses.driverAssignment, { identifier: args.busNumber ?? "" }) : null;
+    const assignedCampuses = bus?.campusIds ?? args.assignedCampuses;
+    ensureCampusScopeForManagement(actor, assignedCampuses);
     if (!isSuperadminRole(actor.role) && args.role === "superadmin") {
       throw new Error("Only superadmin can create superadmin users");
     }
     ensurePrincipalCrudTarget(actor.role, args.role);
     const busNumber = args.role === "bus_driver" ? normalizeVehicleIdentifier(args.busNumber ?? "") : undefined;
-    if (args.role === "bus_driver" && !args.assignedCampuses.length) throw new Error("A campus is required for the driver");
     const username = args.username?.trim();
     const email = args.email?.trim();
     if (args.role === "bus_driver" && !username) {
@@ -567,7 +559,7 @@ export const createUserWithClerk = action({
       // Build public_metadata with avatarStorageId for Convex → Clerk sync
       const publicMetadata: any = {
         role: args.role,
-        assignedCampuses: args.assignedCampuses,
+        assignedCampuses,
         status: "active",
         busNumber,
       };
@@ -625,7 +617,7 @@ export const createUserWithClerk = action({
             email_address: email,
             public_metadata: {
               role: args.role,
-              assignedCampuses: args.assignedCampuses,
+              assignedCampuses,
               busNumber,
             },
             redirect_url: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/sign-in",
@@ -684,7 +676,8 @@ export const updateUserWithClerk = action({
     }
     const targetRole = args.role ?? targetUser.role;
     const busNumber = targetRole === "bus_driver" ? normalizeVehicleIdentifier(args.busNumber ?? targetUser.busNumber ?? "") : null;
-    if (targetRole === "bus_driver" && !(args.assignedCampuses ?? targetUser.assignedCampuses).length) throw new Error("A campus is required for the driver");
+    const bus = targetRole === "bus_driver" ? await ctx.runQuery(internal.buses.driverAssignment, { identifier: busNumber! }) : null;
+    const assignedCampuses = bus?.campusIds ?? args.assignedCampuses;
 
     if (
       targetUser.role === "superadmin" &&
@@ -702,8 +695,8 @@ export const updateUserWithClerk = action({
       if (args.role !== undefined) {
         ensurePrincipalCrudTarget(actor.role, args.role);
       }
-      if (args.assignedCampuses !== undefined) {
-        ensureCampusScopeForManagement(actor, args.assignedCampuses);
+      if (assignedCampuses !== undefined) {
+        ensureCampusScopeForManagement(actor, assignedCampuses);
       }
     }
 
@@ -748,7 +741,7 @@ export const updateUserWithClerk = action({
       
       // Update only the fields that were provided
       if (args.role) publicMetadata.role = args.role;
-      if (args.assignedCampuses !== undefined) publicMetadata.assignedCampuses = args.assignedCampuses;
+      if (assignedCampuses !== undefined) publicMetadata.assignedCampuses = assignedCampuses;
       if (args.phone !== undefined) publicMetadata.phone = args.phone;
       publicMetadata.busNumber = busNumber;
       if (args.status) publicMetadata.status = args.status;

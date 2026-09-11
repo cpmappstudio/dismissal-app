@@ -14,6 +14,8 @@ import {
   type VehicleIdentifier,
 } from "../lib/vehicle";
 import { operationalDate } from "../lib/operational-day";
+import { isBus } from "./buses";
+export { isBus } from "./buses";
 
 const rosterRoles: DismissalRole[] = [
   "superadmin",
@@ -32,22 +34,6 @@ const editableStatus = v.union(
   v.literal("picked_up_early"),
 );
 
-export async function isBus(
-  db: DatabaseReader,
-  identifier: VehicleIdentifier,
-) {
-  const drivers = await db
-    .query("users")
-    .withIndex("by_busNumber", (q) => q.eq("busNumber", identifier))
-    .take(100);
-  return drivers.some(
-    (driver) =>
-      driver.role === "bus_driver" &&
-      driver.isActive &&
-      driver.status !== "inactive",
-  );
-}
-
 export async function rosterStudents(
   db: DatabaseReader,
   identifier: VehicleIdentifier,
@@ -59,14 +45,16 @@ export async function rosterStudents(
     .query("studentDismissals")
     .withIndex("by_campusId_date_vehicleIdentifier_status", (q) =>
       q.eq("campusId", campusId).eq("date", date)
-        .eq("vehicleIdentifier", identifier).eq("status", "boarded"),
+        .eq("vehicleIdentifier", identifier),
     )
     .take(201);
   if (students.length > 200 || boardings.length > 200)
     throw new Error("Too many students assigned to this vehicle");
-  // Preserve actual boardings, including those recorded under the old cross-campus fallback.
+  // Preserve the day's bus journey after departure or assignment changes as well.
   const roster = new Map(students.map((student) => [student._id, student]));
   for (const boarding of boardings) {
+    if (boarding.dropoff) continue;
+    if (boarding.status !== "boarded" && !(boarding.status === "departed" && boarding.vehicleType === "bus")) continue;
     if (roster.has(boarding.studentId)) continue;
     const student = await db.get(boarding.studentId);
     if (!student) throw new Error("A boarded student's record is missing");
@@ -106,7 +94,7 @@ export async function assertNotBoarded(
   const boardings = await db
     .query("studentDismissals")
     .withIndex("by_studentId_date_status", (q) =>
-      q.eq("studentId", student._id).eq("date", operationalDate()).eq("status", "boarded"),
+      q.eq("studentId", student._id).eq("date", operationalDate()),
     )
     .collect();
   for (const boarding of boardings) {
@@ -116,11 +104,15 @@ export async function assertNotBoarded(
       boarding.date,
       student._id,
     );
-    if (state?.status === "boarded")
+    if (state && !state.dropoff && (state.status === "boarded" || (state.status === "departed" && state.vehicleType === "bus")))
       throw new Error(
         "Mark this student pending in the bus list before changing their assignment or deleting them",
       );
   }
+}
+
+function transportEvent(data: Pick<Doc<"studentDismissals">, "updatedAt" | "updatedBy" | "updatedByName">) {
+  return { at: data.updatedAt, by: data.updatedBy, byName: data.updatedByName };
 }
 
 export async function writeDailyState(
@@ -129,7 +121,15 @@ export async function writeDailyState(
   data: Omit<Doc<"studentDismissals">, "_id" | "_creationTime" | "revision">,
   user: Doc<"users">,
 ) {
-  const next = { ...data, revision: (previous?.revision ?? 0) + 1 };
+  const traveling = data.vehicleType === "bus" && (data.status === "boarded" || data.status === "departed");
+  const next = {
+    ...data,
+    boarding: traveling ? previous?.boarding ??
+      (previous?.status === "boarded" ? transportEvent(previous) : data.status === "boarded" ? transportEvent(data) : undefined) : undefined,
+    departure: data.status === "departed" ? previous?.departure ??
+      transportEvent(previous?.status === "departed" ? previous : data) : undefined,
+    revision: (previous?.revision ?? 0) + 1,
+  };
   const id = previous
     ? previous._id
     : await ctx.db.insert("studentDismissals", next);
@@ -164,7 +164,7 @@ export const getDriverContext = query({
 });
 
 export const getRoster = query({
-  args: { campus: v.string(), carNumber: vehicleValidator, date: v.string() },
+  args: { campus: v.string(), carNumber: vehicleValidator, date: v.string(), historical: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const { user, role } = await validateUserAccess(
       ctx,
@@ -176,38 +176,57 @@ export const getRoster = query({
       throw new Error("This is not your bus");
     const campus = await getCampusSettings(ctx.db, args.campus);
     if (!campus || !campus.isActive) throw new Error("Campus unavailable");
-    const students = await rosterStudents(ctx.db, identifier, campus._id, args.date);
-    const bus = await isBus(ctx.db, identifier);
-    const entries = await ctx.db
-      .query("dismissalQueue")
-      .withIndex("by_car_campus", (q) =>
-        q.eq("carNumber", identifier).eq("campusLocation", args.campus),
-      )
-      .take(2);
-    return {
-      date: args.date,
-      timezone: campus.timezone,
-      isBus: bus,
-      inQueue: entries.some(
-        (entry) =>
-          entry.status === "waiting" &&
-          operationalDate(entry.assignedTime) === args.date,
-      ),
-      canEdit: bus && (canDispatch(role) || role === "bus_driver"),
-      students: await Promise.all(
-        students.map(async (student) => ({
+    const today = operationalDate();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date) ||
+      !Number.isFinite(Date.parse(args.date)) ||
+      new Date(args.date).toISOString().slice(0, 10) !== args.date || args.date > today)
+      throw new Error("Choose today or a valid past date");
+    // Distinct query keys prevent a cached live roster being reused as history after midnight.
+    const isToday = args.date === today && !args.historical;
+    // Historical membership comes from recorded events, never today's assignments.
+    const records = isToday ? null : await ctx.db.query("studentDismissals")
+      .withIndex("by_campusId_date_vehicleIdentifier_status", q =>
+        q.eq("campusId", campus._id).eq("date", args.date).eq("vehicleIdentifier", identifier),
+      ).take(201);
+    if (records && records.length > 200) throw new Error("Too many student records for this vehicle");
+    const rows = records
+      ? await Promise.all(records.map(async record => ({
+          id: record.studentId,
+          name: record.studentName,
+          student: await ctx.db.get(record.studentId),
+          state: await getDailyState(ctx.db, campus._id, args.date, record.studentId),
+        })))
+      : await Promise.all((await rosterStudents(ctx.db, identifier, campus._id, args.date)).map(async student => ({
           id: student._id,
           name: student.fullName,
-          grade: student.grade,
-          avatarUrl: student.avatarStorageId
+          student,
+          state: await getDailyState(ctx.db, campus._id, args.date, student._id),
+        })));
+    const bus = await isBus(ctx.db, identifier);
+    const [previous, next] = await Promise.all([
+      ctx.db.query("studentDismissals")
+        .withIndex("by_campusId_vehicleIdentifier_date", q =>
+          q.eq("campusId", campus._id).eq("vehicleIdentifier", identifier).lt("date", args.date),
+        ).order("desc").first(),
+      ctx.db.query("studentDismissals")
+        .withIndex("by_campusId_vehicleIdentifier_date", q =>
+          q.eq("campusId", campus._id).eq("vehicleIdentifier", identifier).gt("date", args.date),
+        ).order("asc").first(),
+    ]);
+    return {
+      date: args.date,
+      previousDate: previous?.date ?? null,
+      nextDate: next && next.date <= today ? next.date : null,
+      timezone: campus.timezone,
+      isBus: bus,
+      canEdit: isToday && bus && (canDispatch(role) || role === "bus_driver"),
+      students: await Promise.all(
+        rows.map(async ({ student, ...row }) => ({
+          ...row,
+          grade: student?.grade ?? "",
+          avatarUrl: student?.avatarStorageId
             ? await ctx.storage.getUrl(student.avatarStorageId)
-            : student.avatarUrl,
-          state: await getDailyState(
-            ctx.db,
-            campus._id,
-            args.date,
-            student._id,
-          ),
+            : student?.avatarUrl,
         })),
       ),
     };
@@ -267,7 +286,7 @@ export const listRecordedDepartures = query({
       const origin = record.campusId === campus._id ? campus : await ctx.db.get(record.campusId);
       return {
         ...record, departureCampus: origin?.campusName ?? "—",
-        canCorrect: record.status === "departed" ? isManagementRole(role)
+        canCorrect: record.status === "departed" ? isManagementRole(role) && !record.dropoff
           : !!origin?.isActive && (hasGlobalCampusScope(role) || user.assignedCampuses.includes(record.campusId)),
       };
     }));
@@ -293,6 +312,7 @@ export const correctDeparture = mutation({
     const previous = await ctx.db.get(args.departureId);
     if (previous?.date !== args.date || previous.status !== "departed" || previous.revision !== args.expectedRevision)
       throw new Error("The student was updated by someone else. Review the latest state");
+    if (previous.dropoff) throw new Error("Undo the bus drop-off before correcting this departure");
     const student = await ctx.db.get(previous.studentId);
     if (!student?.isActive || !student.campuses.includes(campus._id))
       throw new Error("Student does not belong to this campus");
@@ -302,6 +322,54 @@ export const correctDeparture = mutation({
       vehicleIdentifier: previous.vehicleIdentifier, vehicleType: previous.vehicleType,
       reason, updatedAt: Date.now(), updatedBy: user._id,
       updatedByName: user.fullName ?? user.email ?? "",
+    }, user);
+    return null;
+  },
+});
+
+// Shared authorization and concurrency boundary for attendance and drop-off writes.
+async function editableStudent(ctx: MutationCtx, args: {
+  campus: string; date: string; studentId: Id<"students">; expectedRevision: number;
+}) {
+  const { user, role } = await validateUserAccess(ctx, rosterRoles, args.campus);
+  if (!canDispatch(role) && role !== "bus_driver")
+    throw new Error("Not authorized to update student departures");
+  const campus = await getCampusSettings(ctx.db, args.campus);
+  if (!campus?.isActive || args.date !== operationalDate())
+    throw new Error("The operational day changed. Refresh the list");
+  const student = await ctx.db.get(args.studentId);
+  if (!student?.isActive) throw new Error("Student does not belong to this campus");
+  const bus = student.carNumber !== 0 && await isBus(ctx.db, student.carNumber);
+  if (!student.campuses.includes(campus._id) && (
+    !bus || !(await rosterStudents(ctx.db, student.carNumber, campus._id, args.date)).some(s => s._id === student._id)
+  )) throw new Error("Student does not belong to this campus");
+  if (role === "bus_driver" && (!bus || user.busNumber !== student.carNumber))
+    throw new Error("Student does not belong to your bus");
+  const previous = await getDailyState(ctx.db, campus._id, args.date, student._id);
+  if ((previous?.revision ?? 0) !== args.expectedRevision)
+    throw new Error("The student was updated by someone else. Review the latest state");
+  return { user, role, campus, student, bus, previous };
+}
+
+export const setDropoff = mutation({
+  args: {
+    campus: v.string(), date: v.string(), studentId: v.id("students"),
+    expectedRevision: v.number(), droppedOff: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const { user, student, bus, previous } = await editableStudent(ctx, args);
+    if (!bus || !previous || previous.vehicleType !== "bus" ||
+      previous.vehicleIdentifier !== student.carNumber ||
+      (previous.status !== "boarded" && previous.status !== "departed"))
+      throw new Error("The student must be on this bus before recording a drop-off");
+    if (!!previous.dropoff === args.droppedOff) return null;
+    const now = Date.now();
+    await writeDailyState(ctx, previous, {
+      studentId: previous.studentId, studentName: previous.studentName,
+      campusId: previous.campusId, date: previous.date, status: previous.status,
+      vehicleIdentifier: previous.vehicleIdentifier, vehicleType: previous.vehicleType,
+      dropoff: args.droppedOff ? { at: now, by: user._id, byName: user.fullName ?? user.email ?? "" } : undefined,
+      updatedAt: now, updatedBy: user._id, updatedByName: user.fullName ?? user.email ?? "",
     }, user);
     return null;
   },
@@ -318,38 +386,10 @@ export const setStatus = mutation({
     collectedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { user, role } = await validateUserAccess(
-      ctx,
-      rosterRoles,
-      args.campus,
-    );
-    if (!canDispatch(role) && role !== "bus_driver")
-      throw new Error("Not authorized to update student departures");
-    const campus = await getCampusSettings(ctx.db, args.campus);
-    if (!campus?.isActive || args.date !== operationalDate())
-      throw new Error("The operational day changed. Refresh the list");
-    const student = await ctx.db.get(args.studentId);
-    if (!student?.isActive)
+    const { user, role, campus, student, bus, previous } = await editableStudent(ctx, args);
+    if (args.status === "picked_up_early" && !student.campuses.includes(campus._id))
       throw new Error("Student does not belong to this campus");
-    const bus =
-      student.carNumber !== 0 &&
-      (await isBus(ctx.db, student.carNumber));
-    if (!student.campuses.includes(campus._id) && (
-      !bus || args.status === "picked_up_early" ||
-      !(await rosterStudents(ctx.db, student.carNumber, campus._id, args.date)).some(s => s._id === student._id)
-    )) throw new Error("Student does not belong to this campus");
-    if (role === "bus_driver" && (!bus || user.busNumber !== student.carNumber))
-      throw new Error("Student does not belong to your bus");
-    const previous = await getDailyState(
-      ctx.db,
-      campus._id,
-      args.date,
-      args.studentId,
-    );
-    if ((previous?.revision ?? 0) !== args.expectedRevision)
-      throw new Error(
-        "The student was updated by someone else. Review the latest state",
-      );
+    if (previous?.dropoff) throw new Error("Undo the bus drop-off before changing attendance");
     if (previous?.status === "departed")
       throw new Error("The student has already departed");
     if (
@@ -374,24 +414,8 @@ export const setStatus = mutation({
       throw new Error("A correction reason is required");
     if ((reason?.length ?? 0) > 500 || (collectedBy?.length ?? 0) > 150)
       throw new Error("Text is too long");
-    if (args.status === "boarded") {
-      if (!bus)
-        throw new Error("This student is not assigned to an active bus");
-      const entry = await ctx.db
-        .query("dismissalQueue")
-        .withIndex("by_car_campus", (q) =>
-          q
-            .eq("carNumber", student.carNumber)
-            .eq("campusLocation", args.campus),
-        )
-        .first();
-      if (
-        !entry ||
-        entry.status !== "waiting" ||
-        operationalDate(entry.assignedTime) !== args.date
-      )
-        throw new Error("The bus has not arrived today");
-    }
+    if (args.status === "boarded" && !bus)
+      throw new Error("This student is not assigned to an active bus");
     await writeDailyState(
       ctx,
       previous,
@@ -448,7 +472,7 @@ export async function recordDeparture(
       );
     if (
       previous &&
-      ["picked_up_early", "not_traveling", "departed"].includes(previous.status)
+      (previous.dropoff || ["picked_up_early", "not_traveling", "departed"].includes(previous.status))
     )
       continue;
     if (

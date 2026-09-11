@@ -38,6 +38,7 @@ import { DeleteStudentsDialog } from "./delete-students-dialog"
 import { CampusOption, GRADES } from "@/convex/types"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
+import { BusSelect } from "@/components/dashboard/buses/bus-select"
 
 interface StudentFormDialogProps {
     mode: 'create' | 'edit'
@@ -45,7 +46,7 @@ interface StudentFormDialogProps {
     trigger?: React.ReactNode
     open?: boolean
     onOpenChange?: (open: boolean) => void
-    onSubmit: (student: Omit<Student, 'id'>) => void
+    onSubmit: (student: Omit<Student, 'id'>) => void | Promise<void>
     onDelete?: (studentId: string) => void
 }
 
@@ -59,6 +60,7 @@ export function StudentFormDialog({
     onDelete
 }: StudentFormDialogProps) {
     const t = useTranslations('studentsManagement')
+    const bt = useTranslations('buses')
     const [internalOpen, setInternalOpen] = React.useState(false)
 
     // Ref for file input to allow resetting
@@ -74,6 +76,7 @@ export function StudentFormDialog({
     const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
     const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
+    const [isSubmitting, setIsSubmitting] = React.useState(false)
     const [currentAvatarStorageId, setCurrentAvatarStorageId] = React.useState<Id<"_storage"> | null>(null)
 
     // Query to get the current avatar URL from storage ID (uses local state, not prop)
@@ -118,6 +121,11 @@ export function StudentFormDialog({
     })
 
     const [formData, setFormData] = React.useState(initialFormData)
+    const buses = useQuery(api.buses.options, open ? { forDriver: false } : "skip")
+    const [chosenType, setChosenType] = React.useState<"car" | "bus" | null>(null)
+    React.useEffect(() => { if (open) setChosenType(null) }, [open, student?.id])
+    const vehicleType = chosenType ?? (buses?.some(bus => String(bus.identifier) === initialFormData.carNumber) ? "bus" : "car")
+    const availableBuses = buses?.filter(bus => formData.campusId && bus.campusIds.includes(formData.campusId))
 
     // Reset form when student changes or dialog opens
     React.useEffect(() => {
@@ -257,11 +265,16 @@ export function StudentFormDialog({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!buses || isSubmitting) return
+        if (vehicleType === "bus" && !availableBuses?.some(bus => String(bus.identifier) === formData.carNumber)) {
+            alert(bt("select")); return
+        }
 
         if (!formData.firstName || !formData.lastName || !date || !formData.grade || !formData.campusId) {
             return // Basic validation
         }
 
+        setIsSubmitting(true)
         try {
             // Determine final avatar values
             let finalAvatarStorageId: Id<"_storage"> | undefined
@@ -300,6 +313,7 @@ export function StudentFormDialog({
                     day: '2-digit'
                 }),
                 carNumber: normalizeVehicleIdentifier(formData.carNumber, true),
+                vehicleType,
                 grade: formData.grade as Grade,
                 campusId: formData.campusId as Id<"campusSettings">,
                 campusLocation: campusName,
@@ -307,10 +321,12 @@ export function StudentFormDialog({
                 avatarStorageId: finalAvatarStorageId
             }
 
-            onSubmit(studentData)
+            await onSubmit(studentData)
             setOpen(false)
         } catch {
             alert("Failed to save student. Please try again.")
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -545,6 +561,12 @@ export function StudentFormDialog({
 
                         {/* Car Number Section */}
                         <div className="space-y-2">
+                            <Label>{bt('vehicleType')}</Label>
+                            <Select value={vehicleType} disabled={!buses} onValueChange={(value: "car" | "bus") => { setChosenType(value); updateFormData("carNumber", "") }}>
+                                <SelectTrigger className="w-full" aria-label={bt('vehicleType')}><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="car">{bt('car')}</SelectItem><SelectItem value="bus">{bt('bus')}</SelectItem></SelectContent>
+                            </Select>
+                            {vehicleType === "bus" ? <BusSelect buses={availableBuses} value={formData.carNumber} onChange={value => updateFormData("carNumber", value)} disabled={!formData.campusId} /> : <>
                             <Label htmlFor="carNumber" className="text-sm font-medium">{t('createDialog.fields.carNumber.label')}</Label>
                             <Input
                                 id="carNumber"
@@ -556,6 +578,7 @@ export function StudentFormDialog({
                                 placeholder="0"
                                 className="h-10"
                             />
+                            </>}
                         </div>
 
                         {/* Legacy Avatar URL (for compatibility) */}
@@ -600,6 +623,7 @@ export function StudentFormDialog({
                         )}
                         <Button
                             type="submit"
+                            disabled={isSubmitting || !buses}
                             className="bg-yankees-blue hover:bg-yankees-blue/90 gap-2"
                         >
                             <SubmitIcon className="h-4 w-4" />

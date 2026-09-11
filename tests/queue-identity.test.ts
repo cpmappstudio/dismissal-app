@@ -33,6 +33,7 @@ test('Reordering and moving preserve IDs, metadata, lane order and subsequent di
             campusSettings: new Map([['campus-id', { _id: 'campus-id', campusName: 'campus', timezone: 'America/New_York' }]]),
             dismissalHistory: new Map<string, Row>(),
             studentDismissals: new Map<string, Row>(),
+            buses: new Map<string, Row>(),
             auditLogs: new Map<string, Row>(),
         };
         const ctx = {

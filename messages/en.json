@@ -1,5 +1,27 @@
 {
+  "buses": {
+    "select": "Select a bus",
+    "noneAvailable": "No buses available. Create a bus for the campus first.",
+    "vehicleType": "Transport",
+    "car": "Car",
+    "bus": "Bus",
+    "create": "Create bus",
+    "edit": "Edit bus",
+    "name": "Name",
+    "campuses": "Campuses",
+    "back": "Back to buses",
+    "search": "Search buses by name, number or plate",
+    "empty": "No buses found.",
+    "moreResults": "No matches among the loaded buses. Load more to continue searching.",
+    "noDriver": "No active driver assigned.",
+    "formDescription": "Configure the bus and its campuses. Assigned drivers inherit these campuses.",
+    "identifierHint": "This identifier links students, drivers and Road and cannot be changed here."
+  },
   "transport": {
+    "dateNavigation": "Attendance date",
+    "today": "Today",
+    "previousDay": "Previous date with records",
+    "nextDay": "Next date with records",
     "driverCreated": "Bus driver created",
     "username": "Username",
     "password": "Password",
@@ -27,12 +49,13 @@
     "pickupDescription": "Record early pickups and review students who departed today.",
     "loading": "Loading…",
     "saveError": "Could not save. Please try again.",
-    "notInQueue": "The bus is not on the road. You can review the list; boarding is enabled once it arrives.",
     "noStudents": "No students assigned to this bus at this campus.",
     "noAssignment": "No active campus or bus assigned. Contact the school.",
     "markBoarded": "Boarded",
+    "markDroppedOff": "Got off the bus",
+    "undoDropoff": "Undo drop-off",
     "boardingStatus": "Boarding status",
-    "boardingProgress": "{boarded} of {total} expected students have boarded",
+    "boardingProgress": "{boarded} of {total} expected students are on the bus",
     "notTraveling": "Not traveling",
     "undo": "Mark pending",
     "reason": "Reason",
@@ -49,6 +72,7 @@
     "status": {
       "pending": "Pending",
       "boarded": "Boarded",
+      "dropped_off": "Got off the bus",
       "not_traveling": "Not traveling · do not wait",
       "picked_up_early": "Picked up early · do not wait",
       "departed": "Departed"
@@ -67,6 +91,7 @@
     "birthdayMessage": "Happy birthday"
   },
   "navigation": {
+    "buses": "Buses",
     "busDrivers": "Bus drivers",
     "bus": "My bus",
     "university": "Dismissal App",
@@ -189,6 +214,10 @@
           {
             "title": "Road",
             "url": "/operators"
+          },
+          {
+            "title": "Buses",
+            "url": "/operators/buses"
           },
           {
             "title": "Viewer",
@@ -527,6 +556,9 @@
     }
   },
   "staffManagement": {
+    "missingRole": "This account has no assigned role. Select its role before saving.",
+    "restrictedTitle": "Restricted access",
+    "restrictedDescription": "Your current permissions do not allow editing this account.",
     "title": "Staff",
     "subtitle": "Manage and view all staff members in the system",
     "search": {

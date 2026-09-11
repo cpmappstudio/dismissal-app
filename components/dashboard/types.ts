@@ -8,6 +8,7 @@ export type Student = {
     lastName: string
     birthday: string
     carNumber: number | string
+    vehicleType?: "car" | "bus"
     grade: Grade
     campusId: Id<"campusSettings"> // Campus ID for database operations
     campusLocation: string // Campus name for display (derived from campusId)

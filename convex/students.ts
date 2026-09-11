@@ -6,6 +6,7 @@ import { gradeValidator } from "./types";
 import { Id } from "./_generated/dataModel";
 import { normalizeVehicleIdentifier } from "../lib/vehicle";
 import { assertNotBoarded } from "./studentDismissals";
+import { validateStudentVehicle } from "./buses";
 import { getStudentsByCarNumber, repositionLaneCars, userHasAccessToCampusById, validateUserAccess } from "./helpers";
 
 const STUDENT_MANAGEMENT_ROLES = ["principal", "admin", "superadmin"] as const;
@@ -260,6 +261,7 @@ export const create = mutation({
         birthday: v.string(),
         grade: gradeValidator,
         campuses: v.array(v.id("campusSettings")),
+        vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
         carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")), // For new Convex storage
@@ -289,6 +291,7 @@ export const create = mutation({
 
         // Validate car number
         const carNumber = normalizeVehicleIdentifier(args.carNumber ?? 0, true);
+        await validateStudentVehicle(ctx.db, carNumber, args.campuses, args.vehicleType);
 
         // Create full name
         const fullName = `${args.firstName.trim()} ${args.lastName.trim()}`;
@@ -323,6 +326,7 @@ export const update = mutation({
         birthday: v.optional(v.string()),
         grade: v.optional(gradeValidator),
         campuses: v.optional(v.array(v.id("campusSettings"))),
+        vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
         carNumber: v.optional(v.union(v.number(), v.string())),
         avatarUrl: v.optional(v.string()),
         avatarStorageId: v.optional(v.id("_storage")) // For new Convex storage
@@ -352,6 +356,8 @@ export const update = mutation({
         }
 
         const changesVehicle = args.carNumber !== undefined && normalizeVehicleIdentifier(args.carNumber, true) !== student.carNumber;
+        if (args.carNumber !== undefined || args.campuses !== undefined || args.vehicleType !== undefined)
+            await validateStudentVehicle(ctx.db, normalizeVehicleIdentifier(args.carNumber ?? student.carNumber, true), args.campuses ?? student.campuses, args.vehicleType);
         const changesCampuses = args.campuses !== undefined && (args.campuses.length !== student.campuses.length || args.campuses.some(id => !student.campuses.includes(id)));
         if (changesVehicle || changesCampuses) await assertNotBoarded(ctx.db, student);
 
@@ -662,6 +668,7 @@ export const assignCarNumber = mutation({
         }
 
         const carNumber = normalizeVehicleIdentifier(args.carNumber, true);
+        await validateStudentVehicle(ctx.db, carNumber, student.campuses);
         if (carNumber !== student.carNumber) await assertNotBoarded(ctx.db, student);
 
         // Update car number

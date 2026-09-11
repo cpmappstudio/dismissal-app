@@ -1,5 +1,27 @@
 {
+  "buses": {
+    "select": "Selecciona un bus",
+    "noneAvailable": "No hay buses disponibles. Crea primero un bus para la sede.",
+    "vehicleType": "Transporte",
+    "car": "Carro",
+    "bus": "Bus",
+    "create": "Crear bus",
+    "edit": "Editar bus",
+    "name": "Nombre",
+    "campuses": "Sedes",
+    "back": "Volver a buses",
+    "search": "Buscar buses por nombre, número o placa",
+    "empty": "No se encontraron buses.",
+    "moreResults": "No hay coincidencias entre los buses cargados. Carga más para continuar buscando.",
+    "noDriver": "Sin chofer activo asignado.",
+    "formDescription": "Configura el bus y sus sedes. Los choferes asignados heredan estas sedes.",
+    "identifierHint": "Este identificador vincula estudiantes, choferes y Road; no se puede cambiar desde aquí."
+  },
   "transport": {
+    "dateNavigation": "Fecha de asistencia",
+    "today": "Hoy",
+    "previousDay": "Fecha anterior con registros",
+    "nextDay": "Fecha siguiente con registros",
     "driverCreated": "Chofer de bus creado",
     "username": "Nombre de usuario",
     "password": "Contraseña",
@@ -27,12 +49,13 @@
     "pickupDescription": "Registra recogidas anticipadas y consulta los estudiantes que ya salieron hoy.",
     "loading": "Cargando…",
     "saveError": "No se pudo guardar. Inténtalo de nuevo.",
-    "notInQueue": "El bus no está en la carretera. Puedes consultar la lista; el registro de subida se habilita cuando llegue.",
     "noStudents": "No hay estudiantes asignados a este bus en esta sede.",
     "noAssignment": "No tienes una sede activa o un bus asignado. Contacta al colegio.",
     "markBoarded": "Subió",
+    "markDroppedOff": "Bajó del bus",
+    "undoDropoff": "Deshacer bajada",
     "boardingStatus": "Estado de embarque",
-    "boardingProgress": "Han subido {boarded} de {total} estudiantes esperados",
+    "boardingProgress": "Hay {boarded} de {total} estudiantes esperados en el bus",
     "notTraveling": "No viaja",
     "undo": "Marcar pendiente",
     "reason": "Motivo",
@@ -49,6 +72,7 @@
     "status": {
       "pending": "Pendiente",
       "boarded": "Subió al bus",
+      "dropped_off": "Bajó del bus",
       "not_traveling": "No viaja · no esperar",
       "picked_up_early": "Recogida anticipada · no esperar",
       "departed": "Ya salió"
@@ -67,6 +91,7 @@
     "birthdayMessage": "Feliz cumpleaños"
   },
   "navigation": {
+    "buses": "Buses",
     "busDrivers": "Choferes de bus",
     "bus": "Mi bus",
     "university": "Dismissal App",
@@ -190,6 +215,10 @@
           {
             "title": "Carretera",
             "url": "/operators"
+          },
+          {
+            "title": "Buses",
+            "url": "/operators/buses"
           },
           {
             "title": "Visor",
@@ -528,6 +557,9 @@
     }
   },
   "staffManagement": {
+    "missingRole": "Esta cuenta no tiene un rol asignado. Selecciona su rol antes de guardar.",
+    "restrictedTitle": "Acceso restringido",
+    "restrictedDescription": "Tus permisos actuales no permiten editar esta cuenta.",
     "title": "Personal",
     "subtitle": "Administra y visualiza todo el personal del sistema",
     "search": {
