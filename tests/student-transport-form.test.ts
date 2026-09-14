@@ -69,4 +69,14 @@ test("student form edits and clears the bus without clearing the car, and submit
   await submit();
   assert.equal(submitted[1].carNumber, 21);
   assert.equal(submitted[1].busNumber, 123);
+  (render().find(n => n.props["aria-label"] === "removeAssignment")!.props.onClick as () => void)();
+  buses.length = 0;
+  props.mode = "create";
+  const submitButton = () => render().find(n => n.props.type === "submit")!.props;
+  assert.equal(submitButton().disabled, false, "No available buses must not block creation");
+  await submit();
+  assert.equal(submitted[2].busNumber, 0);
+  props.onSubmit = () => { throw new Error("Save failed"); };
+  await assert.rejects(submit(), /Failed to save student/);
+  assert.equal(submitButton().disabled, false, "A failed save must release the submit button");
 });

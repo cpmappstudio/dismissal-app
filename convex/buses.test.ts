@@ -8,6 +8,17 @@ import { isBus } from "./studentDismissals";
 
 const modules = import.meta.glob("./**/*.ts");
 
+test("student creation and updates accept busNumber zero when no buses are available", async () => {
+  const { ids, principal } = await setup();
+  expect(await principal.query(api.buses.options, { forDriver: false })).toEqual([]);
+  const id = await principal.mutation(api.students.create, {
+    firstName: "Ana", lastName: "Test", birthday: "01/01/2015", grade: "4th",
+    campuses: [ids.campuses[0]], carNumber: 990, busNumber: 0,
+  });
+  await principal.mutation(api.students.update, { studentId: id, firstName: "Ana Maria", carNumber: 991, busNumber: 0 });
+  expect((await principal.query(api.students.get, { id }))!.student).toMatchObject({ firstName: "Ana Maria", carNumber: 991, busNumber: 0 });
+});
+
 test("car and bus assignments coexist, validate campus coverage and can be removed independently", async () => {
   const { t, ids, principal } = await setup();
   const busId = await principal.mutation(api.buses.save, { identifier: 123, name: "Bus", campusIds: [ids.campuses[0]] });
