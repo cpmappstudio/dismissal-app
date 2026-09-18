@@ -7,9 +7,9 @@ interface CampusStatusBadgeProps {
 
 export function CampusStatusBadge({ status }: CampusStatusBadgeProps) {
     const styles: Record<CampusStatus, string> = {
-        active: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
-        inactive: "bg-gray-500/15 text-gray-700 border-gray-500/20",
-        maintenance: "bg-amber-500/15 text-amber-700 border-amber-500/20",
+        active: "text-success",
+        inactive: "text-muted-foreground",
+        maintenance: "text-amber-700 dark:text-amber-400",
     };
 
     const labels: Record<CampusStatus, string> = {
@@ -21,7 +21,7 @@ export function CampusStatusBadge({ status }: CampusStatusBadgeProps) {
     return (
         <Badge
             variant="outline"
-            className={`rounded-full px-3 py-0.5 text-xs font-medium ${styles[status] ?? styles.inactive}`}
+            className={`rounded-full border-border bg-card px-3 py-0.5 text-xs font-medium shadow-sm ${styles[status] ?? styles.inactive}`}
         >
             {labels[status] ?? status}
         </Badge>

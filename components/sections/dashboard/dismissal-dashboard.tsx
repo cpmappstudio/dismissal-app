@@ -4,6 +4,7 @@ import { CampusActivityCard } from "./campus-activity-card";
 import { AverageWaitTimeCard } from "./average-wait-time-card";
 import { SessionDurationCard } from "./session-duration-card";
 import { TopArrivalsCard } from "./top-arrivals-card";
+import { Card } from "@/components/ui/card";
 
 export function DismissalDashboard() {
   return (
@@ -12,13 +13,12 @@ export function DismissalDashboard() {
         <AverageWaitTimeCard />
         <SessionDurationCard />
       </div>
-      <div className="flex-1 grid gap-4 grid-cols-1">
-        <CampusActivityCard />
-      </div>
-
-      <div className="flex-1 grid gap-4 grid-cols-1">
-        <TopArrivalsCard />
-      </div>
+      <Card className="gap-0 overflow-hidden py-0">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,24rem),1fr))] gap-px bg-border [&>section]:bg-card">
+          <CampusActivityCard />
+          <TopArrivalsCard />
+        </div>
+      </Card>
     </div>
   );
 }

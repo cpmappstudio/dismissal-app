@@ -1,3 +1,10 @@
+/* Fade the scrollable road into its background below the floating controls.
+   The mask stays on the viewport, so it works while scrolling in either axis. */
+.road-scroll-container[data-has-controls="true"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 3.5rem, #000 6rem);
+  mask-image: linear-gradient(to bottom, transparent 3.5rem, #000 6rem);
+}
+
 /* Road scroll container - Mobile-friendly scrollbar */
 .road-scroll-container {
   /* Mobile scrollbar - wider and more touch-friendly */
@@ -90,5 +97,4 @@
   background: rgba(229, 231, 235, 0.8);
   border-radius: 8px;
 }
-
 

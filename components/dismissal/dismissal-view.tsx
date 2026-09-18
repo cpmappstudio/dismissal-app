@@ -379,7 +379,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
         return (
             <div data-dismissal-view className={cn("w-full min-h-0 flex flex-1 flex-col items-center justify-center", className)}>
                 <div className="text-center space-y-2">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yankees-blue mx-auto"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                     <p className="text-sm text-muted-foreground">Loading campus selection...</p>
                 </div>
             </div>
@@ -388,52 +388,9 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
 
     return (
         <div data-dismissal-view className={cn("w-full min-h-0 flex flex-1 flex-col", className)}>
-            {/* Campus selection and early pickups */}
-            <div className="flex items-center gap-2 md:gap-4 md:justify-between flex-shrink-0">
-                <div className="min-w-0 flex-1 md:flex-none relative">
-                    <FilterDropdown<string>
-                        value={selectedCampus}
-                        onChange={(value) => updateSelectedCampus(value)}
-                        options={campusOptions?.map((c) => c.label) ?? []}
-                        icon={MapPin}
-                        label={t('campus.select')}
-                        placeholder={t('campus.select')}
-                        className="w-full md:w-64"
-                        showAllOption={false}
-                        optionCounts={carCountsByCampus}
-                    />
-                    {/* Auth State Indicator */}
-                    {isLoading && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"
-                            title="Loading authentication..." />
-                    )}
-                    {authError && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full"
-                            title="Authentication error" />
-                    )}
-                </div>
-
-                {/* Clear All Button - Currently disabled */}
-                {allowDispatch && isCampusSelected && campusOptions?.some(c => c.value === selectedCampus) && (
-                    <EarlyPickups campus={selectedCampus} timezone={campusOptions.find(c => c.value === selectedCampus)!.timezone} />
-                )}
-                {/* {allowDispatch && isCampusSelected && (
-                    <Button
-                        onClick={() => setShowClearDialog(true)}
-                        disabled={isSubmitting || (leftLaneCars.length === 0 && rightLaneCars.length === 0)}
-                        variant="destructive"
-                        className="gap-2"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="hidden sm:inline">{t('dispatcher.clearAll')}</span>
-                        <span className="sm:hidden">Clear</span>
-                    </Button>
-                )} */}
-            </div>
-
             {/* Main Content Area - Takes remaining space */}
-            <div className="flex-1 flex flex-col mt-4 mb-4 gap-4 min-h-0 relative">
-                <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${!isCampusSelected ? 'pointer-events-none' : ''}`}>
+            <div className="flex-1 flex flex-col mb-4 gap-4 min-h-0 relative">
+                <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
                     <Road
                         leftLaneCars={leftLaneCars}
                         rightLaneCars={rightLaneCars}
@@ -443,31 +400,60 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                         isFullscreen={isFullscreen}
                         onToggleFullscreen={toggleFullscreen}
                         birthdayCarIds={birthdayCarIds}
-                    />
-
-                    {/* Overlay cuando no hay campus */}
-                    {!isCampusSelected && (
-                        <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
-                            <Card className="bg-white shadow-xl border-2 border-yankees-blue">
-                                <CardContent className="flex items-center justify-center p-6">
-                                    <div className="text-center space-y-2">
-                                        <Car className="h-12 w-12 text-muted-foreground mx-auto" />
-                                        <CardTitle className="text-lg text-muted-foreground">{t('campus.required')}</CardTitle>
-                                        <CardDescription>
-                                            {t('campus.placeholder')}
-                                        </CardDescription>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+                        startControl={
+                            <div className="relative min-w-0">
+                                <FilterDropdown<string>
+                                    value={selectedCampus}
+                                    onChange={(value) => updateSelectedCampus(value)}
+                                    options={campusOptions?.map((c) => c.label) ?? []}
+                                    icon={MapPin}
+                                    label={t('campus.select')}
+                                    placeholder={t('campus.select')}
+                                    className="w-full bg-card hover:bg-accent md:w-full"
+                                    showAllOption={false}
+                                    optionCounts={carCountsByCampus}
+                                />
+                                {/* Auth State Indicator */}
+                                {isLoading && (
+                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"
+                                        title="Loading authentication..." />
+                                )}
+                                {authError && (
+                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full"
+                                        title="Authentication error" />
+                                )}
+                            </div>
+                        }
+                        endControl={
+                            allowDispatch && isCampusSelected && campusOptions?.some(c => c.value === selectedCampus) && (
+                                <EarlyPickups campus={selectedCampus} timezone={campusOptions.find(c => c.value === selectedCampus)!.timezone} />
+                            )
+                        }
+                    >
+                        {/* Overlay cuando no hay campus */}
+                        {!isCampusSelected && (
+                            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 flex items-center justify-center">
+                                <Card className="bg-card shadow-xl border border-input">
+                                    <CardContent className="flex items-center justify-center p-6">
+                                        <div className="text-center space-y-2">
+                                            <Car className="h-12 w-12 text-muted-foreground mx-auto" />
+                                            <CardTitle className="text-lg text-muted-foreground">{t('campus.required')}</CardTitle>
+                                            <CardDescription>
+                                                {t('campus.placeholder')}
+                                            </CardDescription>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+                    </Road>
                 </div>
 
                 {/* Allocator Control with Finish Line - Responsive */}
                 {allowAllocate && isCampusSelected && (
                     <div className="shrink-0 px-2">
                         <div className="flex justify-center">
-                            <div className="allocator-area bg-white/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
+                            <div className="allocator-area bg-card/90 w-full max-w-xs sm:max-w-sm backdrop-blur-md rounded-xl sm:rounded-2xl  border-white/30 relative overflow-hidden">
                                 <div className="flex items-center gap-2 sm:gap-3 relative z-10 justify-center">
                                     {/* Left Arrow Button */}
                                     <Button
@@ -495,7 +481,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                         onFocus={handleInputFocus}
                                         onKeyDown={handleKeyPress}
                                         disabled={isSubmitting}
-                                        className="text-center text-base sm:text-lg font-bold border-2 border-gray-300 focus:border-yankees-blue focus:ring-2 focus:ring-yankees-blue/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-white disabled:opacity-50"
+                                        className="text-center text-base sm:text-lg font-bold border-2 border-input focus:border-primary focus:ring-2 focus:ring-primary/20 h-10 sm:h-12 rounded-lg sm:rounded-xl shadow-sm bg-card disabled:opacity-50"
                                         autoFocus
                                     />
 
@@ -505,7 +491,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                                         onClick={(e) => handleArrowClick('right', e)}
                                         disabled={!carInputValue.trim() || isSubmitting}
                                         size="sm"
-                                        className="bg-green-600 hover:bg-green-700 text-white p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
+                                        className="bg-primary hover:bg-primary/90 text-primary-foreground p-2 sm:p-3 h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl shrink-0 shadow-md transition-colors duration-200 disabled:opacity-50"
                                     >
                                         <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                                     </Button>
@@ -521,7 +507,7 @@ export function DismissalView({ mode, className }: DismissalViewProps) {
                 <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
                     <Alert
                         variant={alert.type === 'error' ? 'destructive' : 'default'}
-                        className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+                        className="max-w-sm w-auto bg-card shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
                         onClick={hideAlert}
                     >
                         {alert.type === 'error' ? (

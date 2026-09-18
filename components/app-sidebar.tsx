@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 
 import { NavMain } from "@/components/nav-main";
 import { UniversityLogo } from "@/components/university-logo";
+import { BrandWaves } from "@/components/brand-waves";
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +32,8 @@ const iconMap = {
 } as const;
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
+  const isCollapsed = !isMobile && state === "collapsed";
   const { user } = useUser();
   const t = useTranslations("navigation");
 
@@ -112,9 +114,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
+        <UniversityLogo />
         <UserButtonWrapper
-          showName={state !== "collapsed"}
-          collapsed={state === "collapsed"}
+          showName={!isCollapsed}
+          collapsed={isCollapsed}
         />
       </SidebarHeader>
       <SidebarContent>
@@ -125,10 +128,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           showDashboard={hasDashboardAccess}
         />
       </SidebarContent>
-      <SidebarFooter>
-        {/* <LangToggle showText={state !== "collapsed"} /> */}
-        {/* <ModeToggle showText={state !== "collapsed"} /> */}
-        <UniversityLogo />
+      <SidebarFooter className="relative h-24 shrink-0 overflow-hidden p-0 group-data-[collapsible=icon]:h-12" aria-hidden="true">
+        <BrandWaves className="h-full sm:h-full" />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

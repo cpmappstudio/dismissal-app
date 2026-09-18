@@ -360,8 +360,8 @@ export function StudentFormDialog({
                     {/* Personal Information Section */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b pb-2">
-                            <div className="h-2 w-2 rounded-full bg-yankees-blue"></div>
-                            <h3 className="text-sm font-medium text-yankees-blue">{t('createDialog.sections.personal')}</h3>
+                            <div className="h-2 w-2 rounded-full bg-primary"></div>
+                            <h3 className="text-sm font-medium text-primary">{t('createDialog.sections.personal')}</h3>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -427,8 +427,8 @@ export function StudentFormDialog({
                     {/* Academic Information Section */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b pb-2">
-                            <div className="h-2 w-2 rounded-full bg-yankees-blue"></div>
-                            <h3 className="text-sm font-medium text-yankees-blue">{t('createDialog.sections.academic')}</h3>
+                            <div className="h-2 w-2 rounded-full bg-primary"></div>
+                            <h3 className="text-sm font-medium text-primary">{t('createDialog.sections.academic')}</h3>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -623,7 +623,7 @@ export function StudentFormDialog({
                         <Button
                             type="submit"
                             disabled={isSubmitting || !buses}
-                            className="bg-yankees-blue hover:bg-yankees-blue/90 gap-2"
+                            className="bg-primary hover:bg-primary/90 gap-2"
                         >
                             <SubmitIcon className="h-4 w-4" />
                             {submitButtonText}

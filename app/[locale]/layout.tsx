@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Nunito, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import ConvexClientProvider from "@/components/convex-client-provider";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -12,8 +12,8 @@ import { hasLocale } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { enUS, esES } from '@clerk/localizations';
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
+const nunito = Nunito({
+    variable: "--font-nunito",
     subsets: ["latin"],
 });
 
@@ -57,7 +57,7 @@ export default async function RootLayout({
     return (
         <html lang={locale} suppressHydrationWarning>
             <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+                className={`${nunito.variable} ${geistMono.variable} antialiased`}
             >
                 {/* <ThemeProvider
                     attribute="class"
@@ -68,6 +68,21 @@ export default async function RootLayout({
                 <ClerkProvider
                     appearance={{
                         baseTheme: shadcn,
+                        variables: {
+                            colorPrimary: "var(--primary)",
+                            colorText: "var(--foreground)",
+                            colorTextSecondary: "var(--muted-foreground)",
+                            colorBackground: "var(--card)",
+                            colorInputBackground: "var(--muted)",
+                            colorInputText: "var(--foreground)",
+                            borderRadius: "1rem",
+                            fontFamily: "var(--font-nunito), sans-serif",
+                        },
+                        elements: {
+                            cardBox: "rounded-3xl shadow-card",
+                            formButtonPrimary: "rounded-full shadow-none",
+                            formFieldInput: "rounded-full",
+                        },
                     }}
                     localization={clerkLocalization}
                     afterSignOutUrl={`/${locale}/sign-in`}

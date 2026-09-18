@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { DashboardFilters } from "@/lib/dashboard/types";
+import { useOperationalDate } from "@/hooks/use-operational-date";
 
 export function useCampusActivity(filters?: DashboardFilters) {
   return useQuery(api.dashboard.getCampusActivity, {
@@ -9,17 +10,12 @@ export function useCampusActivity(filters?: DashboardFilters) {
   });
 }
 
-export function useAverageWaitTime(filters?: DashboardFilters) {
-  return useQuery(api.dashboard.getAverageWaitTime, {
+export function useDurationTrends(filters?: DashboardFilters) {
+  const throughDate = useOperationalDate();
+  return useQuery(api.dashboard.getDurationTrends, {
     campus: filters?.campus,
     month: filters?.month,
-  });
-}
-
-export function useSessionDuration(filters?: DashboardFilters) {
-  return useQuery(api.dashboard.getSessionDuration, {
-    campus: filters?.campus,
-    month: filters?.month,
+    throughDate,
   });
 }
 

@@ -42,7 +42,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium text-foreground hover:text-primary hover:bg-accent"
         >
           <span className="hidden sm:inline">{t("table.headers.name")}</span>
           <span className="sm:hidden">{t("table.headers.name")}</span>
@@ -92,7 +92,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium hidden sm:flex text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium hidden sm:flex text-foreground hover:text-primary hover:bg-accent"
         >
           {driversOnly ? bt("username") : t("table.headers.email")}
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -113,7 +113,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium text-foreground hover:text-primary hover:bg-accent"
         >
           <span className="hidden md:inline">{t("table.headers.phone")}</span>
           <span className="md:hidden">{t("table.headers.phone")}</span>
@@ -135,7 +135,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium hidden sm:flex text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium hidden sm:flex text-foreground hover:text-primary hover:bg-accent"
         >
           {t("table.headers.role")}
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -156,7 +156,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium text-foreground hover:text-primary hover:bg-accent"
         >
           {t("table.headers.status")}
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -179,7 +179,7 @@ export const useColumns = (driversOnly = false): ColumnDef<Staff>[] => {
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-medium hidden lg:flex text-white hover:text-white hover:bg-white/10"
+          className="h-auto p-0 font-medium hidden lg:flex text-foreground hover:text-primary hover:bg-accent"
         >
           {t("table.headers.campus")}
           <ArrowUpDown className="ml-2 h-4 w-4" />

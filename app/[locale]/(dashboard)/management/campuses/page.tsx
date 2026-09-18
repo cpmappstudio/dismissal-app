@@ -66,7 +66,7 @@ function DeletedCampusAlert() {
     <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
       <Alert
         variant="default"
-        className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+        className="max-w-sm w-auto bg-card shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
         onClick={hideAlert}
       >
         <CheckCircle2 className="h-4 w-4" />

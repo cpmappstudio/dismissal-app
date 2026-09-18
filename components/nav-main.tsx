@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useMemo, memo, useCallback } from "react"
 import { ChevronRight, Home, type LucideIcon } from "lucide-react"
-import { clsx } from "clsx"
 
 import {
   Collapsible,
@@ -70,9 +69,7 @@ export const NavMain = memo(function NavMain({
         {showDashboard && (
           <SidebarMenuButton
             asChild
-            className={clsx({
-              'text-lime-300': isDashboardActive,
-            })}
+            isActive={isDashboardActive}
           >
             <Link href="/" onClick={handleLinkClick}>
               <Home />
@@ -101,9 +98,7 @@ export const NavMain = memo(function NavMain({
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton
                         asChild
-                        className={clsx({
-                          'text-lime-300': pathWithoutLocale === subItem.url,
-                        })}
+                        isActive={pathWithoutLocale === subItem.url}
                       >
                         <Link href={subItem.url} onClick={handleLinkClick}>
                           <span>{subItem.title}</span>

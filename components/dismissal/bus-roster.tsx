@@ -25,31 +25,31 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const studentStatusStyles = {
   dropped_off: {
     color:
-      "border-indigo-300 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950",
+      "border-info/30 bg-info-soft",
     Icon: LogOut,
   },
   pending: {
     color:
-      "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900",
+      "border-border bg-card",
     Icon: Clock,
   },
   boarded: {
     color:
-      "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950",
+      "border-success/30 bg-success-soft",
     Icon: Check,
   },
   not_traveling: {
     color:
-      "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950",
+      "border-destructive/30 bg-destructive-soft",
     Icon: UserX,
   },
   picked_up_early: {
-    color: "border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950",
+    color: "border-info/30 bg-info-soft",
     Icon: UserCheck,
   },
   departed: {
     color:
-      "border-violet-300 bg-violet-50 dark:border-violet-800 dark:bg-violet-950",
+      "border-primary/30 bg-secondary",
     Icon: LogOut,
   },
 };
@@ -159,7 +159,7 @@ function BoardingControls({
             aria-label={t(state?.dropoff ? "undoDropoff" : "markDroppedOff")}
             title={t(state?.dropoff ? "undoDropoff" : "markDroppedOff")}
             disabled={busy}
-            className="border-indigo-300 text-indigo-700 hover:bg-indigo-100 data-pressed:border-indigo-600 data-pressed:bg-indigo-600 data-pressed:text-white dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900 motion-safe:animate-slide-in-left motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%]"
+            className="border-info/40 text-info hover:bg-info-soft hover:text-info data-pressed:border-info data-pressed:bg-info data-pressed:text-info-foreground motion-safe:animate-slide-in-left motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%]"
           >
             <LogOut className="size-4" aria-hidden="true" />
           </Toggle>
@@ -179,7 +179,7 @@ function BoardingControls({
               : "markBoarded",
           )}
           disabled={busy || !!state?.dropoff || status === "departed"}
-          className={`border-emerald-300 text-emerald-700 hover:bg-emerald-100 data-pressed:border-emerald-600 data-pressed:bg-emerald-600 data-pressed:text-white dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900 dark:data-pressed:text-white motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%] ${hasBoarded ? "motion-safe:animate-slide-in-left" : "motion-safe:animate-slide-in-right"}`}
+          className={`border-success/40 text-success hover:bg-success-soft hover:text-success data-pressed:border-success data-pressed:bg-success data-pressed:text-success-foreground motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%] ${hasBoarded ? "motion-safe:animate-slide-in-left" : "motion-safe:animate-slide-in-right"}`}
         >
           <Check className="size-4" aria-hidden="true" />
         </Toggle>
@@ -191,7 +191,7 @@ function BoardingControls({
             aria-label={t("notTraveling")}
             title={t(status === "not_traveling" ? "undo" : "notTraveling")}
             disabled={busy}
-            className="border-amber-300 text-amber-800 hover:bg-amber-100 data-pressed:border-amber-500 data-pressed:bg-amber-500 data-pressed:text-black dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-900 dark:data-pressed:text-black"
+            className="border-destructive/40 text-destructive hover:bg-destructive-soft hover:text-destructive data-pressed:border-destructive data-pressed:bg-destructive data-pressed:text-destructive-foreground"
           >
             <UserX className="size-4" aria-hidden="true" />
           </Toggle>
@@ -278,7 +278,7 @@ export function BusRoster({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <Users
-            className="h-5 w-5 shrink-0 text-gray-600"
+            className="h-5 w-5 shrink-0 text-muted-foreground"
             aria-hidden="true"
           />
           <h3

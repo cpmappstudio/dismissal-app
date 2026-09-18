@@ -336,7 +336,7 @@ export const CarCard = React.memo<CarCardProps>(
                   open && car.timezone && <BusRoster campus={car.campus} carNumber={car.carNumber} timezone={car.timezone} />
                 ) : <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-gray-600" />
+                    <Users className="h-5 w-5 text-muted-foreground" />
                     <h3 className="text-lg font-semibold">
                       {t("car.students")} ({car.students.length})
                     </h3>
@@ -346,7 +346,7 @@ export const CarCard = React.memo<CarCardProps>(
                     className="space-y-3 pr-2"
                     style={{
                       scrollbarWidth: "thin",
-                      scrollbarColor: "#D1D5DB #F3F4F6",
+                      scrollbarColor: "var(--border) var(--muted)",
                     }}
                   >
                     {car.students.map((student) => {
@@ -356,7 +356,7 @@ export const CarCard = React.memo<CarCardProps>(
                       return (
                         <div
                           key={student.id}
-                          className={`flex items-center gap-3 p-3 border rounded-lg ${student.pickup ? "bg-sky-50 border-sky-300" : studentHasBirthday ? "bg-yellow-50 border-yellow-200" : "bg-white"}`}
+                          className={`flex items-center gap-3 p-3 border rounded-lg ${student.pickup ? "bg-info-soft border-info/30" : studentHasBirthday ? "bg-yellow-50 border-yellow-200" : "bg-card"}`}
                         >
                           <div className="relative">
                             <StudentAvatar
@@ -378,7 +378,7 @@ export const CarCard = React.memo<CarCardProps>(
                           </div>
                           <div className="flex-1">
                             <div
-                              className={`font-semibold ${studentHasBirthday ? "text-yellow-800" : "text-gray-900"} flex items-center gap-2`}
+                              className={`font-semibold ${studentHasBirthday ? "text-yellow-800" : "text-foreground"} flex items-center gap-2`}
                             >
                               {student.name}
                               {studentHasBirthday && (
@@ -388,7 +388,7 @@ export const CarCard = React.memo<CarCardProps>(
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
                               <GraduationCap className="h-3 w-3" />
                               {student.grade || `${t("car.grade")} 5`}
                             </div>

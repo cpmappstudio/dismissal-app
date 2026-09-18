@@ -48,6 +48,7 @@ import {
   Id,
 } from "@/convex/types";
 import { useStudentsData } from "@/hooks/use-students-data";
+import { DEFAULT_TABLE_PAGE_SIZE } from "../table-pagination";
 
 // Componente de Skeleton optimizado
 function StudentsTableSkeleton() {
@@ -81,7 +82,7 @@ export function StudentsTable() {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: DEFAULT_TABLE_PAGE_SIZE,
   });
 
   // Efecto para resetear la página cuando cambia la búsqueda global
@@ -454,7 +455,7 @@ export function StudentsTable() {
               placeholder={t("search.placeholder")}
               value={globalFilter ?? ""}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="pl-8 border-2 border-yankees-blue focus:ring-yankees-blue"
+              className="pl-8 border border-input focus:ring-primary"
               aria-label={t("search.placeholder")}
             />
           </div>
@@ -496,7 +497,7 @@ export function StudentsTable() {
                 mode="create"
                 onSubmit={handleCreateStudent}
                 trigger={
-                  <Button className="w-full gap-2 bg-yankees-blue hover:bg-yankees-blue/90 md:w-auto">
+                  <Button className="w-full gap-2 bg-primary hover:bg-primary/90 md:w-auto">
                     <Plus className="h-4 w-4" />
                     <span className="hidden lg:inline">{t("actions.add")}</span>
                     <span className="lg:hidden">{t("actions.addShort")}</span>
@@ -515,18 +516,18 @@ export function StudentsTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-md border-2 border-yankees-blue">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <Table>
-          <TableHeader className="bg-yankees-blue">
+          <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="border-b-2 border-yankees-blue hover:bg-yankees-blue"
+                className="border-b border-border hover:bg-muted"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={`whitespace-nowrap px-2 py-3 text-white lg:px-4 ${
+                    className={`whitespace-nowrap px-2 py-3 text-foreground lg:px-4 ${
                       (header.column.columnDef.meta as { className?: string })
                         ?.className || ""
                     }`}
@@ -548,7 +549,7 @@ export function StudentsTable() {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="cursor-pointer border-b border-yankees-blue/20 hover:bg-muted/50"
+                  className="cursor-pointer border-b border-border hover:bg-muted/50"
                   onClick={(e) => handleRowClick(row.original, e)}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -589,7 +590,7 @@ export function StudentsTable() {
             {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
           <div className="hidden sm:block">•</div>
-          <div className="font-medium text-yankees-blue">
+          <div className="font-medium text-primary">
             {studentsData?.total ?? data.length} total students
           </div>
           <div className="hidden md:block">•</div>
@@ -638,7 +639,7 @@ export function StudentsTable() {
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
           <Alert
             variant={alert.type === "error" ? "destructive" : "default"}
-            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            className="max-w-sm w-auto bg-card shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
             onClick={hideAlert}
           >
             {alert.type === "error" ? (

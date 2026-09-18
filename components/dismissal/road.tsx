@@ -19,6 +19,9 @@ interface RoadProps {
   onToggleFullscreen?: () => void;
   className?: string;
   birthdayCarIds?: Set<string>;
+  startControl?: React.ReactNode;
+  endControl?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const Road = React.memo<RoadProps>(
@@ -31,9 +34,13 @@ export const Road = React.memo<RoadProps>(
     isFullscreen = false,
     onToggleFullscreen,
     birthdayCarIds,
+    startControl,
+    endControl,
+    children,
   }) => {
     const t = useTranslations("common");
     const isViewer = mode === "viewer";
+    const hasControls = !!(startControl || endControl || (isViewer && onToggleFullscreen));
 
     // Handle ESC key to exit fullscreen
     React.useEffect(() => {
@@ -51,30 +58,42 @@ export const Road = React.memo<RoadProps>(
 
     return (
       <div
-        className={`flex flex-1 flex-col min-h-0 min-w-0 ${isFullscreen ? "fixed inset-0 z-[9999] bg-white" : ""}`}
+        className={`flex flex-1 flex-col min-h-0 min-w-0 ${isFullscreen ? "fixed inset-0 z-40 bg-background" : ""}`}
       >
         <Card
           className="border-2 border-yankees-blue flex flex-1 flex-col min-h-0 min-w-0 py-0 overflow-hidden relative"
           style={{ backgroundColor: "#9CA3AF" }}
         >
-          {/* Fullscreen Toggle Button - Only visible in viewer mode */}
-          {isViewer && onToggleFullscreen && (
-            <Button
-              onClick={onToggleFullscreen}
-              variant="secondary"
-              size="sm"
-              title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
-              className="absolute top-2 right-2 z-50 bg-white/90 hover:bg-white border border-gray-300 p-2 h-8 w-8 rounded-lg shadow-sm transition-all duration-200"
-            >
-              {isFullscreen ? (
-                <Minimize className="h-4 w-4 text-gray-700" />
-              ) : (
-                <Maximize className="h-4 w-4 text-gray-700" />
-              )}
-            </Button>
+          {hasControls && (
+            <div data-road-controls className="pointer-events-none absolute inset-x-2 top-2 z-30 flex min-w-0 items-start justify-between gap-2 sm:inset-x-3 sm:top-3">
+              <div className="pointer-events-auto min-w-0 max-w-64 flex-1">
+                {startControl}
+              </div>
+              <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+                {endControl}
+                {isViewer && onToggleFullscreen && (
+                  <Button
+                    onClick={onToggleFullscreen}
+                    variant="secondary"
+                    size="sm"
+                    title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
+                    aria-label={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
+                    className="size-9 border bg-card p-2 shadow-sm"
+                  >
+                    {isFullscreen ? (
+                      <Minimize className="h-4 w-4" />
+                    ) : (
+                      <Maximize className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
+          {children}
 
           <CardContent
+            data-has-controls={hasControls || undefined}
             ref={(el) => {
               if (el) {
                 // Posicionar el scroll según el modo
@@ -172,7 +191,7 @@ export const Road = React.memo<RoadProps>(
             //         }
             //     }
             // }}
-            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${isViewer ? "max-md:overflow-y-auto max-md:overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden" : "overflow-y-auto overflow-x-hidden"}`}
+            className={`flex-1 min-h-0 p-0 relative road-scroll-container ${hasControls ? "pt-14" : ""} ${isViewer ? "max-md:overflow-y-auto max-md:overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden" : "overflow-y-auto overflow-x-hidden"}`}
             style={{
               WebkitOverflowScrolling: "touch",
             }}

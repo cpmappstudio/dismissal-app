@@ -210,7 +210,7 @@ export const DynamicBreadcrumb = memo(function DynamicBreadcrumb() {
               ) : (
                 <BreadcrumbLink
                   href={segment.href || "#"}
-                  className="text-base hover:text-yankees-blue transition-colors"
+                  className="text-base hover:text-primary transition-colors"
                 >
                   {segment.title}
                 </BreadcrumbLink>

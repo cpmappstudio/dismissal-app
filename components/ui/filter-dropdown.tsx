@@ -51,14 +51,14 @@ export function FilterDropdown<T extends string>({
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="outline"
-                    className={`w-full justify-between overflow-hidden border-2 border-yankees-blue hover:bg-yankees-blue/10 md:w-auto ${className}`}
+                    className={`w-full justify-between overflow-hidden border border-input hover:bg-primary/10 md:w-auto ${className}`}
                     disabled={disabled}
                     aria-label={`Filter by ${label.toLowerCase()}`}
                 >
-                    <div className="flex items-center">
+                    <div className="flex min-w-0 items-center">
                         <Icon className="mr-2 h-4 w-4" aria-hidden="true" />
-                        <span className="hidden lg:inline">{displayValue}</span>
-                        <span className="lg:hidden">{displayValueShort}</span>
+                        <span className="hidden truncate lg:inline">{displayValue}</span>
+                        <span className="truncate lg:hidden">{displayValueShort}</span>
                     </div>
                     {/* <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" /> */}
                 </Button>

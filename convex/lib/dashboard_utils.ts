@@ -1,6 +1,8 @@
 import { GenericDatabaseReader, GenericDatabaseWriter } from "convex/server";
 import { DataModel } from "../_generated/dataModel";
 import { normalizeVehicleIdentifier } from "../../lib/vehicle";
+import { operationalDate } from "../../lib/operational-day";
+import type { Doc } from "../_generated/dataModel";
 
 // ============================================================================
 // Data Validation Constants
@@ -230,6 +232,56 @@ export function calculateSessionDuration(
 
 export function calculateAverage(total: number, count: number): number {
   return count > 0 ? Math.round(total / count) : 0;
+}
+
+/** Road pickup metrics, grouped by the shared operational day, not UTC midnight. */
+export function calculateDurationTrend(
+  records: Doc<"dismissalHistory">[],
+  startDate: string,
+  endExclusive: string,
+) {
+  const days = new Map<string, { wait: number; count: number; first: number; last: number }>();
+  for (const record of records) {
+    if (record.completionReason === "cleared" || record.studentIds.length === 0) continue;
+    if (!Number.isFinite(record.queuedAt) || !Number.isFinite(record.completedAt) || record.completedAt < record.queuedAt) continue;
+    const date = operationalDate(record.completedAt);
+    if (date < startDate || date >= endExclusive) continue;
+    const day = days.get(date) ?? { wait: 0, count: 0, first: Infinity, last: 0 };
+    // Legacy entries have no completionReason; retain their existing validity checks.
+    if (Number.isFinite(record.waitTimeSeconds) && isValidForWaitTime(record)) {
+      day.wait += record.waitTimeSeconds;
+      day.count++;
+    }
+    if (operationalDate(record.queuedAt) === date) {
+      day.first = Math.min(day.first, record.queuedAt);
+      day.last = Math.max(day.last, record.completedAt);
+    }
+    days.set(date, day);
+  }
+
+  let totalWait = 0, waitCount = 0, totalSession = 0, sessionCount = 0;
+  const points: { date: string; waitMinutes: number | null; sessionMinutes: number | null }[] = [];
+  for (let timestamp = Date.parse(startDate); timestamp < Date.parse(endExclusive); timestamp += 86400000) {
+    const date = new Date(timestamp).toISOString().slice(0, 10);
+    const day = days.get(date);
+    const session = day && day.first !== Infinity ? (day.last - day.first) / 1000 : null;
+    totalWait += day?.wait ?? 0;
+    waitCount += day?.count ?? 0;
+    if (session !== null) {
+      totalSession += session;
+      sessionCount++;
+    }
+    points.push({
+      date,
+      waitMinutes: day?.count ? day.wait / day.count / 60 : null,
+      sessionMinutes: session === null ? null : session / 60,
+    });
+  }
+  return {
+    points,
+    avgWaitMinutes: waitCount ? totalWait / waitCount / 60 : null,
+    avgSessionMinutes: sessionCount ? totalSession / sessionCount / 60 : null,
+  };
 }
 
 export async function getExistingMetric(

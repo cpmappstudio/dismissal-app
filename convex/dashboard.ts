@@ -14,7 +14,9 @@ import {
   upsertMetric,
   calculateTopArrivalsForMonth,
   upsertTopArrivals,
+  calculateDurationTrend,
 } from "./lib/dashboard_utils";
+import { operationalDate } from "../lib/operational-day";
 
 const DASHBOARD_ALLOWED_ROLES = new Set(["superadmin"]);
 
@@ -89,6 +91,46 @@ async function getDashboardAccess(ctx: DashboardAccessCtx): Promise<DashboardAcc
 function isCampusAllowed(access: DashboardAccess, campus: string): boolean {
   return access.isGlobal || access.allowedCampuses.has(campus);
 }
+
+export const getDurationTrends = query({
+  args: {
+    campus: v.optional(v.string()),
+    month: v.optional(v.string()),
+    throughDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const access = await getDashboardAccess(ctx);
+    if (!access || (args.campus && !isCampusAllowed(access, args.campus))) return null;
+    const cutoff = Date.parse(args.throughDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.throughDate) || !Number.isFinite(cutoff)
+      || new Date(cutoff).toISOString().slice(0, 10) !== args.throughDate
+      || args.throughDate > operationalDate()) throw new Error("Invalid reporting date");
+    if (args.month && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(args.month)
+      || args.month > args.throughDate.slice(0, 7))) throw new Error("Invalid reporting month");
+
+    const startDate = args.month ? `${args.month}-01` : new Date(cutoff - 30 * 86400000).toISOString().slice(0, 10);
+    const nextMonth = new Date(`${startDate}T00:00:00Z`);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+    const endExclusive = args.month
+      ? [args.throughDate, nextMonth.toISOString().slice(0, 10)].sort()[0]
+      : args.throughDate;
+    // ponytail: bound raw-history reads. Add daily aggregates if this ceiling is reached;
+    // never show averages from a silently truncated sample.
+    // Include the next UTC date: legacy date fields use UTC, while the cutoff is 05:00 UTC.
+    const records = args.campus
+      ? await ctx.db.query("dismissalHistory").withIndex("by_campus_date", q =>
+          q.eq("campusLocation", args.campus!).gte("date", startDate).lte("date", endExclusive)).take(10001)
+      : await ctx.db.query("dismissalHistory").withIndex("by_date", q =>
+          q.gte("date", startDate).lte("date", endExclusive)).take(10001);
+    const limitReached = records.length > 10000;
+    return {
+      startDate,
+      endDate: new Date(Date.parse(endExclusive) - 86400000).toISOString().slice(0, 10),
+      limitReached,
+      ...calculateDurationTrend(limitReached ? [] : filterByCampusScope(access, records), startDate, endExclusive),
+    };
+  },
+});
 
 function filterByCampusScope<T extends { campusLocation?: string }>(
   access: DashboardAccess,

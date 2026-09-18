@@ -29,7 +29,7 @@ test('early pickups uses an accessible mobile icon button and keeps the desktop 
     assert.match(html, /<button[^>]*class="[^"]*size-9/);
     assert.ok(html.includes(`aria-label="${messages.transport.earlyPickups}"`));
     assert.ok(html.includes('md:w-auto md:px-4'));
-    assert.ok(html.includes('border-2 border-yankees-blue hover:bg-yankees-blue/10'));
+    assert.ok(html.includes('border border-input hover:bg-accent'));
     assert.ok(html.includes('lucide-user-check'));
     assert.match(html, /<svg[^>]*md:hidden[^>]*aria-hidden="true"/);
     assert.ok(html.includes(`<span class="hidden md:inline">${messages.transport.earlyPickups}</span>`));
@@ -74,6 +74,33 @@ test('Dispatch button remains visible but disabled while another operation is pe
 });
 
 for (const mode of ['operator', 'viewer'] as const) {
+    test(`${mode}: road owns floating controls in normal and fullscreen layouts`, () => {
+        for (const fullscreen of [false, true]) {
+            const html = renderToStaticMarkup(
+                <NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
+                    <Road leftLaneCars={[]} rightLaneCars={[]} mode={mode}
+                        isFullscreen={fullscreen} onToggleFullscreen={() => {}}
+                        startControl={<button>Campus control</button>}
+                        endControl={mode === 'operator' ? <button>Pickup control</button> : undefined}
+                    >
+                        <div data-empty-overlay>Select a campus</div>
+                    </Road>
+                </NextIntlClientProvider>
+            );
+            assert.ok(html.indexOf('data-slot="card"') < html.indexOf('data-road-controls'));
+            assert.ok(html.indexOf('Campus control') < html.indexOf('road-scroll-container'));
+            assert.ok(html.includes('pointer-events-none absolute inset-x-2 top-2 z-30'));
+            assert.ok(html.includes('pointer-events-auto min-w-0'));
+            assert.ok(html.includes('pt-14'), 'Cars have clearance below the floating controls');
+            assert.ok(html.includes('data-has-controls="true"'), 'The scrolling surface fades below floating controls');
+            assert.ok(html.includes('data-empty-overlay'), 'The empty-state overlay travels with Road');
+            assert.equal(html.includes('Pickup control'), mode === 'operator');
+            assert.equal(html.includes('fixed inset-0 z-40'), fullscreen);
+            assert.ok(!html.includes('z-[9999]'), 'Portalled dropdowns stay above fullscreen Road');
+            if (mode === 'viewer') assert.match(html, /aria-label="[^"]*Fullscreen"/i);
+        }
+    });
+
     for (const lane of ['left', 'right'] as const) {
         test(`${mode}, ${lane}: buses use yellow with dark text and cars retain lane colors`, () => {
             const bus = renderLane(mode, undefined, false, { ...car, lane, vehicleType: 'bus' });
@@ -108,5 +135,6 @@ for (const mode of ['operator', 'viewer'] as const) {
         assert.ok(!html.includes('100vh'));
         assert.ok(!html.includes('margin-bottom'));
         assert.ok(!html.includes('h-48'));
+        assert.ok(!html.includes('data-has-controls="true"'), 'Roads without floating controls do not fade');
     });
 }

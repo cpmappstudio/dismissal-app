@@ -58,7 +58,11 @@ export function UserButtonWrapper({ showName = true, collapsed = false }: UserBu
                             width: "100%",
                         },
                         userButtonPopoverCard: { pointerEvents: "initial" },
-                        userButtonOuterIdentifier: { color: "white" }
+                        userButtonOuterIdentifier: {
+                            color: "var(--sidebar-foreground)",
+                            fontSize: "var(--text-base)",
+                            fontWeight: "var(--font-weight-semibold)",
+                        }
                     },
                 }}
                 showName={showName}

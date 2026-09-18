@@ -766,7 +766,7 @@ export function StaffFormDialog({
               <Button
                 type="submit"
                 disabled={!canSubmitForm || isSubmitting}
-                className="bg-yankees-blue hover:bg-yankees-blue/90 gap-2"
+                className="bg-primary hover:bg-primary/90 gap-2"
               >
                 <SubmitIcon className="h-4 w-4" />
                 {submitText}

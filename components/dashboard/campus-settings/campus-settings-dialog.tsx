@@ -779,7 +779,7 @@ export function CampusSettingsDialog({
       Edit Campus
     </Button>
   ) : (
-    <Button className="bg-sidebar-accent h-9 dark:text-white gap-2">
+    <Button className="h-9 gap-2">
       <Plus className="h-4 w-4" />
       <span className="hidden md:inline">Add Campus</span>
     </Button>
@@ -1290,7 +1290,7 @@ export function CampusSettingsDialog({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-white"
+              className="bg-destructive text-destructive-foreground"
             >
               Delete Campus
             </AlertDialogAction>
@@ -1303,7 +1303,7 @@ export function CampusSettingsDialog({
         <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
           <Alert
             variant={alert.type === "error" ? "destructive" : "default"}
-            className="max-w-sm w-auto bg-white shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
+            className="max-w-sm w-auto bg-card shadow-lg cursor-pointer border-2 transition-all hover:shadow-xl"
             onClick={hideAlert}
           >
             {alert.type === "error" ? (

@@ -138,9 +138,14 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         assert.equal(render().length, 0);
     }
     const cards = render(false).filter(node => node.type === 'li');
-    for (const [index, color] of ['slate', 'emerald', 'amber', 'sky', 'violet'].entries()) {
-        assert.match(String(cards[index].props.className), new RegExp(`bg-${color}-50`));
-        assert.match(String(cards[index].props.className), new RegExp(`border-${color}-`));
+    for (const [index, styles] of [
+        ['bg-card', 'border-border'],
+        ['bg-success-soft', 'border-success/30'],
+        ['bg-destructive-soft', 'border-destructive/30'],
+        ['bg-info-soft', 'border-info/30'],
+        ['bg-secondary', 'border-primary/30'],
+    ].entries()) {
+        for (const style of styles) assert.ok(String(cards[index].props.className).includes(style));
     }
     const labels = render(false).filter(node => typeof node.props.children === 'string' && node.props.children.startsWith('status.'));
     assert.equal(labels.length, 5);
@@ -159,7 +164,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     roster.students[1].state.boarding = { at: 1788512400000, byName: 'Driver boarding' };
     roster.students[1].state.dropoff = { at: 1788516000000, byName: 'Driver dropoff' };
     assert.equal(counterText(), 'students (1/3)', 'Drop-off reduces passengers on board without changing the expected total');
-    assert.match(String(render(false).filter(node => node.type === 'li')[1].props.className), /bg-indigo-50/);
+    assert.match(String(render(false).filter(node => node.type === 'li')[1].props.className), /bg-info-soft/);
     const eventLines = render(false).filter(node => node.type === 'p').map(node => React.Children.toArray(node.props.children as React.ReactNode).filter(child => typeof child === 'string').join(''));
     assert.ok(eventLines.some(line => line.includes('Driver boarding')));
     assert.ok(eventLines.some(line => line.includes('Driver dropoff')), 'Both events are displayed');

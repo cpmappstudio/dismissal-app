@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
@@ -33,14 +32,14 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
 
   if (data === undefined) {
     return (
-      <Card className="bg-card">
+      <section className="min-w-0 space-y-6 py-6">
         <CardHeader className="flex flex-col justify-center items-center">
-          <Skeleton className="bg-american-blue/40 h-8 w-64 rounded-md mb-2" />
-          <Skeleton className="bg-american-blue/40 h-4 w-48 rounded-md" />
+          <Skeleton className="bg-muted h-8 w-64 max-w-full rounded-md mb-2" />
+          <Skeleton className="bg-muted h-4 w-48 rounded-md" />
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Podio Top 3 */}
-          <div className="flex items-end justify-center gap-4 pb-6">
+          <div className="flex items-end justify-center gap-2 pb-6 sm:gap-4">
             {[
               { height: "h-32", order: 0 },
               { height: "h-40", order: 1 },
@@ -48,20 +47,20 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
             ].map((item, i) => (
               <div
                 key={i}
-                className="flex flex-col items-center gap-2"
+                className="flex min-w-0 max-w-32 flex-1 flex-col items-center gap-2"
                 style={{ order: item.order }}
               >
                 <div className="relative">
-                  <Skeleton className="bg-american-blue/40 h-16 w-16 rounded-full" />
+                  <Skeleton className="bg-muted h-16 w-16 rounded-full" />
                 </div>
 
                 <div className="flex flex-col items-center gap-1">
-                  <Skeleton className="bg-american-blue/40 h-3 w-16 rounded-md" />
-                  <Skeleton className="bg-american-blue/40 h-6 w-10 rounded-md" />
+                  <Skeleton className="bg-muted h-3 w-16 rounded-md" />
+                  <Skeleton className="bg-muted h-6 w-10 rounded-md" />
                 </div>
 
                 <Skeleton
-                  className={`bg-american-blue/40 ${item.height} w-20 rounded-t-lg`}
+                  className={`bg-muted ${item.height} w-full max-w-20 rounded-t-lg`}
                 />
               </div>
             ))}
@@ -75,18 +74,18 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
                   key={i}
                   className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0"
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    <Skeleton className="bg-american-blue/40 h-6 w-8 rounded-md" />
-                    <Skeleton className="bg-american-blue/40 h-8 w-8 rounded-md" />
-                    <Skeleton className="bg-american-blue/40 h-4 w-32 rounded-md" />
+                  <div className="flex min-w-0 items-center gap-3 flex-1">
+                    <Skeleton className="bg-muted h-6 w-8 rounded-md" />
+                    <Skeleton className="bg-muted h-8 w-8 rounded-md" />
+                    <Skeleton className="bg-muted h-4 w-32 rounded-md" />
                   </div>
-                  <Skeleton className="bg-american-blue/40 h-6 w-12 rounded-md" />
+                  <Skeleton className="bg-muted h-6 w-12 rounded-md" />
                 </div>
               ))}
             </div>
           </div>
         </CardContent>
-      </Card>
+      </section>
     );
   }
 
@@ -103,7 +102,7 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
 
   if (!data || data.length === 0 || allTopArrivals.length === 0) {
     return (
-      <Card>
+      <section className="min-w-0 space-y-6 py-6">
         <CardHeader>
           <CardTitle>Top 5 Most Frequent Early Arrivals</CardTitle>
           <CardDescription>
@@ -113,7 +112,7 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
         <CardContent>
           <p className="text-sm text-muted-foreground">No data available</p>
         </CardContent>
-      </Card>
+      </section>
     );
   }
 
@@ -142,9 +141,9 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
   };
 
   return (
-    <Card>
+    <section className="min-w-0 space-y-6 py-6">
       <CardHeader className="flex flex-col justify-center items-center">
-        <CardTitle className="text-2xl">
+        <CardTitle className="text-center text-xl sm:text-2xl">
           Top 5 Most Frequent Early Arrivals
         </CardTitle>
         <CardDescription>
@@ -154,7 +153,7 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         {top3.length > 0 && (
-          <div className="flex items-end justify-center gap-4 pb-6">
+          <div className="flex items-end justify-center gap-2 pb-6 sm:gap-4">
             {podiumOrder.map((arrival, displayIndex) => {
               const originalIndex = top3.indexOf(arrival);
               const carLabel = `Car #${arrival.carNumber}`;
@@ -175,12 +174,12 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
               return (
                 <div
                   key={`${arrival.carNumber}-${arrival.position}-${displayIndex}`}
-                  className="flex flex-col items-center gap-2"
+                  className="flex min-w-0 max-w-32 flex-1 flex-col items-center gap-2"
                   style={{ order: displayIndex }}
                 >
                   <div className="relative">
                     <Avatar className="h-16 w-16 border-2 border-border">
-                      <AvatarFallback className="bg-gradient-to-br from-american-blue to-yankees-blue text-accent text-lg font-bold">
+                      <AvatarFallback className="bg-gradient-to-br from-info to-primary text-primary-foreground text-lg font-bold">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
@@ -188,7 +187,7 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
                       {getPodiumIcon(originalIndex)}
                     </div>
                   </div>
-                  <div className="text-center">
+                  <div className="w-full break-words text-center">
                     <p className="text-xs font-semibold text-foreground">
                       {carLabel}
                     </p>
@@ -198,7 +197,7 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
                     </p>
                   </div>
                   <div
-                    className={`${heights} w-20 rounded-t-lg bg-gradient-to-tr from-american-blue to-yankees-blue border-2 text-accent flex items-center justify-center text-3xl font-bold transition-all`}
+                    className={`${heights} w-full max-w-20 rounded-t-lg bg-gradient-to-tr from-info to-primary border-2 text-primary-foreground flex items-center justify-center text-3xl font-bold transition-all`}
                   >
                     #{arrival.position}
                   </div>
@@ -220,13 +219,13 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
                     key={`${arrival.carNumber}-${arrival.position}-${index}`}
                     className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0"
                   >
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex min-w-0 items-center gap-3 flex-1">
                       <span className="text-xl font-bold text-muted-foreground min-w-[2rem]">
                         #{rank}
                       </span>
-                      <Car className="h-8 w-8 text-american-blue" />
-                      <div className="fle flex-row">
-                        <p className="text-sm font-medium">{carLabel}</p>
+                      <Car className="h-8 w-8 shrink-0 text-info" />
+                      <div className="min-w-0 break-words">
+                        <p className="break-words text-sm font-medium">{carLabel}</p>
                         <span className="text-xs text-muted-foreground">
                           {students}
                         </span>
@@ -244,6 +243,6 @@ export function TopArrivalsCard({ filters }: TopArrivalsCardProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+    </section>
   );
 }

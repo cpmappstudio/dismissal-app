@@ -10,15 +10,15 @@ import {
 } from "@/components/ui/sidebar"
 
 export function UniversityLogo() {
-    const { state } = useSidebar()
+    const { state, isMobile } = useSidebar()
     const t = useTranslations('university')
-    const isCollapsed = state === "collapsed"
+    const isCollapsed = !isMobile && state === "collapsed"
 
     return (
         <SidebarMenu>
             <SidebarMenuItem>
-                <div className={`flex w-full items-center justify-center gap-1 rounded-md pb-2  text-sm ${isCollapsed ? 'px-0' : 'px-1'}`}>
-                    <div className="flex aspect-square size-8 items-center justify-center">
+                <div className={`flex w-full items-center justify-center gap-2 py-2 ${isCollapsed ? 'px-0' : 'px-1'}`}>
+                    <div className="flex aspect-square size-8 shrink-0 items-center justify-center">
                         <Image
                             src="/oficial-logo-alt.png"
                             alt="Alef University"
@@ -27,12 +27,11 @@ export function UniversityLogo() {
                             className="object-contain"
                         />
                     </div>
-                    {/* <div className="grid flex-1 text-left  text-sm antialiased leading-tight"> */}
-                    <span className="truncate uppercase italic text-3xl text-lime-300">
-                        {t('name')}
-                    </span>
-
-                    {/* </div> */}
+                    {!isCollapsed && (
+                        <span className="truncate uppercase italic text-3xl text-sidebar-primary">
+                            {t('name')}
+                        </span>
+                    )}
                 </div>
             </SidebarMenuItem>
         </SidebarMenu>

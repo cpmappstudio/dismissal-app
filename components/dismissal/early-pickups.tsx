@@ -210,7 +210,7 @@ export function EarlyPickups({
         <Button
           variant="outline"
           size="icon"
-          className="md:w-auto md:px-4 border-2 border-yankees-blue hover:bg-yankees-blue/10"
+          className="md:w-auto md:px-4 border border-input hover:bg-accent"
           aria-label={t("earlyPickups")}
           title={t("earlyPickups")}
         >

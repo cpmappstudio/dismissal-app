@@ -48,7 +48,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <Building2
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                className="h-10 w-10 md:h-12 md:w-12 text-primary"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -66,7 +66,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/management/campuses"
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <Users
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                className="h-10 w-10 md:h-12 md:w-12 text-primary"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -105,7 +105,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/management/students"
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <User
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                className="h-10 w-10 md:h-12 md:w-12 text-primary"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/management/staff"
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                className="h-10 w-10 md:h-12 md:w-12 text-primary"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/operators"
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
             {/* Left column - Icon (2/5) */}
             <CardHeader className="md:col-span-1 flex items-center justify-center py-4 md:py-6">
               <UserCog
-                className="h-10 w-10 md:h-12 md:w-12 text-yankees-blue"
+                className="h-10 w-10 md:h-12 md:w-12 text-primary"
                 aria-hidden="true"
               />
             </CardHeader>
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
               <CardAction>
                 <Button
                   asChild
-                  className="w-full group mt-3 md:mt-4 bg-yankees-blue hover:bg-yankees-blue/90 text-white font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                  className="w-full group mt-3 md:mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all text-sm"
                 >
                   <Link
                     href="/operators/viewer"
