@@ -4,6 +4,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { DismissalRole } from "../lib/role-utils";
+import { queueCampusMap } from "./campusMaps";
+import { campusAddressKey } from "../lib/campus-map";
 import {
     getActiveCampuses,
     getCampusSettings,
@@ -341,6 +343,14 @@ export const update = mutation({
             updatedAt: Date.now(),
             updatedBy: userId,
         });
+
+        if (
+            campus.mapLocation &&
+            args.updates.address !== undefined &&
+            campusAddressKey(args.updates.address) !== campusAddressKey(campus.address)
+        ) {
+            await queueCampusMap(ctx, { ...campus, address: args.updates.address });
+        }
 
         return args.campusId;
     },

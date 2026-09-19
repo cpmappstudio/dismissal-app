@@ -198,10 +198,31 @@ export const list = query({
       .paginate(args.paginationOpts);
     return {
       ...result,
-      page: result.page.filter((bus) => canRead(bus, user, role)),
+      page: await Promise.all(
+        result.page.filter((bus) => canRead(bus, user, role)).map(async (bus) => ({
+          ...bus,
+          campuses: await visibleCampuses(ctx.db, bus, user, role),
+        })),
+      ),
     };
   },
 });
+
+async function visibleCampuses(
+  db: DatabaseReader,
+  bus: Doc<"buses">,
+  user: Doc<"users">,
+  role: DismissalRole,
+) {
+  const campuses = await Promise.all(
+    bus.campusIds
+      .filter((id) => userHasAccessToCampusById(user, id, role))
+      .map((id) => db.get(id)),
+  );
+  return campuses.flatMap((c) => c?.isActive
+    ? [{ id: c._id, name: c.campusName, timezone: c.timezone, mapLocation: c.mapLocation }]
+    : []);
+}
 
 export const get = query({
   args: { busId: v.id("buses") },
@@ -209,20 +230,12 @@ export const get = query({
     const { user, role } = await validateUserAccess(ctx, managementRoles);
     const bus = await ctx.db.get(busId);
     if (!bus || !canRead(bus, user, role)) return null;
-    const campuses = await Promise.all(
-      bus.campusIds
-        .filter((id) => userHasAccessToCampusById(user, id, role))
-        .map((id) => ctx.db.get(id)),
-    );
+    const campuses = await visibleCampuses(ctx.db, bus, user, role);
     const drivers = await activeDrivers(ctx.db, bus.identifier);
     return {
       ...bus,
       canEdit: canEdit(bus, user, role),
-      campuses: campuses.flatMap((c) =>
-        c?.isActive
-          ? [{ id: c._id, name: c.campusName, timezone: c.timezone }]
-          : [],
-      ),
+      campuses,
       drivers: drivers
         .filter(
           (d) =>

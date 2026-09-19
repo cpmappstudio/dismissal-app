@@ -59,19 +59,25 @@ export default function BusesPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {buses.map((bus) => (
-            <Link key={bus._id} href={`/${locale}/operators/buses/${bus._id}`}>
-              <Card className="group relative cursor-pointer overflow-hidden border-border/60 bg-card pt-0 shadow-sm transition-all duration-200 hover:shadow-md">
-                <BusHero />
-                <CardHeader className="gap-1 px-5">
-                  <CardTitle className="text-lg font-semibold">
+            <Card
+              key={bus._id}
+              className="group relative overflow-hidden border-border/60 bg-card pt-0 shadow-sm transition-all duration-200 hover:shadow-md"
+            >
+              <BusHero busId={bus._id} campuses={bus.campuses} />
+              <CardHeader className="gap-1 px-5">
+                <CardTitle className="text-lg font-semibold">
+                  <Link
+                    className="after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                    href={`/${locale}/operators/buses/${bus._id}`}
+                  >
                     {bus.name}
-                  </CardTitle>
-                  <CardDescription>
-                    {transport("bus")} · {bus.identifier}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+                  </Link>
+                </CardTitle>
+                <CardDescription>
+                  {transport("bus")} · {bus.identifier}
+                </CardDescription>
+              </CardHeader>
+            </Card>
           ))}
         </div>
       )}

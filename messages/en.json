@@ -1,5 +1,10 @@
 {
   "buses": {
+    "mapArea": "Campus area map: {campuses}",
+    "mapLoading": "Locating campus area…",
+    "mapMissing": "No campus location available",
+    "mapUnavailable": "Map temporarily unavailable",
+    "mapPartial": "Some campus locations unavailable",
     "removeAssignment": "Remove bus assignment",
     "select": "Select a bus",
     "noneAvailable": "No buses available. Create a bus for the campus first.",

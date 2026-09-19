@@ -5,6 +5,11 @@ import { v } from "convex/values";
 
 const transportEvent = v.object({ at: v.number(), by: v.id("users"), byName: v.string() });
 
+export const campusMapPointValidator = v.object({
+  latitude: v.number(), longitude: v.number(), label: v.string(),
+  precision: v.union(v.literal("address"), v.literal("street"), v.literal("postal"), v.literal("city"), v.literal("state"), v.literal("country")),
+});
+
 export default defineSchema({
   buses: defineTable({
     identifier: v.union(v.number(), v.string()),
@@ -284,6 +289,20 @@ export default defineSchema({
       }),
     ),
 
+    // Cached campus geocoding; existing campuses are resolved lazily.
+    mapLocation: v.optional(
+      v.object({
+        addressKey: v.string(),
+        requestedAt: v.number(),
+        status: v.union(
+          v.literal("pending"),
+          v.literal("ready"),
+          v.literal("missing"),
+          v.literal("error"),
+        ),
+        point: v.optional(campusMapPointValidator),
+      }),
+    ),
     // Timezone for this campus
     timezone: v.string(), // "America/New_York"
 
@@ -333,6 +352,7 @@ export default defineSchema({
     updatedBy: v.optional(v.id("users")),
   })
     .index("by_name", ["campusName"])
+    .index("by_mapLocation_status", ["mapLocation.status"])
     .index("by_active", ["isActive"])
     .index("by_status", ["status"])
     .index("by_created", ["createdAt"]),

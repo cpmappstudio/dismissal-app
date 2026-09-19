@@ -37,7 +37,7 @@ export default function BusDetailPage({
       />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Card className="gap-3 overflow-hidden pt-0">
-          <BusHero />
+          <BusHero busId={bus._id} campuses={bus.campuses} />
           <CardHeader>
             <CardTitle>
               {transport("bus")} · {bus.identifier}

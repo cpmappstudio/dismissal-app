@@ -4,6 +4,15 @@ import test from 'node:test';
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
+test('bus map credits reuse the sidebar green and omit the route disclaimer', () => {
+    const hero = readFileSync(new URL('../components/dashboard/buses/bus-hero.tsx', import.meta.url), 'utf8');
+    const waves = readFileSync(new URL('../components/brand-waves.tsx', import.meta.url), 'utf8');
+    assert.match(waves, /fill="var\(--primary\)"/);
+    assert.match(hero, /className="[^"]*\bbg-primary\b[^"]*\btext-primary-foreground\b[^"]*">\s*Tiles ©/);
+    assert.doesNotMatch(hero, /mapApproximate/);
+    assert.match(hero, /https:\/\/www\.openstreetmap\.org\/copyright/);
+});
+
 test('campus status badges use an opaque themed surface over campus images', () => {
     const badge = readFileSync(new URL('../components/dashboard/campus-settings/campus-settings-overview/campus-settings-status-badge.tsx', import.meta.url), 'utf8');
     assert.match(badge, /\bbg-card\b/);
