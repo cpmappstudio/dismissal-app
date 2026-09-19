@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { useTranslations } from "next-intl";
 import { Pencil, Plus } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -90,7 +91,12 @@ function BusForm({
           });
           onSaved(id);
         } catch (err) {
-          setError(err instanceof Error ? err.message : transport("saveError"));
+          const data = err instanceof ConvexError ? err.data : null;
+          setError(
+            data && typeof data === "object" && data.code === "CAMPUS_HAS_ASSIGNED_STUDENTS"
+              ? t("campusHasAssignedStudents")
+              : transport("saveError"),
+          );
         } finally {
           setBusy(false);
         }

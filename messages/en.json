@@ -1,4 +1,18 @@
 {
+  "campusImage": {
+    "label": "Campus image (optional)",
+    "upload": "Upload image",
+    "replace": "Replace image",
+    "remove": "Remove image",
+    "preview": "Campus image preview",
+    "current": "Current campus image",
+    "saving": "Saving image…",
+    "hint": "JPG, PNG or WebP · Up to 5 MB",
+    "fallback": "Shown on campus cards. Without an image, campus initials are used.",
+    "type": "Choose a JPG, PNG or WebP image.",
+    "size": "Choose a non-empty image no larger than 5 MB.",
+    "uploadError": "The image could not be uploaded. Your current image has not changed. Please try again."
+  },
   "buses": {
     "mapArea": "Campus area map: {campuses}",
     "mapLoading": "Locating campus area…",
@@ -15,6 +29,7 @@
     "edit": "Edit bus",
     "name": "Name",
     "campuses": "Campuses",
+    "campusHasAssignedStudents": "You cannot remove this campus because it still has students assigned to this bus. Keep it selected, or first remove or change those students' bus assignment in Students. You can add another campus without removing this one.",
     "back": "Back to buses",
     "search": "Search buses by name, number or plate",
     "empty": "No buses found.",

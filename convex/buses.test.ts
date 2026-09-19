@@ -34,7 +34,12 @@ test("car and bus assignments coexist, validate campus coverage and can be remov
   await t.run(ctx => ctx.db.patch(ids.principal, { role: "superadmin" }));
   await expect(principal.mutation(api.students.update, { studentId: id, campuses: [ids.campuses[1]] })).rejects.toThrow("not available");
   const bus = (await t.run(ctx => ctx.db.get(busId)))!;
-  await expect(principal.mutation(api.buses.save, { busId, identifier: 123, name: "Bus", campusIds: [ids.campuses[1]], expectedUpdatedAt: bus.updatedAt })).rejects.toThrow("Reassign students");
+  // convex-test exposes the serialized error data, before the browser client decodes it.
+  await expect(principal.mutation(api.buses.save, { busId, identifier: 123, name: "Bus", campusIds: [ids.campuses[1]], expectedUpdatedAt: bus.updatedAt })).rejects.toMatchObject({
+    name: "ConvexError",
+    data: expect.stringContaining('"code":"CAMPUS_HAS_ASSIGNED_STUDENTS"'),
+  });
+  expect((await t.run(ctx => ctx.db.get(busId)))!.campusIds).toEqual(bus.campusIds);
   await principal.mutation(api.students.removeCarNumber, { studentId: id });
   expect(await read()).toMatchObject({ carNumber: 0, busNumber: 123 });
   await principal.mutation(api.students.assignCarNumber, { studentId: id, carNumber: 21 });

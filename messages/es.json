@@ -1,4 +1,18 @@
 {
+  "campusImage": {
+    "label": "Imagen del campus (opcional)",
+    "upload": "Subir imagen",
+    "replace": "Cambiar imagen",
+    "remove": "Quitar imagen",
+    "preview": "Vista previa de la imagen del campus",
+    "current": "Imagen actual del campus",
+    "saving": "Guardando imagen…",
+    "hint": "JPG, PNG o WebP · Hasta 5 MB",
+    "fallback": "Se muestra en las tarjetas del campus. Sin imagen se usan las iniciales.",
+    "type": "Selecciona una imagen JPG, PNG o WebP.",
+    "size": "Selecciona una imagen no vacía de hasta 5 MB.",
+    "uploadError": "No se pudo subir la imagen. Tu imagen actual no ha cambiado. Inténtalo de nuevo."
+  },
   "buses": {
     "mapArea": "Mapa de la zona de los campus: {campuses}",
     "mapLoading": "Ubicando zona del campus…",
@@ -15,6 +29,7 @@
     "edit": "Editar bus",
     "name": "Nombre",
     "campuses": "Sedes",
+    "campusHasAssignedStudents": "No puedes quitar esta sede porque todavía tiene estudiantes asignados a este bus. Mantenla seleccionada o primero elimina o cambia la asignación de bus de esos estudiantes en Estudiantes. Puedes añadir otra sede sin quitar esta.",
     "back": "Volver a buses",
     "search": "Buscar buses por nombre, número o placa",
     "empty": "No se encontraron buses.",

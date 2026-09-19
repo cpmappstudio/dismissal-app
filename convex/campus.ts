@@ -1,7 +1,9 @@
 // convex/campus.ts
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import { campusImageError } from "../lib/campus-image";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { DismissalRole } from "../lib/role-utils";
 import { queueCampusMap } from "./campusMaps";
@@ -15,6 +17,22 @@ import {
 } from "./helpers";
 
 type CampusUser = Doc<"users">;
+
+async function validateCampusImage(ctx: MutationCtx, storageId: Id<"_storage">) {
+    const file = await ctx.db.system.get(storageId);
+    const error = file ? campusImageError(file) : "missing";
+    if (error) throw new ConvexError({ code: "INVALID_CAMPUS_IMAGE", reason: error });
+}
+
+// Keep the saved image until its replacement has passed validation.
+// Storage deletion and the document update commit in the same transaction.
+async function replaceCampusImage(
+    ctx: MutationCtx, previousId: Id<"_storage"> | undefined, nextId: Id<"_storage"> | null,
+) {
+    if (previousId === nextId) return;
+    if (nextId) await validateCampusImage(ctx, nextId);
+    if (previousId) await ctx.storage.delete(previousId);
+}
 
 function isSuperadmin(role: string): boolean {
     return role === "superadmin";
@@ -225,6 +243,8 @@ export const create = mutation({
             throw new Error("Campus already exists");
         }
 
+        if (args.logoStorageId) await validateCampusImage(ctx, args.logoStorageId);
+
         // Create campus
         const campusId = await ctx.db.insert("campusSettings", {
             campusName: args.campusName.trim(),
@@ -317,6 +337,10 @@ export const update = mutation({
 
         const updates: any = { ...args.updates };
 
+        if (args.updates.logoStorageId !== undefined) {
+            await replaceCampusImage(ctx, campus.logoStorageId, args.updates.logoStorageId);
+        }
+
         // Trim string fields
         if (updates.campusName !== undefined) {
             updates.campusName = updates.campusName.trim();
@@ -396,6 +420,10 @@ export const saveCampusLogo = mutation({
             throw new Error("No access to this campus");
         }
         const userId = user._id;
+
+        const campus = await ctx.db.get(args.campusId);
+        if (!campus) throw new Error("Campus not found");
+        await replaceCampusImage(ctx, campus.logoStorageId, args.storageId);
 
         await ctx.db.patch(args.campusId, {
             logoStorageId: args.storageId,

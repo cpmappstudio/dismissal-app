@@ -15,8 +15,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Upload,
-  ImageIcon,
   ChevronDown,
   User,
   X,
@@ -26,8 +24,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import Image from "next/image";
+import { CampusImageField } from "./campus-image-field";
 import { useQuery, useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -176,6 +175,7 @@ export function CampusSettingsDialog({
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("campusManagement");
+  const imageT = useTranslations("campusImage");
 
   // Clerk user (for authentication check)
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
@@ -246,7 +246,6 @@ export function CampusSettingsDialog({
   const updateCampusMutation = useMutation(api.campus.update);
   const deleteCampusMutation = useMutation(api.campus.deleteCampus);
   const generateUploadUrl = useMutation(api.campus.generateUploadUrl);
-  const deleteCampusLogo = useMutation(api.campus.deleteCampusLogo);
 
   // Dialog state
   const [isOpen, setIsOpen] = useState(false);
@@ -261,9 +260,11 @@ export function CampusSettingsDialog({
     Id<"users"> | undefined
   >(campus?.directorId || undefined);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [deleteExistingImage, setDeleteExistingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadedImage = useRef<{
+    file: File;
+    storageId: Id<"_storage">;
+  } | null>(null);
 
   // Grades state
   const [grades, setGrades] = useState<Grade[]>(campus?.availableGrades || []);
@@ -333,37 +334,14 @@ export function CampusSettingsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campus?._id, isOpen]);
 
-  // Image handling functions
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
+  // Cancel only discards the local selection; it never deletes the saved image.
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedImage(null);
       setDeleteExistingImage(false);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      uploadedImage.current = null;
     }
-  };
-
-  const handleImageRemove = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleDeleteExistingImage = () => {
-    setDeleteExistingImage(true);
-    setSelectedImage(null);
-    setImagePreview(null);
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
+  }, [isOpen]);
 
   // Grade template handler
   const handleUseGradeTemplate = (checked: boolean) => {
@@ -433,8 +411,9 @@ export function CampusSettingsDialog({
     }
   };
 
-  // Upload image to Convex storage
-  const uploadImage = async (file: File): Promise<Id<"_storage"> | null> => {
+  // Reuse a successful upload when the campus save is retried.
+  const uploadImage = async (file: File): Promise<Id<"_storage">> => {
+    if (uploadedImage.current?.file === file) return uploadedImage.current.storageId;
     try {
       const uploadUrl = await generateUploadUrl();
       const result = await fetch(uploadUrl, {
@@ -442,20 +421,19 @@ export function CampusSettingsDialog({
         headers: { "Content-Type": file.type },
         body: file,
       });
-
-      if (!result.ok) {
-        throw new Error(`Upload failed: ${result.statusText}`);
-      }
-
+      if (!result.ok) throw new Error("Upload failed");
       const { storageId } = await result.json();
-      return storageId as Id<"_storage">;
-    } catch (error) {
-      throw error;
+      if (typeof storageId !== "string") throw new Error("Missing storage ID");
+      uploadedImage.current = { file, storageId: storageId as Id<"_storage"> };
+      return uploadedImage.current.storageId;
+    } catch {
+      throw new Error(imageT("uploadError"));
     }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
     const form = event.currentTarget;
 
     // Check if Clerk is loaded and user is authenticated
@@ -492,15 +470,6 @@ export function CampusSettingsDialog({
     setIsSubmitting(true);
 
     try {
-      // Handle image deletion or replacement
-      if (isEditing && campus?._id && campus?.logoStorageId) {
-        if (deleteExistingImage || selectedImage) {
-          await deleteCampusLogo({
-            campusId: campus._id,
-          });
-        }
-      }
-
       // Upload new image if selected
       let uploadedLogoStorageId: Id<"_storage"> | null = null;
       if (selectedImage) {
@@ -530,6 +499,8 @@ export function CampusSettingsDialog({
 
         if (uploadedLogoStorageId) {
           updates.logoStorageId = uploadedLogoStorageId;
+        } else if (deleteExistingImage && campus.logoStorageId) {
+          updates.logoStorageId = null;
         }
 
         if (campusName.trim() !== campus.campusName) {
@@ -593,15 +564,12 @@ export function CampusSettingsDialog({
         }
 
         const hasChanges = Object.keys(updates).length > 0;
-        const imageWasDeleted = deleteExistingImage && campus.logoStorageId;
-
-        if (hasChanges || imageWasDeleted) {
-          if (hasChanges) {
-            await updateCampusMutation({
-              campusId: campus._id,
-              updates,
-            });
-          }
+        if (hasChanges) {
+          await updateCampusMutation({
+            campusId: campus._id,
+            updates,
+          });
+          uploadedImage.current = null;
 
           showAlert(
             "success",
@@ -694,6 +662,7 @@ export function CampusSettingsDialog({
         }
 
         await createCampusMutation(campusData);
+        uploadedImage.current = null;
 
         showAlert(
           "success",
@@ -703,7 +672,6 @@ export function CampusSettingsDialog({
         form.reset();
         setSelectedDirectorId(undefined);
         setSelectedImage(null);
-        setImagePreview(null);
         setDeleteExistingImage(false);
         setGrades([]);
         setNewGradeName("");
@@ -713,7 +681,9 @@ export function CampusSettingsDialog({
       }
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : t("alerts.saveError.message");
+        error instanceof ConvexError && error.data?.code === "INVALID_CAMPUS_IMAGE"
+          ? imageT(error.data.reason === "type" ? "type" : error.data.reason === "size" ? "size" : "uploadError")
+          : error instanceof Error ? error.message : t("alerts.saveError.message");
       showAlert(
         "error",
         isEditing ? t("alerts.updateError.title") : t("alerts.createError.title"),
@@ -787,7 +757,10 @@ export function CampusSettingsDialog({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => { if (!isSubmitting) setIsOpen(open); }}
+      >
         <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
@@ -810,6 +783,16 @@ export function CampusSettingsDialog({
                   Loading authentication...
                 </div>
               )}
+
+              <CampusImageField
+                file={selectedImage}
+                existingUrl={deleteExistingImage ? null : existingLogoUrl}
+                disabled={isSubmitting}
+                onChange={(file) => {
+                  setSelectedImage(file);
+                  setDeleteExistingImage(!file);
+                }}
+              />
 
               {/* Basic Information */}
               <div className="mt-4 space-y-4">
@@ -1156,117 +1139,33 @@ export function CampusSettingsDialog({
                   </div>
                 </div>
               </div>
-
-              {/* Logo Upload */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium border-b pb-2">
-                  Campus Logo
-                </h4>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="space-y-3">
-                    <Label>Preview</Label>
-                    <div className="aspect-video bg-muted rounded-lg relative overflow-hidden">
-                      {imagePreview ? (
-                        <Image
-                          src={imagePreview}
-                          alt="Preview"
-                          fill
-                          className="object-cover"
-                        />
-                      ) : existingLogoUrl && !deleteExistingImage ? (
-                        <Image
-                          src={existingLogoUrl}
-                          alt="Current logo"
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 lg:col-span-2">
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={triggerFileUpload}
-                        className="gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        Upload Logo
-                      </Button>
-
-                      {(selectedImage || imagePreview) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleImageRemove}
-                          className="gap-2 text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Remove
-                        </Button>
-                      )}
-
-                      {existingLogoUrl &&
-                        !deleteExistingImage &&
-                        !imagePreview &&
-                        isEditing && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleDeleteExistingImage}
-                            className="gap-2 text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete Current
-                          </Button>
-                        )}
-                    </div>
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
 
-            <DialogFooter className="flex justify-between">
-              <div className="flex gap-2">
-                {isEditing && canManageCampusLifecycle && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setShowDeleteAlert(true)}
-                    className="gap-2 mr-auto"
-                    disabled={isSubmitting}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Campus
-                  </Button>
-                )}
+            <DialogFooter className="mt-6 gap-3 border-t pt-4">
+              {isEditing && canManageCampusLifecycle && (
                 <Button
-                  type="submit"
-                  disabled={isSubmitting || !isClerkLoaded || !clerkUser}
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteAlert(true)}
+                  className="sm:mr-auto"
+                  disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? "Saving..."
-                    : !isClerkLoaded
-                      ? "Loading..."
-                      : isEditing
-                        ? "Save changes"
-                        : "Create Campus"}
+                  <Trash2 className="h-4 w-4" />
+                  Delete Campus
                 </Button>
-              </div>
+              )}
+              <Button
+                type="submit"
+                disabled={isSubmitting || !isClerkLoaded || !clerkUser}
+              >
+                {isSubmitting
+                  ? "Saving..."
+                  : !isClerkLoaded
+                    ? "Loading..."
+                    : isEditing
+                      ? "Save changes"
+                      : "Create Campus"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import {
   mutation,
@@ -295,9 +295,10 @@ export const save = mutation({
           student.campuses.some((id) => !campusIds.includes(id)),
       )
     )
-      throw new Error(
-        "Reassign students before removing their campus from this bus",
-      );
+      throw new ConvexError({
+        code: "CAMPUS_HAS_ASSIGNED_STUDENTS",
+        message: "Reassign students before removing their campus from this bus. Keep the campus selected, or remove or change those students' bus assignment first.",
+      });
     if (bus) {
       if (bus.updatedAt !== args.expectedUpdatedAt)
         throw new Error("The bus changed. Reopen the editor and try again.");
