@@ -100,9 +100,10 @@ test("campus image picker validates files, previews selection, removes locally a
     visit(component(props));
     return nodes;
   };
+  const longName = "9215b23-39bc-40d5-b464-80d368774b9e".repeat(8) + ".jpg";
   const select = (type: string, size: number) => {
     const target = {
-      files: [{ name: "campus.png", type, size }],
+      files: [{ name: longName, type, size }],
       value: "selected",
     };
     (
@@ -134,7 +135,12 @@ test("campus image picker validates files, previews selection, removes locally a
   );
   assert.ok(chosen);
   props.file = chosen;
-  render();
+  const selected = render();
+  assert.match(String(selected[0].props.className), /\bmin-w-0\b/);
+  assert.match(String(selected.find(n => n.type === "Attachment")?.props.className), /\bmin-w-0\b/);
+  assert.equal(selected.find(n => n.type === "AttachmentContent")?.props.className, "overflow-hidden");
+  assert.equal(selected.find(n => n.type === "AttachmentTitle")?.props.title, longName);
+  assert.equal(selected.find(n => n.type === "AttachmentTitle")?.props.children, longName);
   const cleanup = effects.at(-1)!();
   assert.equal(
     render().find((n) => n.type === "img")?.props.src,
@@ -160,4 +166,12 @@ test("campus image picker validates files, previews selection, removes locally a
   assert.equal(chosen, null);
   if (cleanup) cleanup();
   assert.deepEqual(revoked, ["blob:preview"]);
+});
+
+test("campus form constrains the attachment's grid track instead of sizing it to a filename", () => {
+  const source = readFileSync(new URL("../components/dashboard/campus-settings/campus-settings-dialog.tsx", import.meta.url), "utf8");
+  assert.match(source, /<form onSubmit={handleSubmit} className="min-w-0">/);
+  assert.match(source, /className="grid min-w-0 grid-cols-1 gap-6"/);
+  const attachment = readFileSync(new URL("../components/ui/attachment.tsx", import.meta.url), "utf8");
+  assert.match(attachment, /min-w-0 truncate font-medium/);
 });

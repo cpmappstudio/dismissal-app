@@ -48,10 +48,10 @@ export function CampusImageField({
   const hasImage = Boolean(file || existingUrl);
   const action = hasImage ? t("replace") : t("upload");
   return (
-    <div className="mt-4 space-y-2">
+    <div className="mt-4 min-w-0 space-y-2">
       <Label htmlFor={id}>{t("label")}</Label>
       <Attachment
-        className="w-full flex-nowrap"
+        className="w-full min-w-0 flex-nowrap"
         state={
           error
             ? "error"
@@ -77,8 +77,8 @@ export function CampusImageField({
             <ImageIcon aria-hidden />
           )}
         </AttachmentMedia>
-        <AttachmentContent>
-          <AttachmentTitle>
+        <AttachmentContent className="overflow-hidden">
+          <AttachmentTitle title={file?.name}>
             {disabled && file
               ? t("saving")
               : file?.name || (hasImage ? t("current") : t("upload"))}

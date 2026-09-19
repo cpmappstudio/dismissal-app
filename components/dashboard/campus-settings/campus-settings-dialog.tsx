@@ -763,14 +763,14 @@ export function CampusSettingsDialog({
       >
         <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="min-w-0">
             <DialogHeader>
               <DialogTitle>
                 {isEditing ? "Edit Campus" : "Create New Campus"}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="grid gap-6">
+            <div className="grid min-w-0 grid-cols-1 gap-6">
               {/* Hidden inputs */}
               <input type="hidden" name="status" value={selectedStatus} />
               <input type="hidden" name="country" value={selectedCountry} />
