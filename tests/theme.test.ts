@@ -4,6 +4,20 @@ import test from 'node:test';
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
+test('brand references use the current SVG logo and both favicon formats', () => {
+    const logo = readFileSync(new URL('../components/university-logo.tsx', import.meta.url), 'utf8');
+    const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8');
+    assert.ok(logo.includes('isCollapsed ? "/favicon.svg" : "/oficial-logo.svg"'));
+    assert.ok(logo.includes('alt="Dismissal"'));
+    assert.doesNotMatch(logo, /oficial-logo.*\.png|Alef University/);
+    for (const name of ['oficial-logo.svg', 'favicon.svg']) {
+        assert.match(readFileSync(new URL('../public/' + name, import.meta.url), 'utf8'), /<svg\b/);
+    }
+    assert.ok(layout.includes('{ url: "/favicon.svg", type: "image/svg+xml", sizes: "any" }'));
+    assert.ok(layout.includes('{ url: "/favicon.ico", type: "image/x-icon" }'));
+    assert.ok(readFileSync(new URL('../public/favicon.ico', import.meta.url)).length > 0);
+});
+
 test('bus map credits reuse the sidebar green and omit the route disclaimer', () => {
     const hero = readFileSync(new URL('../components/dashboard/buses/bus-hero.tsx', import.meta.url), 'utf8');
     const waves = readFileSync(new URL('../components/brand-waves.tsx', import.meta.url), 'utf8');
@@ -30,6 +44,20 @@ test('compact Clerk card sizing is scoped to sign-in, not the account panel', ()
     assert.doesNotMatch(globalCardClasses, /(?:^|\s)(?:max-w-|min-w-|w-)/);
     assert.match(signIn, /<SignIn\s+appearance=/);
     assert.match(signIn, /cardBox:\s*"w-full max-w-sm"/);
+});
+
+test('sign-in reuses the brand assets and keeps artwork spacing desktop-only', () => {
+    const page = readFileSync(new URL('../app/[locale]/sign-in/[[...sign-in]]/page.tsx', import.meta.url), 'utf8');
+    assert.ok(page.includes('src="/oficial-logo.svg"'));
+    assert.ok(page.includes('<BrandWaves className='));
+    assert.ok(page.includes('grid-cols-1'));
+    assert.ok(page.includes('lg:grid-cols-[1.15fr_1fr]'));
+    assert.ok(page.includes('className="hidden lg:block lg:h-48 xl:h-64"'));
+    assert.ok(page.includes('getTranslations("signInPage")'));
+    for (const locale of ['en', 'es']) {
+        const messages = JSON.parse(readFileSync(new URL('../messages/' + locale + '.json', import.meta.url), 'utf8'));
+        for (const key of ['headline', 'headlineEnd', 'description']) assert.ok(messages.signInPage[key]);
+    }
 });
 
 function luminance(hex: string) {

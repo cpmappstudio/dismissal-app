@@ -1,4 +1,9 @@
 {
+  "signInPage": {
+    "headline": "La seguridad del regreso,",
+    "headlineEnd": "en tus manos",
+    "description": "Gestiona, supervisa y mantén la comunicación en tiempo real con toda la comunidad escolar."
+  },
   "campusImage": {
     "label": "Imagen del campus (opcional)",
     "upload": "Subir imagen",

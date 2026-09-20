@@ -1,4 +1,9 @@
 {
+  "signInPage": {
+    "headline": "A safe journey home,",
+    "headlineEnd": "in your hands",
+    "description": "Manage, oversee and stay connected with your school community in real time."
+  },
   "campusImage": {
     "label": "Campus image (optional)",
     "upload": "Upload image",

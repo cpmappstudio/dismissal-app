@@ -26,7 +26,10 @@ export const metadata: Metadata = {
     title: "DismissalApp",
     description: "An innovative app that streamlines student dismissal by managing vehicle pickups efficiently and safely, ensuring a smooth process for schools and parents.",
     icons: {
-        icon: "/favicon.ico",
+        icon: [
+            { url: "/favicon.ico", type: "image/x-icon" },
+            { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
+        ],
     },
 };
 
