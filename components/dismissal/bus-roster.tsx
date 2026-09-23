@@ -10,7 +10,9 @@ import {
   ChevronRight,
   ChevronDown,
   Clock,
+  House,
   LogOut,
+  School,
   UserCheck,
   Users,
   UserX,
@@ -39,7 +41,7 @@ const studentStatusStyles = {
   dropped_off: {
     color:
       "border-info/30 bg-info-soft",
-    Icon: LogOut,
+    Icon: House,
   },
   pending: {
     color:
@@ -88,6 +90,7 @@ function BoardingControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const status = state?.status ?? "pending";
+  const ArrivalIcon = journey ? School : House;
   const hasBoarded =
     status === "boarded" ||
     (status === "departed" && state?.vehicleType === "bus");
@@ -178,7 +181,7 @@ function BoardingControls({
             disabled={busy}
             className="border-info/40 text-info hover:bg-info-soft hover:text-info data-pressed:border-info data-pressed:bg-info data-pressed:text-info-foreground motion-safe:animate-slide-in-left motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%]"
           >
-            <LogOut className="size-4" aria-hidden="true" />
+            <ArrivalIcon className="size-4" aria-hidden="true" />
           </Toggle>
         )}
         <Toggle
@@ -421,7 +424,8 @@ function RosterStudents({ roster, campus, date, timezone, isToday, journey }: {
           const status = student.state?.dropoff
             ? "dropped_off"
             : (student.state?.status ?? "pending");
-          const { color, Icon } = studentStatusStyles[status];
+          const { color, Icon: StatusIcon } = studentStatusStyles[status];
+          const Icon = status === "dropped_off" && journey ? School : StatusIcon;
           return (
             <li
               key={`${campus}-${date}-${student.id}`}

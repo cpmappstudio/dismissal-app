@@ -8,18 +8,23 @@ export default async function SignInPage() {
 
     return (
         <main className="relative isolate min-h-svh overflow-hidden bg-card lg:min-h-[max(48rem,100svh)]">
-            <div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-[5%] hidden h-[82%] w-[72%] lg:block xl:left-[12%]">
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-0 -right-[8%] hidden h-[95%] w-[90%] lg:block">
                 <Image
-                    src="/bg-bus.webp"
+                    src="/bg-bus.png"
                     alt=""
                     fill
-                    sizes="(min-width: 1024px) 72vw, 1px"
-                    className="object-cover object-left-bottom"
+                    sizes="(min-width: 1024px) 90vw, 1px"
+                    className="object-contain object-right-bottom"
                 />
-                {/* Match the photo's cover alignment; the cutout restores the child above the blue shape. */}
-                <svg aria-hidden="true" focusable="false" viewBox="0 0 5521 3681" preserveAspectRatio="xMinYMax slice" className="absolute inset-0 z-[2] h-full w-full">
-                    <image href="/kid.webp" x="948" y="1028" width="2024" height="2653" />
-                </svg>
+            </div>
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-[24%] z-[2] hidden h-[58%] w-[34%] lg:block">
+                <Image
+                    src="/kid.webp"
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 34vw, 1px"
+                    className="object-contain object-left-bottom"
+                />
             </div>
             <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 z-10 h-44 w-64 rounded-[50%] bg-info sm:-right-32 sm:-top-48 sm:h-80 sm:w-[28rem]" />
             <div className="relative z-20 mx-auto grid min-h-svh w-full max-w-[100rem] grid-cols-1 items-center gap-10 px-6 pb-32 pt-12 sm:px-10 sm:pb-44 sm:pt-16 lg:min-h-[max(48rem,100svh)] lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-12 lg:py-16 xl:px-20">

@@ -58,10 +58,10 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
             mutations.push(args);
         },
         api: { studentDismissals: { getRoster: 'query', setStatus: 'mutation', setDropoff: 'dropoff' } },
-        ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'ChevronDown', 'Clock', 'LogOut', 'UserCheck', 'Users', 'UserX', 'Collapsible', 'CollapsibleTrigger', 'CollapsibleContent'].map(key => [key, key])),
+        ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'ChevronDown', 'Clock', 'House', 'School', 'LogOut', 'UserCheck', 'Users', 'UserX', 'Collapsible', 'CollapsibleTrigger', 'CollapsibleContent'].map(key => [key, key])),
     });
     type Element = React.ReactElement<Record<string, unknown>>;
-    const props = { campus: 'School', date: '2026-09-04', studentId: 'sofia', state: null as null | { status: string; revision: number; vehicleType?: string; dropoff?: object } };
+    const props = { campus: 'School', date: '2026-09-04', studentId: 'sofia', journey: undefined as 'to_school' | undefined, state: null as null | { status: string; revision: number; vehicleType?: string; dropoff?: object } };
     const render = (controls = true) => {
         cursor = 0;
         currentState = controls ? state : rosterState;
@@ -125,11 +125,19 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     assert.deepEqual(toggleValues(), ['boarded', 'not_traveling']);
     props.state = { status: 'boarded', revision: 5, vehicleType: 'bus' };
     assert.deepEqual(toggleValues(), ['dropoff', 'boarded'], 'Boarding moves right and drop-off replaces not-traveling');
+    const arrivalIcon = () => (render().find(node => node.props.value === 'dropoff')!.props.children as Element).type;
+    assert.equal(arrivalIcon(), 'House', 'Return arrival uses a house');
+    props.journey = 'to_school';
+    assert.equal(arrivalIcon(), 'School', 'Morning arrival uses a school');
+    assert.equal(render().find(node => node.props.value === 'dropoff')!.props['aria-label'], 'arrivedAtSchool');
+    props.journey = undefined;
     assert.match(String(render().find(node => node.props.value === 'boarded')!.props.className), /motion-safe:animate-slide-in-left/);
     await change(['boarded', 'dropoff']);
     assert.equal(mutations.at(-1)!.droppedOff, true);
     assert.equal(mutations.at(-1)!.expectedRevision, 5);
     props.state = { status: 'boarded', revision: 6, vehicleType: 'bus', dropoff: { at: 1 } };
+    assert.equal(arrivalIcon(), 'House', 'Completed arrivals retain the destination icon');
+    assert.equal(render().find(node => node.props.value === 'dropoff')!.props['aria-label'], 'undoDropoff');
     assert.equal(render().find(node => node.props.value === 'boarded')!.props.disabled, true, 'Undo drop-off before undoing boarding');
     const beforeInvalidUndo = mutations.length;
     await change([]);
