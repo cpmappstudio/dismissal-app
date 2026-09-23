@@ -150,6 +150,7 @@ test("campus badges select one roster and the compact driver card includes usern
     "Switching campus returns to today rather than retaining an empty historical date",
   );
   assert.equal(roster().props.showDate, true);
+  assert.equal(roster().props.showJourneys, true);
   assert.ok(
     render().some(
       (node) =>

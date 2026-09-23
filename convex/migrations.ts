@@ -35,8 +35,8 @@ export const alignStudentDismissalDates = migrations.define({
     const today = operationalDate();
     if (record.date < today && date < today) return;
     const local = await ctx.db.query("studentDismissals")
-      .withIndex("by_campusId_date_studentId", q =>
-        q.eq("campusId", record.campusId).eq("date", date).eq("studentId", record.studentId),
+      .withIndex("by_studentId_date_journey_campusId", q =>
+        q.eq("studentId", record.studentId).eq("date", date).eq("journey", record.journey).eq("campusId", record.campusId),
       ).first();
     const earlyPickup = record.status === "picked_up_early"
       ? await ctx.db.query("studentDismissals")

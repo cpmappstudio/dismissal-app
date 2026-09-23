@@ -44,6 +44,12 @@
     "identifierHint": "Este identificador vincula estudiantes, choferes y Road; no se puede cambiar desde aquí."
   },
   "transport": {
+    "toSchool": "Casa → Colegio",
+    "toHome": "Colegio → Casa",
+    "journeyCompleted": "Completado",
+    "arrivedAtSchool": "Llegó al colegio",
+    "arrivalRequired": "De camino al colegio. Registra su llegada antes de recogerlo de regreso.",
+    "returnAlreadyRecorded": "La recogida de regreso ya está registrada.",
     "alreadyPickedUp": "Ya fue recogido — no disponible para esta recogida",
     "pickedUpCount": "Ya recogidos: {count}",
     "dateNavigation": "Fecha de asistencia",

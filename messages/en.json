@@ -44,6 +44,12 @@
     "identifierHint": "This identifier links students, drivers and Road and cannot be changed here."
   },
   "transport": {
+    "toSchool": "Home → School",
+    "toHome": "School → Home",
+    "journeyCompleted": "Completed",
+    "arrivedAtSchool": "Arrived at school",
+    "arrivalRequired": "On the way to school. Record arrival before a return pickup.",
+    "returnAlreadyRecorded": "The return pickup has already been recorded.",
     "alreadyPickedUp": "Already picked up — unavailable for this pickup",
     "pickedUpCount": "Already picked up: {count}",
     "dateNavigation": "Attendance date",

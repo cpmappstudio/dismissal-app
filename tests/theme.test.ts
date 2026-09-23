@@ -46,13 +46,24 @@ test('compact Clerk card sizing is scoped to sign-in, not the account panel', ()
     assert.match(signIn, /cardBox:\s*"w-full max-w-sm"/);
 });
 
-test('sign-in reuses the brand assets and keeps artwork spacing desktop-only', () => {
+test('sign-in centers the form and layers the aligned child between solid brand shapes', () => {
     const page = readFileSync(new URL('../app/[locale]/sign-in/[[...sign-in]]/page.tsx', import.meta.url), 'utf8');
     assert.ok(page.includes('src="/oficial-logo.svg"'));
-    assert.ok(page.includes('<BrandWaves className='));
+    assert.ok(page.includes('<BrandWaves variant="sign-in"'));
     assert.ok(page.includes('grid-cols-1'));
     assert.ok(page.includes('lg:grid-cols-[1.15fr_1fr]'));
-    assert.ok(page.includes('className="hidden lg:block lg:h-48 xl:h-64"'));
+    assert.match(page, /hidden h-\[82%\] w-\[72%\] lg:block/);
+    assert.ok(page.includes('src="/bg-bus.webp"'));
+    assert.ok(page.includes('sizes="(min-width: 1024px) 72vw, 1px"'));
+    assert.ok(readFileSync(new URL('../public/bg-bus.webp', import.meta.url)).length > 0);
+    assert.ok(page.includes('preserveAspectRatio="xMinYMax slice"'));
+    assert.ok(page.includes('<image href="/kid.webp" x="948" y="1028" width="2024" height="2653"'));
+    assert.ok(readFileSync(new URL('../public/kid.webp', import.meta.url)).length > 0);
+    assert.ok(page.includes('lg:self-center'));
+    assert.doesNotMatch(page, /gradient|lg:self-start|lg:mt-4/);
+    const waves = readFileSync(new URL('../components/brand-waves.tsx', import.meta.url), 'utf8');
+    const foreground = waves.split('{variant === "sign-in" ? <>')[1].split('</> : <>')[0];
+    assert.doesNotMatch(foreground, /opacity|gradient/i);
     assert.ok(page.includes('getTranslations("signInPage")'));
     for (const locale of ['en', 'es']) {
         const messages = JSON.parse(readFileSync(new URL('../messages/' + locale + '.json', import.meta.url), 'utf8'));

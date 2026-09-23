@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import type { FunctionReturnType } from "convex/server";
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
 import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Clock,
   LogOut,
   UserCheck,
@@ -21,6 +23,17 @@ import { useOperationalDate } from "@/hooks/use-operational-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+type Roster = FunctionReturnType<typeof api.studentDismissals.getRoster>;
+
+function rosterProgress(roster: Roster) {
+  const pending = roster.students.filter(student => !student.state || student.state.status === "pending").length;
+  const onboard = roster.students.filter(student => !student.otherPickup && !student.state?.dropoff &&
+    (student.state?.status === "boarded" || student.state?.status === "departed")).length;
+  const delivered = roster.students.filter(student => !student.otherPickup && student.state?.dropoff).length;
+  return { onboard, total: pending + onboard + delivered };
+}
 
 const studentStatusStyles = {
   dropped_off: {
@@ -59,11 +72,13 @@ function BoardingControls({
   campus,
   date,
   state,
+  journey,
 }: {
   studentId: Id<"students">;
   campus: string;
   date: string;
   state: Doc<"studentDismissals"> | null;
+  journey?: "to_school";
 }) {
   const t = useTranslations("transport");
   const setStatus = useMutation(api.studentDismissals.setStatus);
@@ -90,6 +105,7 @@ function BoardingControls({
           studentId,
           expectedRevision: state?.revision ?? 0,
           droppedOff: status === "dropoff",
+          journey,
         });
       } else {
         await setStatus({
@@ -97,6 +113,7 @@ function BoardingControls({
           date,
           studentId,
           status,
+          journey,
           reason: status === "not_traveling" ? reason : undefined,
           expectedRevision:
             status === "not_traveling"
@@ -156,8 +173,8 @@ function BoardingControls({
             key="dropoff"
             value="dropoff"
             render={<Button size="icon" variant="outline" />}
-            aria-label={t(state?.dropoff ? "undoDropoff" : "markDroppedOff")}
-            title={t(state?.dropoff ? "undoDropoff" : "markDroppedOff")}
+            aria-label={t(state?.dropoff ? "undoDropoff" : journey ? "arrivedAtSchool" : "markDroppedOff")}
+            title={t(state?.dropoff ? "undoDropoff" : journey ? "arrivedAtSchool" : "markDroppedOff")}
             disabled={busy}
             className="border-info/40 text-info hover:bg-info-soft hover:text-info data-pressed:border-info data-pressed:bg-info data-pressed:text-info-foreground motion-safe:animate-slide-in-left motion-safe:animate-duration-200 motion-safe:animate-slide-distance-[100%]"
           >
@@ -233,11 +250,13 @@ export function BusRoster({
   carNumber,
   timezone,
   showDate = false,
+  showJourneys = false,
 }: {
   campus: string;
   carNumber: number | string;
   timezone: string;
   showDate?: boolean;
+  showJourneys?: boolean;
 }) {
   const t = useTranslations("transport");
   const tCar = useTranslations("dismissal.car");
@@ -255,20 +274,15 @@ export function BusRoster({
     date,
     historical: !isToday,
   });
-  if (!roster) return <p role="status">{t("loading")}</p>;
-  const pendingCount = roster.students.filter(
-    (student) => !student.state || student.state.status === "pending",
-  ).length;
-  const boardedCount = roster.students.filter(
-    (student) =>
-      !student.otherPickup && !student.state?.dropoff &&
-      (student.state?.status === "boarded" ||
-        student.state?.status === "departed"),
-  ).length;
-  const expectedCount =
-    pendingCount +
-    boardedCount +
-    roster.students.filter((student) => !student.otherPickup && student.state?.dropoff).length;
+  const schoolRoster = useQuery(api.studentDismissals.getRoster, showJourneys ? {
+    campus, carNumber, date, historical: !isToday, journey: "to_school",
+  } : "skip");
+  if (!roster || (showJourneys && !schoolRoster)) return <p role="status">{t("loading")}</p>;
+  const schoolComplete = !!schoolRoster?.students.length && schoolRoster.students.every(
+    student => !!student.state?.dropoff || student.state?.status === "not_traveling",
+  );
+  const returnStarted = roster.students.some(student => student.state && student.state.status !== "pending");
+  const { onboard: boardedCount, total: expectedCount } = rosterProgress(roster);
   const boardingProgressLabel = t("boardingProgress", {
     boarded: boardedCount,
     total: expectedCount,
@@ -283,15 +297,15 @@ export function BusRoster({
           />
           <h3
             aria-live="polite"
-            aria-label={boardingProgressLabel}
-            title={boardingProgressLabel}
+            aria-label={showJourneys ? undefined : boardingProgressLabel}
+            title={showJourneys ? undefined : boardingProgressLabel}
             className={
               showDate
                 ? "truncate text-base font-semibold sm:text-lg"
                 : "text-lg font-semibold"
             }
           >
-            {tCar("students")} ({boardedCount}/{expectedCount})
+            {tCar("students")}{!showJourneys && ` (${boardedCount}/${expectedCount})`}
           </h3>
         </div>
         {showDate && (
@@ -342,6 +356,65 @@ export function BusRoster({
           </div>
         )}
       </div>
+      {showJourneys && schoolRoster ? (
+        <div className="space-y-4">
+          <BusJourneySection
+            key={`${date}-school-${schoolComplete}`}
+            title={t("toSchool")}
+            roster={schoolRoster}
+            complete={schoolComplete}
+            defaultOpen={!schoolComplete}
+          >
+            <RosterStudents roster={schoolRoster} campus={campus} date={date} timezone={timezone} isToday={isToday} journey="to_school" />
+          </BusJourneySection>
+          <BusJourneySection
+            key={`${date}-home-${schoolComplete}-${returnStarted}`}
+            title={t("toHome")}
+            roster={roster}
+            defaultOpen={schoolComplete || returnStarted}
+          >
+            <RosterStudents roster={roster} campus={campus} date={date} timezone={timezone} isToday={isToday} />
+          </BusJourneySection>
+        </div>
+      ) : (
+        <RosterStudents roster={roster} campus={campus} date={date} timezone={timezone} isToday={isToday} />
+      )}
+    </section>
+  );
+}
+
+function BusJourneySection({ title, roster, complete = false, defaultOpen, children }: {
+  title: string; roster: Roster; complete?: boolean; defaultOpen: boolean; children: ReactNode;
+}) {
+  const t = useTranslations("transport");
+  const { onboard, total } = rosterProgress(roster);
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="space-y-3">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="group h-auto w-full justify-between gap-3 rounded-lg bg-secondary/50 px-3 py-3 text-left whitespace-normal">
+          <span className="min-w-0 font-semibold">
+            {title}
+            <span className="mt-0.5 block text-xs font-normal text-muted-foreground" aria-live="polite">
+              {t("boardingProgress", { boarded: onboard, total })}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {complete && <span className="text-xs text-success">{t("journeyCompleted")}</span>}
+            <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+          </span>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function RosterStudents({ roster, campus, date, timezone, isToday, journey }: {
+  roster: Roster; campus: string; date: string; timezone: string; isToday: boolean; journey?: "to_school";
+}) {
+  const t = useTranslations("transport");
+  return (
+    <>
       {!roster.students.length && <p>{t("noStudents")}</p>}
       <ul className="space-y-3">
         {roster.students.map((student) => {
@@ -370,13 +443,19 @@ export function BusRoster({
                   </p>
                 </div>
               </div>
-              {isToday && roster.canEdit && !student.otherPickup && (
+              {isToday && roster.canEdit && !student.otherPickup && !student.journeyBlocked && (
                 <BoardingControls
                   studentId={student.id}
                   campus={campus}
                   date={date}
                   state={student.state}
+                  journey={journey}
                 />
+              )}
+              {student.journeyBlocked && (
+                <p className="col-span-2 text-xs text-muted-foreground">
+                  {t(journey ? "returnAlreadyRecorded" : "arrivalRequired")}
+                </p>
               )}
               {student.state && status !== "pending" && (
                 <div className="col-span-2 space-y-1 break-words text-xs text-muted-foreground">
@@ -395,7 +474,7 @@ export function BusRoster({
                         },
                         student.state.dropoff && {
                           ...student.state.dropoff,
-                          label: "markDroppedOff",
+                          label: journey ? "arrivedAtSchool" : "markDroppedOff",
                         },
                       ].filter((event) => !!event)
                     : [
@@ -422,6 +501,6 @@ export function BusRoster({
           );
         })}
       </ul>
-    </section>
+    </>
   );
 }

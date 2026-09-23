@@ -52,6 +52,7 @@ export function BusRosterPanel({
             timezone={campus.timezone}
             carNumber={carNumber}
             showDate
+            showJourneys
           />
         </>
       ) : (

@@ -365,6 +365,8 @@ export default defineSchema({
     studentName: v.string(),
     campusId: v.id("campusSettings"),
     date: v.string(),
+    // Missing means the existing school-to-home dismissal, including legacy history.
+    journey: v.optional(v.literal("to_school")),
     status: v.union(v.literal("pending"), v.literal("boarded"), v.literal("not_traveling"), v.literal("picked_up_early"), v.literal("departed")),
     vehicleIdentifier: v.optional(v.union(v.number(), v.string())),
     vehicleType: v.optional(v.union(v.literal("car"), v.literal("bus"))),
@@ -380,6 +382,8 @@ export default defineSchema({
   })
     .index("by_campusId_date_studentId", ["campusId", "date", "studentId"])
     .index("by_studentId_date_status", ["studentId", "date", "status"])
+    .index("by_studentId_date_journey_campusId", ["studentId", "date", "journey", "campusId"])
+    .index("by_campusId_vehicleIdentifier_journey_date", ["campusId", "vehicleIdentifier", "journey", "date"])
     .index("by_campusId_date_vehicleIdentifier_status", ["campusId", "date", "vehicleIdentifier", "status"])
     .index("by_campusId_vehicleIdentifier_date", ["campusId", "vehicleIdentifier", "date"])
     .index("by_campusId_date_status", ["campusId", "date", "status"])

@@ -9,7 +9,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const file = '../components/dismissal/bus-roster.tsx';
     const source = ts.createSourceFile(file, readFileSync(new URL(file, import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
     const declarations = source.statements.filter(node => ts.isFunctionDeclaration(node) || ts.isVariableStatement(node));
-    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls });`, {
+    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls, RosterStudents, BusJourneySection });`, {
         compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
     });
     const state: unknown[] = [];
@@ -19,6 +19,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     let cursor = 0;
     let fail = false;
     let showDate = false;
+    let showJourneys = false;
     let operationalDate = '2026-09-04';
     const recordedDates = ['2026-08-27', '2026-09-01'];
     const mutations: Record<string, unknown>[] = [];
@@ -32,6 +33,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
             },
         })),
     };
+    const schoolRoster = { ...roster, students: [] as typeof roster.students };
     const components = runInNewContext(outputText, {
         React,
         useState: (initial: unknown) => {
@@ -42,10 +44,11 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         },
         useTranslations: () => (key: string) => key,
         useOperationalDate: () => operationalDate,
-        useQuery: (_name: string, args: { date: string; historical: boolean }) => {
+        useQuery: (_name: string, args: { date: string; historical: boolean; journey?: string } | 'skip') => {
+            if (args === 'skip') return undefined;
             queriedDate = args.date;
             assert.equal(args.historical, args.date !== operationalDate, 'Live and historical subscriptions have distinct keys');
-            return { ...roster,
+            return { ...(args.journey === 'to_school' ? schoolRoster : roster),
                 previousDate: recordedDates.filter(d => d < args.date).at(-1) ?? null,
                 nextDate: recordedDates.find(d => d > args.date && d <= operationalDate) ?? null,
             };
@@ -55,7 +58,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
             mutations.push(args);
         },
         api: { studentDismissals: { getRoster: 'query', setStatus: 'mutation', setDropoff: 'dropoff' } },
-        ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'Clock', 'LogOut', 'UserCheck', 'Users', 'UserX'].map(key => [key, key])),
+        ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'ChevronDown', 'Clock', 'LogOut', 'UserCheck', 'Users', 'UserX', 'Collapsible', 'CollapsibleTrigger', 'CollapsibleContent'].map(key => [key, key])),
     });
     type Element = React.ReactElement<Record<string, unknown>>;
     const props = { campus: 'School', date: '2026-09-04', studentId: 'sofia', state: null as null | { status: string; revision: number; vehicleType?: string; dropoff?: object } };
@@ -67,10 +70,14 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
             React.Children.forEach(node, child => {
                 if (!React.isValidElement<Record<string, unknown>>(child)) return;
                 elements.push(child);
+                if (child.type === components.RosterStudents) {
+                    visit(components.RosterStudents(child.props));
+                    return;
+                }
                 visit(child.props.children as React.ReactNode);
             });
         }
-        visit(controls ? components.BoardingControls(props) : components.BusRoster({ campus: 'School', carNumber: 123, timezone: 'UTC', showDate }));
+        visit(controls ? components.BoardingControls(props) : components.BusRoster({ campus: 'School', carNumber: 123, timezone: 'UTC', showDate, showJourneys }));
         return elements;
     };
     const group = () => render().find(node => node.type === 'ToggleGroup')!.props;
@@ -235,4 +242,46 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     assert.equal(render(false).some(node => node.type === components.BoardingControls), false);
     roster.students.splice(0);
     assert.equal(counterText(), 'students (0/0)', 'Empty rosters remain well defined');
+    showJourneys = true;
+    roster.students.push({ id: 'morning', name: 'Morning student', grade: '4th', otherPickup: false, state: null! });
+    schoolRoster.students.push({ ...roster.students[0] });
+    const sections = () => render(false).filter(node => node.type === components.BusJourneySection);
+    assert.deepEqual(sections().map(section => section.props.defaultOpen), [true, false]);
+    const pendingKey = sections()[0].key;
+    schoolRoster.students[0].state = { status: 'boarded', revision: 1, updatedAt: 1, boarding: undefined, dropoff: { at: 2, byName: 'Driver' } };
+    assert.deepEqual(sections().map(section => section.props.defaultOpen), [false, true]);
+    assert.equal(sections()[0].props.complete, true);
+    assert.notEqual(sections()[0].key, pendingKey, 'Completion resets the collapsible without removing the ability to reopen it');
+    assert.equal(components.BusJourneySection(sections()[0].props).type, 'Collapsible');
+    schoolRoster.canEdit = false;
+    const schoolControls = render(false).filter(node => node.type === components.BoardingControls && node.props.journey === 'to_school');
+    // Viewing history or lack of edit permissions must also apply to the new journey.
+    assert.equal(schoolControls.length, 0);
+    schoolRoster.canEdit = true;
+    const inboundControl = render(false).find(node => node.type === components.BoardingControls && node.props.journey === 'to_school');
+    assert.ok(inboundControl, 'Shared controls receive the inbound journey');
+    cursor = 0;
+    currentState = state;
+    const inboundGroup = components.BoardingControls({ ...props, state: { status: 'boarded', revision: 1 }, journey: 'to_school' }).props.children[0].props;
+    inboundGroup.onValueChange(['boarded', 'dropoff']);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(mutations.at(-1)!.journey, 'to_school');
+    assert.equal(mutations.at(-1)!.droppedOff, true);
+    schoolRoster.students[0].state = { status: 'not_traveling', revision: 2, updatedAt: 1, boarding: undefined, dropoff: undefined };
+    assert.equal(sections()[0].props.complete, true, 'A reasoned absence resolves the school journey too');
+    schoolRoster.students[0].state.status = 'pending';
+    assert.deepEqual(sections().map(section => section.props.defaultOpen), [true, false], 'Undoing morning completion restores the morning default');
+    roster.students[0].state = { status: 'picked_up_early', revision: 1, updatedAt: 1, boarding: undefined, dropoff: undefined };
+    assert.deepEqual(sections().map(section => section.props.defaultOpen), [true, true], 'Return activity does not close an unfinished school journey');
+    schoolRoster.students[0].state.status = 'boarded';
+    roster.students[0].state = null!;
+    roster.students.push({ ...roster.students[0], id: 'other', name: 'Other student' });
+    schoolRoster.students.push({ ...roster.students[1], state: { status: 'not_traveling', revision: 1, updatedAt: 1, boarding: undefined, dropoff: undefined } });
+    const activeSchoolKey = sections()[0].key;
+    for (const status of ['picked_up_early', 'not_traveling', 'boarded']) {
+        roster.students[1].state = { status, revision: 1, updatedAt: 1, boarding: undefined, dropoff: undefined };
+        assert.equal(sections()[0].props.complete, false);
+        assert.equal(sections()[0].props.defaultOpen, true, 'Another student’s return activity must not hide children still aboard toward school');
+        assert.equal(sections()[0].key, activeSchoolKey, 'Return updates preserve the school section and any unsaved absence reason');
+    }
 });
