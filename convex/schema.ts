@@ -18,6 +18,16 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_identifier", ["identifier"]),
+  busRosterOrders: defineTable({
+    busId: v.id("buses"),
+    campusId: v.id("campusSettings"),
+    journey: v.optional(v.literal("to_school")),
+    // Bounded to the existing 200-student roster limit by reorderRoster.
+    studentIds: v.array(v.id("students")),
+    revision: v.number(),
+    updatedBy: v.id("users"),
+    updatedAt: v.number(),
+  }).index("by_busId_campusId_journey", ["busId", "campusId", "journey"]),
   /**
    * Users/workers table - Simplified for username-based auth
    */

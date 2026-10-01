@@ -44,10 +44,26 @@
     "identifierHint": "Este identificador vincula estudiantes, choferes y Road; no se puede cambiar desde aquí."
   },
   "transport": {
+    "order": {
+      "up": "Subir",
+      "down": "Bajar",
+      "handle": "Reordenar a {name}",
+      "instructions": "Pulsa Espacio o Enter para seleccionar un estudiante. Usa las flechas para moverlo, Espacio o Enter para soltarlo y Escape para cancelar.",
+      "picked": "Seleccionado {name}, posición {position} de {total}.",
+      "moved": "{name}, posición {position} de {total}.",
+      "dropped": "Arrastre terminado.",
+      "cancelled": "Reordenación cancelada.",
+      "saving": "Guardando el orden compartido…",
+      "conflict": "La lista cambió mientras la ordenabas. Se muestra la lista actualizada; inténtalo de nuevo.",
+      "dayChanged": "Cambió el día. Actualiza la lista antes de reordenar.",
+      "failed": "No se pudo guardar el orden. Tu cambio no se guardó. Inténtalo de nuevo."
+    },
     "toSchool": "Casa → Colegio",
     "toHome": "Colegio → Casa",
     "journeyCompleted": "Completado",
     "arrivedAtSchool": "Llegó al colegio",
+    "arriveAllAtSchool": "Marcar la llegada al colegio de todos los estudiantes a bordo",
+    "schoolArrivalFailed": "No se pudo registrar la llegada. Revisa los estados actuales de los estudiantes e inténtalo de nuevo.",
     "arrivalRequired": "De camino al colegio. Registra su llegada antes de recogerlo de regreso.",
     "returnAlreadyRecorded": "La recogida de regreso ya está registrada.",
     "alreadyPickedUp": "Ya fue recogido — no disponible para esta recogida",

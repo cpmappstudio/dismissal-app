@@ -2,6 +2,31 @@
 @import "tw-animate-css";
 @import "tailwind-animations";
 
+@layer components {
+  .bus-next-stop {
+    position: relative;
+    border-color: var(--primary);
+    background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
+    box-shadow: 0 0 0 1px var(--primary), 0 4px 16px color-mix(in oklab, var(--primary) 18%, transparent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .bus-next-stop::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      animation: bus-next-stop-glow 2.6s ease-out infinite;
+    }
+  }
+}
+
+@keyframes bus-next-stop-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent); }
+  75%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {

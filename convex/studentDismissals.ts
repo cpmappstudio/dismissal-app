@@ -14,7 +14,8 @@ import {
   type VehicleIdentifier,
 } from "../lib/vehicle";
 import { operationalDate } from "../lib/operational-day";
-import { isBus, studentTransport } from "./buses";
+import { getBusByIdentifier, isBus, studentTransport } from "./buses";
+import { orderBusStudents } from "../lib/bus-roster-order";
 export { isBus } from "./buses";
 
 const rosterRoles: DismissalRole[] = [
@@ -35,6 +36,12 @@ const editableStatus = v.union(
   v.literal("not_traveling"),
   v.literal("picked_up_early"),
 );
+
+function getRosterOrder(db: DatabaseReader, busId: Id<"buses">, campusId: Id<"campusSettings">, journey?: Journey) {
+  return db.query("busRosterOrders").withIndex("by_busId_campusId_journey", q =>
+    q.eq("busId", busId).eq("campusId", campusId).eq("journey", journey),
+  ).unique();
+}
 
 export async function rosterStudents(
   db: DatabaseReader,
@@ -215,6 +222,8 @@ export const getRoster = query({
           state: await getDailyState(ctx.db, campus._id, args.date, student._id, args.journey),
         })));
     const bus = await isBus(ctx.db, identifier);
+    const registeredBus = bus ? await getBusByIdentifier(ctx.db, identifier) : null;
+    const order = registeredBus ? await getRosterOrder(ctx.db, registeredBus._id, campus._id, args.journey) : null;
     const [previous, next] = await Promise.all([
       ctx.db.query("studentDismissals")
         .withIndex("by_campusId_vehicleIdentifier_date", q =>
@@ -232,8 +241,10 @@ export const getRoster = query({
       timezone: campus.timezone,
       isBus: bus,
       canEdit: isToday && bus && (canDispatch(role) || role === "bus_driver"),
+      canReorder: isToday && !!registeredBus?.campusIds.includes(campus._id) && (isManagementRole(role) || role === "bus_driver"),
+      orderRevision: order?.revision ?? 0,
       students: await Promise.all(
-        rows.map(async ({ student, ...row }) => {
+        orderBusStudents(rows, order?.studentIds ?? []).map(async ({ student, ...row }) => {
           const otherJourney = isToday ? await getDailyState(ctx.db, campus._id, args.date, row.id,
             args.journey === "to_school" ? undefined : "to_school") : null;
           return {
@@ -248,6 +259,45 @@ export const getRoster = query({
         }),
       ),
     };
+  },
+});
+
+export const reorderRoster = mutation({
+  args: {
+    campus: v.string(), carNumber: vehicleValidator, date: v.string(), journey: journeyValidator,
+    studentIds: v.array(v.id("students")), expectedRevision: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, role } = await validateUserAccess(ctx, ["superadmin", "principal", "admin", "bus_driver"], args.campus);
+    const identifier = normalizeVehicleIdentifier(args.carNumber);
+    if (role === "bus_driver" && user.busNumber !== identifier)
+      throw new ConvexError("This is not your bus");
+    const campus = await getCampusSettings(ctx.db, args.campus);
+    const bus = await getBusByIdentifier(ctx.db, identifier);
+    if (!campus?.isActive || !bus?.campusIds.includes(campus._id))
+      throw new ConvexError("Bus or campus unavailable");
+    if (args.date !== operationalDate())
+      throw new ConvexError({ code: "ROSTER_DAY_CHANGED" });
+    if (args.studentIds.length > 200 || new Set(args.studentIds).size !== args.studentIds.length)
+      throw new ConvexError({ code: "ROSTER_CHANGED" });
+    const previous = await getRosterOrder(ctx.db, bus._id, campus._id, args.journey);
+    if ((previous?.revision ?? 0) !== args.expectedRevision)
+      throw new ConvexError({ code: "ROSTER_ORDER_CHANGED" });
+    const students = await rosterStudents(ctx.db, identifier, campus._id, args.date, args.journey);
+    const currentIds = new Set(students.map(student => student._id));
+    if (currentIds.size !== args.studentIds.length || args.studentIds.some(id => !currentIds.has(id)))
+      throw new ConvexError({ code: "ROSTER_CHANGED" });
+    const currentOrder = orderBusStudents(students.map(student => ({ id: student._id })), previous?.studentIds ?? []);
+    if (currentOrder.every((student, index) => student.id === args.studentIds[index])) return null;
+    const data = {
+      busId: bus._id, campusId: campus._id, journey: args.journey,
+      studentIds: args.studentIds, revision: (previous?.revision ?? 0) + 1,
+      updatedBy: user._id, updatedAt: Date.now(),
+    };
+    if (previous) await ctx.db.patch(previous._id, data);
+    else await ctx.db.insert("busRosterOrders", data);
+    return null;
   },
 });
 
@@ -371,6 +421,51 @@ async function editableStudent(ctx: MutationCtx, args: {
   return { user, role, campus, student, bus, busNumber, previous };
 }
 
+async function writeDropoff(ctx: MutationCtx, previous: Doc<"studentDismissals">, user: Doc<"users">, droppedOff: boolean) {
+  if (!!previous.dropoff === droppedOff) return;
+  const now = Date.now();
+  await writeDailyState(ctx, previous, {
+    studentId: previous.studentId, studentName: previous.studentName,
+    campusId: previous.campusId, date: previous.date, status: previous.status,
+    journey: previous.journey,
+    vehicleIdentifier: previous.vehicleIdentifier, vehicleType: previous.vehicleType,
+    dropoff: droppedOff ? { at: now, by: user._id, byName: user.fullName ?? user.email ?? "" } : undefined,
+    updatedAt: now, updatedBy: user._id, updatedByName: user.fullName ?? user.email ?? "",
+  }, user);
+}
+
+export const arriveAtSchool = mutation({
+  args: {
+    campus: v.string(), carNumber: vehicleValidator, date: v.string(),
+    students: v.array(v.object({ id: v.id("students"), revision: v.number() })),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, role } = await validateUserAccess(ctx, rosterRoles, args.campus);
+    if (!canDispatch(role) && role !== "bus_driver") throw new ConvexError("Not authorized");
+    const identifier = normalizeVehicleIdentifier(args.carNumber);
+    if (role === "bus_driver" && user.busNumber !== identifier) throw new ConvexError("This is not your bus");
+    const campus = await getCampusSettings(ctx.db, args.campus);
+    const bus = await getBusByIdentifier(ctx.db, identifier);
+    if (!campus?.isActive || !bus?.campusIds.includes(campus._id)) throw new ConvexError("Bus or campus unavailable");
+    if (args.date !== operationalDate()) throw new ConvexError("The day changed. Refresh the list");
+    const expected = new Map(args.students.map(s => [s.id, s.revision]));
+    if (!expected.size || args.students.length > 200 || expected.size !== args.students.length) throw new ConvexError("Review the latest roster");
+    const students = await rosterStudents(ctx.db, identifier, campus._id, args.date, "to_school");
+    if (students.length !== expected.size || students.some(s => !expected.has(s._id))) throw new ConvexError("The roster changed. Review the latest list");
+    for (const student of students) {
+      const state = await getDailyState(ctx.db, campus._id, args.date, student._id, "to_school");
+      if (!state || state.status === "pending") throw new ConvexError("Resolve all students before recording arrival");
+      if (state.revision !== expected.get(student._id)) throw new ConvexError("A student was updated. Review the latest list");
+      if (state.status === "boarded" && !state.dropoff && state.vehicleType === "bus" &&
+        state.vehicleIdentifier === identifier && state.campusId === campus._id) {
+        await writeDropoff(ctx, state, user, true);
+      }
+    }
+    return null;
+  },
+});
+
 export const setDropoff = mutation({
   args: {
     campus: v.string(), date: v.string(), studentId: v.id("students"),
@@ -383,16 +478,7 @@ export const setDropoff = mutation({
       previous.vehicleIdentifier !== busNumber || previous.campusId !== campus._id ||
       (previous.status !== "boarded" && previous.status !== "departed"))
       throw new Error("The student must be on this bus before recording a drop-off");
-    if (!!previous.dropoff === args.droppedOff) return null;
-    const now = Date.now();
-    await writeDailyState(ctx, previous, {
-      studentId: previous.studentId, studentName: previous.studentName,
-      campusId: previous.campusId, date: previous.date, status: previous.status,
-      journey: previous.journey,
-      vehicleIdentifier: previous.vehicleIdentifier, vehicleType: previous.vehicleType,
-      dropoff: args.droppedOff ? { at: now, by: user._id, byName: user.fullName ?? user.email ?? "" } : undefined,
-      updatedAt: now, updatedBy: user._id, updatedByName: user.fullName ?? user.email ?? "",
-    }, user);
+    await writeDropoff(ctx, previous, user, args.droppedOff);
     return null;
   },
 });

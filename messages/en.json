@@ -44,10 +44,26 @@
     "identifierHint": "This identifier links students, drivers and Road and cannot be changed here."
   },
   "transport": {
+    "order": {
+      "up": "Move up",
+      "down": "Move down",
+      "handle": "Reorder {name}",
+      "instructions": "Press Space or Enter to pick up a student. Use the arrow keys to move, Space or Enter to drop, and Escape to cancel.",
+      "picked": "Picked up {name}, position {position} of {total}.",
+      "moved": "{name}, position {position} of {total}.",
+      "dropped": "Drag finished.",
+      "cancelled": "Reordering cancelled.",
+      "saving": "Saving shared order…",
+      "conflict": "The list changed while you were reordering. The latest list is shown; please try again.",
+      "dayChanged": "The day changed. Refresh the list before reordering.",
+      "failed": "Could not save the order. Your change was not saved. Please try again."
+    },
     "toSchool": "Home → School",
     "toHome": "School → Home",
     "journeyCompleted": "Completed",
     "arrivedAtSchool": "Arrived at school",
+    "arriveAllAtSchool": "Mark all boarded students as arrived at school",
+    "schoolArrivalFailed": "Could not record arrival. Review the latest student statuses and try again.",
     "arrivalRequired": "On the way to school. Record arrival before a return pickup.",
     "returnAlreadyRecorded": "The return pickup has already been recorded.",
     "alreadyPickedUp": "Already picked up — unavailable for this pickup",

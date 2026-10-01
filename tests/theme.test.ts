@@ -4,6 +4,13 @@ import test from 'node:test';
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
+test('next bus stop has a tinted background and a non-blocking glow only when motion is allowed', () => {
+    assert.match(css, /\.bus-next-stop\s*\{[^}]*background-color: color-mix\(in oklab, var\(--primary\) 16%, var\(--card\)\)/);
+    assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.bus-next-stop::after/);
+    assert.match(css, /pointer-events: none;\s*animation: bus-next-stop-glow 2\.6s/);
+    assert.match(css, /@keyframes bus-next-stop-glow/);
+});
+
 test('brand references use the current SVG logo and both favicon formats', () => {
     const logo = readFileSync(new URL('../components/university-logo.tsx', import.meta.url), 'utf8');
     const layout = readFileSync(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8');

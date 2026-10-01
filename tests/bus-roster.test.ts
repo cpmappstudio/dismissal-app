@@ -4,12 +4,13 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import * as React from 'react';
 import ts from 'typescript';
+import { busJourneyProgress } from '../lib/bus-roster-order';
 
 test('bus status colors and right-side toggles preserve boarding, reason, undo and readonly rules', async () => {
     const file = '../components/dismissal/bus-roster.tsx';
     const source = ts.createSourceFile(file, readFileSync(new URL(file, import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
     const declarations = source.statements.filter(node => ts.isFunctionDeclaration(node) || ts.isVariableStatement(node));
-    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls, RosterStudents, BusJourneySection });`, {
+    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls, RosterStudents, RosterStudent, BusJourneySection, SchoolArrival });`, {
         compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
     });
     const state: unknown[] = [];
@@ -25,6 +26,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const mutations: Record<string, unknown>[] = [];
     const roster = {
         canEdit: true,
+        canReorder: false,
         students: ['pending', 'boarded', 'not_traveling', 'picked_up_early', 'departed'].map((status, index) => ({
             id: String(index), name: `Student ${index}`, grade: '4th', otherPickup: false,
             state: { status, revision: 1, updatedAt: 1788512400000,
@@ -36,6 +38,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const schoolRoster = { ...roster, students: [] as typeof roster.students };
     const components = runInNewContext(outputText, {
         React,
+        busJourneyProgress,
         useState: (initial: unknown) => {
             const values = currentState;
             const index = cursor++;
@@ -58,6 +61,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
             mutations.push(args);
         },
         api: { studentDismissals: { getRoster: 'query', setStatus: 'mutation', setDropoff: 'dropoff' } },
+        BusRosterOrder: 'BusRosterOrder',
         ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'ChevronDown', 'Clock', 'House', 'School', 'LogOut', 'UserCheck', 'Users', 'UserX', 'Collapsible', 'CollapsibleTrigger', 'CollapsibleContent'].map(key => [key, key])),
     });
     type Element = React.ReactElement<Record<string, unknown>>;
@@ -74,6 +78,10 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
                     visit(components.RosterStudents(child.props));
                     return;
                 }
+                if (child.type === components.RosterStudent) {
+                    visit(components.RosterStudent(child.props));
+                    return;
+                }
                 visit(child.props.children as React.ReactNode);
             });
         }
@@ -81,6 +89,11 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         return elements;
     };
     const group = () => render().find(node => node.type === 'ToggleGroup')!.props;
+    assert.match(String(group().className), /\[&>button\]:size-11/);
+    const avatar = render(false).find(node => node.type === 'Avatar')!;
+    assert.equal(avatar.props.className, 'size-11', 'Avatar fills the existing 44px student header without increasing its height');
+    assert.equal(render(false).find(node => node.type === 'AvatarImage')!.props.className, 'object-cover');
+    assert.ok(render(false).some(node => node.props.className === 'flex min-w-0 items-center gap-3'), 'Avatar and drag handle share the vertical center');
     const change = async (values: string[]) => {
         (group().onValueChange as (values: string[]) => void)(values);
         await new Promise(resolve => setImmediate(resolve));
@@ -152,7 +165,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         props.state = { status, revision: 4 };
         assert.equal(render().length, 0);
     }
-    const cards = render(false).filter(node => node.type === 'li');
+    const cards = render(false).filter(node => String(node.props.className).startsWith('grid grid-cols-'));
     for (const [index, styles] of [
         ['bg-card', 'border-border'],
         ['bg-success-soft', 'border-success/30'],
@@ -179,7 +192,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     roster.students[1].state.boarding = { at: 1788512400000, byName: 'Driver boarding' };
     roster.students[1].state.dropoff = { at: 1788516000000, byName: 'Driver dropoff' };
     assert.equal(counterText(), 'students (1/3)', 'Drop-off reduces passengers on board without changing the expected total');
-    assert.match(String(render(false).filter(node => node.type === 'li')[1].props.className), /bg-info-soft/);
+    assert.match(String(render(false).filter(node => String(node.props.className).startsWith('grid grid-cols-'))[1].props.className), /bg-info-soft/);
     const eventLines = render(false).filter(node => node.type === 'p').map(node => React.Children.toArray(node.props.children as React.ReactNode).filter(child => typeof child === 'string').join(''));
     assert.ok(eventLines.some(line => line.includes('Driver boarding')));
     assert.ok(eventLines.some(line => line.includes('Driver dropoff')), 'Both events are displayed');
@@ -292,4 +305,39 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         assert.equal(sections()[0].props.defaultOpen, true, 'Another student’s return activity must not hide children still aboard toward school');
         assert.equal(sections()[0].key, activeSchoolKey, 'Return updates preserve the school section and any unsaved absence reason');
     }
+    roster.canReorder = schoolRoster.canReorder = true;
+    const sorters = () => render(false).filter(node => node.type === 'BusRosterOrder');
+    assert.deepEqual(sorters().map(node => node.props.journey), ['to_school', undefined]);
+    assert.ok(sorters().every(node => node.props.carNumber === 123));
+    showJourneys = false;
+    assert.equal(sorters().length, 0, 'Compact Road view does not show ordering controls');
+    showJourneys = true;
+    rosterState[0] = '2026-09-01';
+    assert.equal(sorters().length, 0, 'Historical rosters cannot be reordered');
+    rosterState[0] = null;
+    cursor = 0;
+    currentState = state;
+    state.length = 0;
+    schoolRoster.students.forEach(s => { s.state = { status: 'boarded', revision: 3, updatedAt: 1, boarding: { at: 1, byName: 'Driver' }, dropoff: undefined }; });
+    const arrival = () => { cursor = 0; return components.SchoolArrival({ roster: schoolRoster, campus: 'School', carNumber: 123, date: operationalDate }); };
+    const arrivalButton = () => arrival().props.children[0].props;
+    assert.match(arrivalButton().className, /\bsize-11\b/);
+    const sectionHeader = components.BusJourneySection(sections()[0].props).props.children[0];
+    assert.match(sectionHeader.props.className, /grid-cols-\[minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
+    assert.match(sectionHeader.props.className, /\bp-3\b/);
+    const trigger = sectionHeader.props.children[0].props.children;
+    assert.match(trigger.props.children[1].props.className, /\bsize-11\b/);
+    currentState = state;
+    assert.equal(arrivalButton().disabled, false);
+    schoolRoster.students[1].state.status = 'pending';
+    assert.equal(arrivalButton().disabled, true, 'Every student must be resolved before bulk arrival');
+    schoolRoster.students[1].state.status = 'not_traveling';
+    fail = true;
+    await arrivalButton().onClick();
+    assert.equal(arrival().props.children[1].props.role, 'alert');
+    assert.equal(arrivalButton().disabled, false, 'Failed arrival can be retried');
+    fail = false;
+    await arrivalButton().onClick();
+    assert.equal(mutations.at(-1)!.carNumber, 123);
+    assert.equal((mutations.at(-1)!.students as unknown[]).length, 2);
 });
