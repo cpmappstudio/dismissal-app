@@ -44,6 +44,9 @@
     "identifierHint": "This identifier links students, drivers and Road and cannot be changed here."
   },
   "transport": {
+    "assignedStudents": "Students",
+    "pickupProgress": "Pickup progress",
+    "collectedProgress": "{collected} of {total} expected students picked up",
     "order": {
       "up": "Move up",
       "down": "Move down",

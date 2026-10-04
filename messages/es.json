@@ -44,6 +44,9 @@
     "identifierHint": "Este identificador vincula estudiantes, choferes y Road; no se puede cambiar desde aquí."
   },
   "transport": {
+    "assignedStudents": "Estudiantes",
+    "pickupProgress": "Progreso de recogida",
+    "collectedProgress": "{collected} de {total} estudiantes esperados recogidos",
     "order": {
       "up": "Subir",
       "down": "Bajar",

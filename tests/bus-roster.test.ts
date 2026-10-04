@@ -10,7 +10,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const file = '../components/dismissal/bus-roster.tsx';
     const source = ts.createSourceFile(file, readFileSync(new URL(file, import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
     const declarations = source.statements.filter(node => ts.isFunctionDeclaration(node) || ts.isVariableStatement(node));
-    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls, RosterStudents, RosterStudent, BusJourneySection, SchoolArrival });`, {
+    const { outputText } = ts.transpileModule(`${declarations.map(node => node.getText(source).replace(/^export /, '')).join('\n')}; ({ BusRoster, BoardingControls, RosterStudents, RosterStudent, BusJourneySection, SchoolArrival, rosterProgress });`, {
         compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
     });
     const state: unknown[] = [];
@@ -62,6 +62,8 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
         },
         api: { studentDismissals: { getRoster: 'query', setStatus: 'mutation', setDropoff: 'dropoff' } },
         BusRosterOrder: 'BusRosterOrder',
+        BusRosterPosition: 'BusRosterPosition',
+        Progress: 'Progress',
         ...Object.fromEntries(['Button', 'Input', 'Avatar', 'AvatarImage', 'AvatarFallback', 'ToggleGroup', 'Toggle', 'Check', 'ChevronLeft', 'ChevronRight', 'ChevronDown', 'Clock', 'House', 'School', 'LogOut', 'UserCheck', 'Users', 'UserX', 'Collapsible', 'CollapsibleTrigger', 'CollapsibleContent'].map(key => [key, key])),
     });
     type Element = React.ReactElement<Record<string, unknown>>;
@@ -93,7 +95,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const avatar = render(false).find(node => node.type === 'Avatar')!;
     assert.equal(avatar.props.className, 'size-11', 'Avatar fills the existing 44px student header without increasing its height');
     assert.equal(render(false).find(node => node.type === 'AvatarImage')!.props.className, 'object-cover');
-    assert.ok(render(false).some(node => node.props.className === 'flex min-w-0 items-center gap-3'), 'Avatar and drag handle share the vertical center');
+    assert.ok(render(false).some(node => node.props.className === 'flex min-w-0 items-center gap-1.5 sm:gap-3'), 'Avatar and drag handle share the vertical center with tighter mobile spacing');
     const change = async (values: string[]) => {
         (group().onValueChange as (values: string[]) => void)(values);
         await new Promise(resolve => setImmediate(resolve));
@@ -192,6 +194,7 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     roster.students[1].state.boarding = { at: 1788512400000, byName: 'Driver boarding' };
     roster.students[1].state.dropoff = { at: 1788516000000, byName: 'Driver dropoff' };
     assert.equal(counterText(), 'students (1/3)', 'Drop-off reduces passengers on board without changing the expected total');
+    assert.equal(components.rosterProgress(roster).collected, 2, 'Pickup progress retains delivered students');
     assert.match(String(render(false).filter(node => String(node.props.className).startsWith('grid grid-cols-'))[1].props.className), /bg-info-soft/);
     const eventLines = render(false).filter(node => node.type === 'p').map(node => React.Children.toArray(node.props.children as React.ReactNode).filter(child => typeof child === 'string').join(''));
     assert.ok(eventLines.some(line => line.includes('Driver boarding')));
@@ -257,15 +260,22 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     assert.equal(dateButton('nextDay').disabled, true);
     roster.students[1].otherPickup = true;
     assert.equal(counterText(), 'students (1/3)', 'A pickup by another vehicle does not count as on this bus');
+    assert.equal(components.rosterProgress(roster).collected, 1, 'Other vehicles do not advance this bus progress');
     assert.equal(render(false).some(node => node.type === components.BoardingControls && node.props.studentId === '1'), false);
     assert.ok(render(false).some(node => String(node.props.children).includes('alreadyPickedUp')));
     roster.canEdit = false;
     assert.equal(render(false).some(node => node.type === components.BoardingControls), false);
     roster.students.splice(0);
     assert.equal(counterText(), 'students (0/0)', 'Empty rosters remain well defined');
+    assert.equal(components.rosterProgress(roster).collected, 0);
     showJourneys = true;
     roster.students.push({ id: 'morning', name: 'Morning student', grade: '4th', otherPickup: false, state: null! });
     schoolRoster.students.push({ ...roster.students[0] });
+    assert.ok(render(false).some(node => React.Children.toArray(node.props.children as React.ReactNode).includes('assignedStudents')));
+    assert.ok(render(false).some(node => node.type === 'span' && node.props.children === 1), 'Counts unique students across both journeys');
+    assert.ok(render(false).some(node => node.type === 'BusRosterPosition' && node.props.position === 1), 'Read-only and single-student lists also have a position');
+    assert.equal(dateButton('previousDay').className, 'size-11', 'Journey date controls retain mobile touch targets');
+    assert.ok(render(false).some(node => String(node.props.className).includes('flex-wrap')), 'Date navigation wraps on small screens');
     const sections = () => render(false).filter(node => node.type === components.BusJourneySection);
     assert.deepEqual(sections().map(section => section.props.defaultOpen), [true, false]);
     const pendingKey = sections()[0].key;
@@ -309,6 +319,16 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const sorters = () => render(false).filter(node => node.type === 'BusRosterOrder');
     assert.deepEqual(sorters().map(node => node.props.journey), ['to_school', undefined]);
     assert.ok(sorters().every(node => node.props.carNumber === 123));
+    for (const sorter of sorters()) {
+        const renderStudent = sorter.props.renderStudent as (student: object) => Element;
+        const item = renderStudent(roster.students[0]);
+        assert.equal(item.props.embedded, true, 'Both journey lists use embedded rows');
+        for (const highlighted of [false, true]) {
+            const row = components.RosterStudent({ ...item.props, highlighted });
+            assert.doesNotMatch(row.props.className, /(?:^|\s)(?:border(?:-\S+)?|shadow-\S+|divide-\S+)(?:\s|$)/, 'No per-student card border, divider or shadow');
+            assert.equal(row.props.className.includes('bus-next-stop'), highlighted, 'Only the next stop retains its shared glow');
+        }
+    }
     showJourneys = false;
     assert.equal(sorters().length, 0, 'Compact Road view does not show ordering controls');
     showJourneys = true;
@@ -322,11 +342,23 @@ test('bus status colors and right-side toggles preserve boarding, reason, undo a
     const arrival = () => { cursor = 0; return components.SchoolArrival({ roster: schoolRoster, campus: 'School', carNumber: 123, date: operationalDate }); };
     const arrivalButton = () => arrival().props.children[0].props;
     assert.match(arrivalButton().className, /\bsize-11\b/);
-    const sectionHeader = components.BusJourneySection(sections()[0].props).props.children[0];
+    const sectionProps = sections()[0].props;
+    const section = components.BusJourneySection(sectionProps);
+    assert.match(section.props.className, /\bborder\b.*\bbg-card\b.*\bshadow-sm\b/, 'One card wraps the header and the collapsible student list');
+    assert.equal(section.props.children[1].type, 'CollapsibleContent');
+    assert.equal(section.props.children[1].props.children, sectionProps.children);
+    const sectionHeader = section.props.children[0];
+    assert.doesNotMatch(sectionHeader.props.className, /border|shadow|bg-card/, 'The header is not a separate card');
     assert.match(sectionHeader.props.className, /grid-cols-\[minmax\(0,1fr\)_2\.75rem_2\.75rem\]/);
     assert.match(sectionHeader.props.className, /\bp-3\b/);
     const trigger = sectionHeader.props.children[0].props.children;
     assert.match(trigger.props.children[1].props.className, /\bsize-11\b/);
+    const progress = sectionHeader.props.children[2].props.children[0];
+    assert.equal(progress.type, 'Progress');
+    assert.equal(progress.props.value, 100, 'All expected students boarded means pickup progress is complete');
+    assert.equal(progress.props['aria-label'], 'pickupProgress');
+    const emptySection = components.BusJourneySection({ ...sections()[0].props, roster: { students: [] } });
+    assert.equal(emptySection.props.children[0].props.children[2].props.children[0].props.value, 0, 'Empty rosters never divide by zero');
     currentState = state;
     assert.equal(arrivalButton().disabled, false);
     schoolRoster.students[1].state.status = 'pending';

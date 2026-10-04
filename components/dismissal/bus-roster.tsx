@@ -24,9 +24,10 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { useOperationalDate } from "@/hooks/use-operational-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BusRosterOrder } from "./bus-roster-order";
+import { BusRosterOrder, BusRosterPosition } from "./bus-roster-order";
 import { busJourneyProgress } from "@/lib/bus-roster-order";
 
 type Roster = FunctionReturnType<typeof api.studentDismissals.getRoster>;
@@ -36,7 +37,7 @@ function rosterProgress(roster: Roster) {
   const onboard = roster.students.filter(student => !student.otherPickup && !student.state?.dropoff &&
     (student.state?.status === "boarded" || student.state?.status === "departed")).length;
   const delivered = roster.students.filter(student => !student.otherPickup && student.state?.dropoff).length;
-  return { onboard, total: pending + onboard + delivered };
+  return { onboard, collected: onboard + delivered, total: pending + onboard + delivered };
 }
 
 const studentStatusStyles = {
@@ -140,7 +141,7 @@ function BoardingControls({
     <>
       <ToggleGroup
         aria-label={t("boardingStatus")}
-        className="col-start-2 row-start-1 flex items-start gap-1 self-start [&>button]:size-11"
+        className="col-start-2 row-start-1 flex items-center gap-1 self-center [&>button]:size-11"
         multiple={hasBoarded}
         disabled={busy}
         value={
@@ -286,29 +287,37 @@ export function BusRoster({
   const schoolComplete = !!schoolRoster && busJourneyProgress(schoolRoster.students, "to_school").complete;
   const returnStarted = roster.students.some(student => student.state && student.state.status !== "pending");
   const { onboard: boardedCount, total: expectedCount } = rosterProgress(roster);
+  const assignedCount = new Set([...roster.students, ...(schoolRoster?.students ?? [])].map(student => student.id)).size;
   const boardingProgressLabel = t("boardingProgress", {
     boarded: boardedCount,
     total: expectedCount,
   });
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className={showJourneys ? "flex flex-wrap items-center justify-between gap-x-4 gap-y-3" : "flex items-center justify-between gap-2"}>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <Users
+          {!showJourneys && <Users
             className="h-5 w-5 shrink-0 text-muted-foreground"
             aria-hidden="true"
-          />
+          />}
           <h3
             aria-live="polite"
             aria-label={showJourneys ? undefined : boardingProgressLabel}
             title={showJourneys ? undefined : boardingProgressLabel}
             className={
-              showDate
+              showJourneys ? "flex items-center gap-3 text-lg font-bold" : showDate
                 ? "truncate text-base font-semibold sm:text-lg"
                 : "text-lg font-semibold"
             }
           >
-            {tCar("students")}{!showJourneys && ` (${boardedCount}/${expectedCount})`}
+            {showJourneys ? (
+              <>
+                {t("assignedStudents")}
+                <span className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-full bg-muted px-2 text-base tabular-nums">
+                  {assignedCount}
+                </span>
+              </>
+            ) : tCar("students")}{!showJourneys && ` (${boardedCount}/${expectedCount})`}
           </h3>
         </div>
         {showDate && (
@@ -321,7 +330,7 @@ export function BusRoster({
               type="button"
               variant="outline"
               size="sm"
-              className="h-6 px-2 text-xs"
+              className={showJourneys ? "h-11 px-3 text-xs" : "h-6 px-2 text-xs"}
               onClick={() => setSelectedDate(null)}
               disabled={isToday}
             >
@@ -332,7 +341,7 @@ export function BusRoster({
               variant="ghost"
               size="icon"
               aria-label={t("previousDay")}
-              className="size-6"
+              className={showJourneys ? "size-11" : "size-6"}
               disabled={!roster.previousDate}
               onClick={() => changeDate(roster.previousDate)}
             >
@@ -343,7 +352,7 @@ export function BusRoster({
               variant="ghost"
               size="icon"
               aria-label={t("nextDay")}
-              className="size-6"
+              className={showJourneys ? "size-11" : "size-6"}
               disabled={!roster.nextDate}
               onClick={() => changeDate(roster.nextDate)}
             >
@@ -364,6 +373,7 @@ export function BusRoster({
           <BusJourneySection
             key={`${date}-school-${schoolComplete}`}
             title={t("toSchool")}
+            journey="to_school"
             roster={schoolRoster}
             complete={schoolComplete}
             defaultOpen={!schoolComplete}
@@ -409,26 +419,29 @@ function SchoolArrival({ roster, campus, carNumber, date }: {
           } catch { setError(true); }
           finally { setBusy(false); }
         }}><School className="size-4" aria-hidden="true" /></Button>
-      {error && <p role="alert" className="col-span-3 row-start-2 px-3 pb-3 text-xs text-destructive">{t("schoolArrivalFailed")}</p>}
+      {error && <p role="alert" className="col-span-3 row-start-3 pt-2 text-xs text-destructive">{t("schoolArrivalFailed")}</p>}
     </>
   );
 }
 
-function BusJourneySection({ title, roster, complete = false, defaultOpen, children, action }: {
-  title: string; roster: Roster; complete?: boolean; defaultOpen: boolean; children: ReactNode; action?: ReactNode;
+function BusJourneySection({ title, roster, journey, complete = false, defaultOpen, children, action }: {
+  title: string; roster: Roster; journey?: "to_school"; complete?: boolean; defaultOpen: boolean; children: ReactNode; action?: ReactNode;
 }) {
   const t = useTranslations("transport");
-  const { onboard, total } = rosterProgress(roster);
+  const { collected, total } = rosterProgress(roster);
+  const DestinationIcon = journey ? School : House;
   return (
-    <Collapsible defaultOpen={defaultOpen} className="space-y-3">
-      <div className="relative grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-x-1 rounded-lg border border-transparent bg-secondary/50 p-3">
+    <Collapsible defaultOpen={defaultOpen} className="rounded-lg border border-border/60 bg-card p-3 shadow-sm">
+      <div className="relative grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-x-1 p-3">
       <CollapsibleTrigger asChild>
         <Button variant="ghost" className="group col-span-3 col-start-1 row-start-1 grid h-auto min-h-11 w-full grid-cols-subgrid gap-x-1 rounded-lg p-0 text-left whitespace-normal">
-          <span className="min-w-0 pr-3 font-semibold">
-            {title}
-            {complete && <span className="ml-2 text-xs text-success">{t("journeyCompleted")}</span>}
-            <span className="mt-0.5 block text-xs font-normal text-muted-foreground" aria-live="polite">
-              {t("boardingProgress", { boarded: onboard, total })}
+          <span className="flex min-w-0 items-center gap-2 py-2 pr-2 sm:gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground sm:size-12">
+              <DestinationIcon className="size-6" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 text-base font-bold sm:text-lg">
+              {title}
+              {complete && <span className="mt-1 block text-xs font-semibold text-success">{t("journeyCompleted")}</span>}
             </span>
           </span>
           <span className="col-start-3 flex size-11 items-center justify-center rounded-full group-hover:bg-accent">
@@ -437,8 +450,17 @@ function BusJourneySection({ title, roster, complete = false, defaultOpen, child
         </Button>
       </CollapsibleTrigger>
       {action}
+      <div className="col-span-3 row-start-2 flex items-center gap-3 pt-3">
+        <Progress
+          value={total ? (collected / total) * 100 : 0}
+          aria-label={t("pickupProgress")}
+          aria-valuetext={t("collectedProgress", { collected, total })}
+          className="min-w-0 flex-1 [&_[data-slot=progress-track]]:h-3 [&_[data-slot=progress-track]]:rounded-md [&_[data-slot=progress-indicator]]:rounded-md [&_[data-slot=progress-indicator]]:bg-brand-aqua"
+        />
+        <span aria-hidden="true" className="shrink-0 text-sm font-bold tabular-nums text-primary">{collected}/{total}</span>
       </div>
-      <CollapsibleContent>{children}</CollapsibleContent>
+      </div>
+      <CollapsibleContent className="pt-2">{children}</CollapsibleContent>
     </Collapsible>
   );
 }
@@ -475,6 +497,7 @@ function RosterStudents({
       canEdit={isToday && roster.canEdit}
       journey={journey}
       dragHandle={dragHandle}
+      embedded={carNumber !== undefined}
       highlighted={isToday && carNumber !== undefined && student.id === progress.next}
     />
   );
@@ -500,8 +523,8 @@ function RosterStudents({
     <>
       {!roster.students.length && <p>{t("noStudents")}</p>}
       <ul className="space-y-3">
-        {students.map((student) => (
-          <li key={`${campus}-${date}-${student.id}`}>{renderStudent(student)}</li>
+        {students.map((student, index) => (
+          <li key={`${campus}-${date}-${student.id}`}>{renderStudent(student, carNumber !== undefined ? <span className="flex size-11 shrink-0 items-center justify-center"><BusRosterPosition position={index + 1} /></span> : undefined)}</li>
         ))}
       </ul>
     </>
@@ -516,6 +539,7 @@ function RosterStudent({
   canEdit,
   journey,
   dragHandle,
+  embedded = false,
   highlighted = false,
 }: {
   student: Roster["students"][number];
@@ -525,6 +549,7 @@ function RosterStudent({
   canEdit: boolean;
   journey?: "to_school";
   dragHandle?: ReactNode;
+  embedded?: boolean;
   highlighted?: boolean;
 }) {
   const t = useTranslations("transport");
@@ -536,16 +561,16 @@ function RosterStudent({
   return (
     <div
       aria-current={highlighted ? "step" : undefined}
-      className={`grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-lg border p-3 ${highlighted ? "bus-next-stop" : color}`}
+      className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-3 rounded-lg p-3 sm:gap-x-3 ${embedded ? (highlighted ? "bus-next-stop" : "bg-transparent") : `border shadow-xs ${color}`}`}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         {dragHandle}
         <Avatar className="size-11">
           <AvatarImage className="object-cover" src={student.avatarUrl ?? undefined} alt="" />
           <AvatarFallback>{student.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="font-medium break-words">{student.name}</p>
+          <p className="font-bold leading-snug break-words">{student.name}</p>
           <p className="flex items-center gap-1 text-sm text-muted-foreground">
             {student.grade}
             <span title={t(`status.${status}`)}>

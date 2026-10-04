@@ -4,11 +4,30 @@ import test from 'node:test';
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
-test('next bus stop has a tinted background and a non-blocking glow only when motion is allowed', () => {
+test('dashboard uses one themed fading background for all roles without changing sign-in or Road artwork', () => {
+    const layout = readFileSync(new URL('../app/[locale]/(dashboard)/layout.tsx', import.meta.url), 'utf8');
+    assert.match(layout, /<SidebarInset className="dashboard-surface/);
+    const surface = css.split('.dashboard-surface {')[1].split('}')[0];
+    assert.match(surface, /linear-gradient\(to bottom, transparent, var\(--background\)\)/);
+    assert.match(surface, /var\(--success\) 20%/);
+    assert.match(surface, /var\(--brand-aqua\) 20%/);
+    assert.match(surface, /--muted-foreground: color-mix\(in srgb, var\(--foreground\) 97%, var\(--background\)\)/);
+    assert.match(surface, /background-repeat: no-repeat/);
+});
+
+test('next bus stop has a subtle non-blocking ping only when motion is allowed', () => {
     assert.match(css, /\.bus-next-stop\s*\{[^}]*background-color: color-mix\(in oklab, var\(--primary\) 16%, var\(--card\)\)/);
     assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.bus-next-stop::after/);
-    assert.match(css, /pointer-events: none;\s*animation: bus-next-stop-glow 2\.6s/);
-    assert.match(css, /@keyframes bus-next-stop-glow/);
+    const halo = css.split('.bus-next-stop::after {')[1].split('}')[0];
+    assert.match(halo, /pointer-events: none/);
+    assert.match(css, /\.bus-next-stop\s*\{[^}]*isolation: isolate/);
+    assert.match(halo, /z-index: -1/, 'Tint stays behind text and controls');
+    assert.match(halo, /background-color: color-mix\(in oklab, var\(--primary\) 18%, transparent\)/);
+    assert.match(halo, /animation: bus-next-stop-ping 2\.2s ease-out infinite/);
+    const keyframes = css.split('@keyframes bus-next-stop-ping {')[1].split('@custom-variant')[0];
+    assert.match(keyframes, /scale\(1\.012, 1\.1\)/);
+    assert.match(keyframes, /15%, 35% \{ opacity: 0\.9/);
+    assert.doesNotMatch(keyframes, /box-shadow|border|background|width|height|padding|margin/, 'Only transform and opacity animate; layout and shadow remain fixed');
 });
 
 test('brand references use the current SVG logo and both favicon formats', () => {
@@ -87,6 +106,21 @@ function luminance(hex: string) {
     });
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
 }
+
+test('dashboard secondary text keeps AA contrast over both gradient endpoints in both themes', () => {
+    const mix = (a: string, b: string, amount: number) => a.slice(1).match(/../g)!.map((value, i) =>
+        Math.round(parseInt(value, 16) * amount + parseInt(b.slice(1).match(/../g)![i], 16) * (1 - amount)).toString(16).padStart(2, '0')
+    ).join('');
+    for (const selector of [':root', '.dark']) {
+        const block = css.slice(css.indexOf(`${selector} {`)).split('}')[0];
+        const colors = Object.fromEntries([...block.matchAll(/--([\w-]+): (#[a-f\d]{6});/gi)].map(([, name, hex]) => [name, hex]));
+        const text = luminance(mix(colors.foreground, colors.background, .97));
+        for (const stop of [colors.success, colors['brand-aqua'] ?? '#119ba4']) {
+            const background = luminance(mix(stop, colors.background, .2));
+            assert.ok((Math.max(text, background) + .05) / (Math.min(text, background) + .05) >= 4.5);
+        }
+    }
+});
 
 for (const selector of [':root', '.dark']) {
     test(`${selector} theme text meets WCAG AA contrast for normal text`, () => {

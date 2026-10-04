@@ -133,11 +133,12 @@ test('drag snapshots, cancellation, optimistic scoping, rollback errors and tap 
   state.length = 0;
   cursor = 0;
   let moved = 0;
-  const row = components.SortableStudent({ student: roster.students[0], first: true, last: false, disabled: false, renderStudent: props.renderStudent, onMove: (offset: number) => { moved = offset; } });
+  const row = components.SortableStudent({ student: roster.students[0], position: 1, first: true, last: false, disabled: false, renderStudent: props.renderStudent, onMove: (offset: number) => { moved = offset; } });
   const popover = row.props.children;
   const handle = popover.props.children[0].props.children;
   assert.match(handle.props.className, /touch-manipulation/);
   assert.match(handle.props.className, /size-11/);
+  assert.equal(handle.props.children.props.position, 1, 'Position badge replaces the grip without removing the touch/keyboard handle');
   const buttons = popover.props.children[1].props.children.props.children;
   assert.equal(buttons[0].props.disabled, true);
   assert.equal(buttons[1].props.disabled, false);

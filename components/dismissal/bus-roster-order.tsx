@@ -24,7 +24,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { orderBusStudents } from "@/lib/bus-roster-order";
@@ -39,6 +39,14 @@ type Roster = FunctionReturnType<typeof api.studentDismissals.getRoster>;
 type Student = Roster["students"][number];
 type RenderStudent = (student: Student, handle?: ReactNode) => ReactNode;
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+export function BusRosterPosition({ position }: { position: number }) {
+  return (
+    <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold tabular-nums text-foreground">
+      {position}
+    </span>
+  );
+}
 
 export function BusRosterOrder({
   roster,
@@ -200,6 +208,7 @@ export function BusRosterOrder({
               <SortableStudent
                 key={student.id}
                 student={student}
+                position={index + 1}
                 disabled={saving}
                 renderStudent={renderStudent}
                 first={index === 0}
@@ -228,7 +237,7 @@ export function BusRosterOrder({
               {renderStudent(
                 drag.student,
                 <span className="flex size-11 shrink-0 items-center justify-center">
-                  <GripVertical className="size-4" />
+                  <BusRosterPosition position={drag.ids.indexOf(drag.student.id) + 1} />
                 </span>,
               )}
             </div>
@@ -241,6 +250,7 @@ export function BusRosterOrder({
 
 function SortableStudent({
   student,
+  position,
   disabled,
   renderStudent,
   first,
@@ -248,6 +258,7 @@ function SortableStudent({
   onMove,
 }: {
   student: Student;
+  position: number;
   disabled: boolean;
   renderStudent: RenderStudent;
   first: boolean;
@@ -287,7 +298,7 @@ function SortableStudent({
               title={t("handle", { name: student.name })}
               className="size-11 shrink-0 touch-manipulation cursor-grab text-muted-foreground active:cursor-grabbing"
             >
-              <GripVertical className="size-4" aria-hidden="true" />
+              <BusRosterPosition position={position} />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto p-1">

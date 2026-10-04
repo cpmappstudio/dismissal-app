@@ -3,8 +3,18 @@
 @import "tailwind-animations";
 
 @layer components {
+  .dashboard-surface {
+    --muted-foreground: color-mix(in srgb, var(--foreground) 97%, var(--background));
+    background-image:
+      linear-gradient(to bottom, transparent, var(--background)),
+      linear-gradient(115deg, color-mix(in srgb, var(--success) 20%, var(--background)), color-mix(in srgb, var(--brand-aqua) 20%, var(--background)));
+    background-size: 100% 24rem;
+    background-repeat: no-repeat;
+  }
+
   .bus-next-stop {
     position: relative;
+    isolation: isolate;
     border-color: var(--primary);
     background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
     box-shadow: 0 0 0 1px var(--primary), 0 4px 16px color-mix(in oklab, var(--primary) 18%, transparent);
@@ -14,17 +24,23 @@
     .bus-next-stop::after {
       content: "";
       position: absolute;
+      z-index: -1;
       inset: 0;
       border-radius: inherit;
       pointer-events: none;
-      animation: bus-next-stop-glow 2.6s ease-out infinite;
+      border: 2px solid var(--primary);
+      background-color: color-mix(in oklab, var(--primary) 18%, transparent);
+      box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 25%, transparent);
+      opacity: 0;
+      animation: bus-next-stop-ping 2.2s ease-out infinite;
     }
   }
 }
 
-@keyframes bus-next-stop-glow {
-  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent); }
-  75%, 100% { box-shadow: 0 0 0 7px transparent; }
+@keyframes bus-next-stop-ping {
+  0% { transform: scale(1); opacity: 0; }
+  15%, 35% { opacity: 0.9; }
+  75%, 100% { transform: scale(1.012, 1.1); opacity: 0; }
 }
 
 @custom-variant dark (&:is(.dark *));
